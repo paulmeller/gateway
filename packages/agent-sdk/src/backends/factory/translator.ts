@@ -109,6 +109,15 @@ export function createFactoryTranslator(opts: TranslatorOptions): Translator {
       return out;
     }
 
+    if (type === "error") {
+      const msg = (typeof raw.message === "string" ? raw.message : null) || "Unknown factory error";
+      out.push({
+        type: "session.error" as const,
+        payload: { error: { type: "backend_error", message: msg } },
+      });
+      return out;
+    }
+
     // Unknown event type — drop silently, translator is forward-compatible.
     return out;
   }
