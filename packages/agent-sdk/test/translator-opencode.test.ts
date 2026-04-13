@@ -212,4 +212,32 @@ describe("createOpencodeTranslator", () => {
     expect(out).toHaveLength(1);
     expect(out[0].type).toBe("agent.message");
   });
+
+  it("translates error events to session.error", () => {
+    const { out } = run([
+      { type: "step_start", sessionID: "ses_1", part: { id: "p1" } },
+      { type: "error", error: { name: "APIError", data: { message: "Quota exceeded" } } },
+    ]);
+    expect(out.some(e => e.type === "session.error")).toBe(true);
+    const errEvt = out.find(e => e.type === "session.error")!;
+    expect((errEvt.payload as any).error.message).toBe("Quota exceeded");
+  });
+
+  it("uses fallback for error without nested data.message", () => {
+    const { out } = run([
+      { type: "step_start", sessionID: "ses_1", part: { id: "p1" } },
+      { type: "error", error: { message: "simple error" } },
+    ]);
+    const errEvt = out.find(e => e.type === "session.error")!;
+    expect((errEvt.payload as any).error.message).toBe("simple error");
+  });
+
+  it("uses default message for error with no message fields", () => {
+    const { out } = run([
+      { type: "step_start", sessionID: "ses_1", part: { id: "p1" } },
+      { type: "error" },
+    ]);
+    const errEvt = out.find(e => e.type === "session.error")!;
+    expect((errEvt.payload as any).error.message).toBe("Unknown opencode error");
+  });
 });

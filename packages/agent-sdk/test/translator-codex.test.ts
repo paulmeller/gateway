@@ -182,6 +182,25 @@ describe("createCodexTranslator", () => {
     expect(out[0].type).toBe("session.error");
   });
 
+  it("translates turn.failed events to session.error", () => {
+    const { out } = run([
+      { type: "thread.started", thread_id: "tid_1" },
+      { type: "turn.failed", error: { message: "Quota exceeded" } },
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].type).toBe("session.error");
+    expect((out[0].payload as any).error.message).toBe("Quota exceeded");
+  });
+
+  it("uses fallback message for error without message field", () => {
+    const { out } = run([
+      { type: "thread.started", thread_id: "tid_1" },
+      { type: "error" },
+    ]);
+    expect(out).toHaveLength(1);
+    expect((out[0].payload as any).error.message).toBe("Unknown codex error");
+  });
+
   it("drops unknown event types silently", () => {
     const { out } = run([
       { type: "thread.started", thread_id: "tid_1" },
