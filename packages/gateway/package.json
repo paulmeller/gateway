@@ -1,6 +1,6 @@
 {
   "name": "@agentstep/gateway",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "AgentStep Gateway — CLI for managing AI agents across multiple LLM backends",
   "type": "module",
   "bin": {
@@ -23,6 +23,7 @@
     "node": ">=18"
   },
   "dependencies": {
+    "cbor-x": "^1.6.0",
     "libsql": "^0.5.29"
   },
   "devDependencies": {
