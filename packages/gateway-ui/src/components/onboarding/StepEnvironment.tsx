@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PROVIDERS } from "@/lib/constants";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LOCAL_PROVIDERS, CLOUD_PROVIDERS } from "@/lib/constants";
 
 interface Props { onNext: (data: { name: string; provider: string }) => void; }
 
@@ -21,7 +21,16 @@ export function StepEnvironment({ onNext }: Props) {
           className="h-10 w-full border-border bg-muted text-sm text-foreground placeholder:text-muted-foreground focus-visible:ring-ring" />
         <Select value={provider} onValueChange={setProvider}>
           <SelectTrigger className="h-10 w-full border-border bg-muted text-sm text-muted-foreground"><SelectValue /></SelectTrigger>
-          <SelectContent>{PROVIDERS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+          <SelectContent>
+            <SelectGroup>
+              <SelectLabel>Local</SelectLabel>
+              {LOCAL_PROVIDERS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+            </SelectGroup>
+            <SelectGroup>
+              <SelectLabel>Cloud</SelectLabel>
+              {CLOUD_PROVIDERS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+            </SelectGroup>
+          </SelectContent>
         </Select>
       </div>
       <Button className="w-full h-10 bg-cta-gradient text-sm font-medium text-black hover:opacity-90" onClick={() => onNext({ name, provider })} disabled={!name.trim()}>

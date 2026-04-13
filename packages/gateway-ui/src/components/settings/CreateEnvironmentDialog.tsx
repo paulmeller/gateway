@@ -3,9 +3,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateEnvironment } from "@/hooks/use-environments";
-import { PROVIDERS, PROVIDER_TOKENS } from "@/lib/constants";
+import { LOCAL_PROVIDERS, CLOUD_PROVIDERS, PROVIDER_TOKENS } from "@/lib/constants";
 import { api } from "@/lib/api-client";
 import { toast } from "sonner";
 
@@ -68,7 +68,16 @@ export function CreateEnvironmentDialog({ open, onOpenChange }: Props) {
             <Label className="text-xs text-muted-foreground">Provider</Label>
             <Select value={provider} onValueChange={(v) => { setProvider(v); setToken(""); }}>
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>{PROVIDERS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel>Local</SelectLabel>
+                  {LOCAL_PROVIDERS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                </SelectGroup>
+                <SelectGroup>
+                  <SelectLabel>Cloud</SelectLabel>
+                  {CLOUD_PROVIDERS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                </SelectGroup>
+              </SelectContent>
             </Select>
           </div>
           {needsToken && (
