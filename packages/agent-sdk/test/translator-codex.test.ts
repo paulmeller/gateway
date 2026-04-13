@@ -173,12 +173,13 @@ describe("createCodexTranslator", () => {
     expect(t.getTurnResult()!.stopReason).toBe("custom_tool_call");
   });
 
-  it("drops error events silently", () => {
+  it("translates error events to session.error", () => {
     const { out } = run([
       { type: "thread.started", thread_id: "tid_1" },
       { type: "error", message: "something broke" },
     ]);
-    expect(out).toHaveLength(0);
+    expect(out).toHaveLength(1);
+    expect(out[0].type).toBe("session.error");
   });
 
   it("drops unknown event types silently", () => {
