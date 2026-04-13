@@ -19,6 +19,7 @@ export const PROVIDERS = [
   "daytona",
   "fly",
   "modal",
+  "mvm",
 ] as const;
 
 export const PROVIDER_TOKENS: Record<string, { key: string; label: string; placeholder: string }> = {

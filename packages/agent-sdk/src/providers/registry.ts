@@ -18,6 +18,7 @@ const PROVIDERS: Record<ProviderName, () => Promise<ContainerProvider>> = {
   daytona: async () => (await import("./daytona")).daytonaProvider,
   fly: async () => (await import("./fly")).flyProvider,
   modal: async () => (await import("./modal")).modalProvider,
+  mvm: async () => (await import("./mvm")).mvmProvider,
 };
 
 export async function resolveContainerProvider(

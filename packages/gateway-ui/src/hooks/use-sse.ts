@@ -44,9 +44,9 @@ export function useSSE(sessionId: string | null) {
             buffer = lines.pop() || "";
 
             for (const line of lines) {
-              if (!line.startsWith("data: ")) continue;
+              if (!line.startsWith("data:")) continue;
               try {
-                const event = JSON.parse(line.slice(6)) as SessionEvent;
+                const event = JSON.parse(line.slice(5).trimStart()) as SessionEvent;
                 seqRef.current = Math.max(seqRef.current, event.seq);
 
                 qc.setQueryData<{ data: SessionEvent[] }>(

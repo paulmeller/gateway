@@ -28,9 +28,15 @@ const UI_VERSION = "${hash}";
 export async function handleGetUI(opts?: { apiKey?: string }): Promise<Response> {
   let body = HTML_TEMPLATE;
   if (opts?.apiKey) {
+    const safe = opts.apiKey
+      .replace(/\\\\/g, "\\\\\\\\")
+      .replace(/"/g, '\\\\"')
+      .replace(/</g, "\\\\x3c")
+      .replace(/>/g, "\\\\x3e")
+      .replace(/\\n/g, "\\\\n");
     body = body.replace(
       "__INJECT__",
-      \`<script>window.__MA_API_KEY__="\${opts.apiKey}";</script>\`,
+      \`<script>window.__MA_API_KEY__="\${safe}";</script>\`,
     );
   } else {
     body = body.replace("__INJECT__", "");

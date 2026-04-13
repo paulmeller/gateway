@@ -218,7 +218,7 @@ export const EnvironmentConfigSchema = registry.register(
   "EnvironmentConfig",
   z.object({
     type: z.literal("cloud"),
-    provider: z.enum(["sprites", "docker", "apple-container", "apple-firecracker", "podman", "e2b", "vercel", "daytona", "fly", "modal"]).optional().openapi({
+    provider: z.enum(["sprites", "docker", "apple-container", "apple-firecracker", "podman", "e2b", "vercel", "daytona", "fly", "modal", "mvm"]).optional().openapi({
       description:
         "Container provider for this environment. `sprites` uses sprites.dev cloud containers (default); `docker` uses local Docker containers; `apple-container` uses Apple Containers on macOS 26+ (Apple Silicon only); `apple-firecracker` uses AgentStep Firecracker microVMs (macOS, M3+ Apple Silicon); `podman` uses Podman containers; `e2b` uses E2B cloud sandboxes; `vercel` uses Vercel Sandboxes; `daytona` uses Daytona workspaces; `fly` uses Fly.io Machines; `modal` uses Modal sandboxes.",
     }),

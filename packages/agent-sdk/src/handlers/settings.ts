@@ -1,5 +1,5 @@
 import { routeWrap, jsonOk } from "../http";
-import { writeSetting, invalidateConfigCache } from "../config";
+import { writeSetting } from "../config";
 import { badRequest } from "../errors";
 
 export function handlePutSetting(request: Request): Promise<Response> {
@@ -20,7 +20,6 @@ export function handlePutSetting(request: Request): Promise<Response> {
     }
 
     writeSetting(body.key, body.value);
-    invalidateConfigCache();
     return jsonOk({ ok: true });
   });
 }

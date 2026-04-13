@@ -9,7 +9,7 @@ You are guiding the user through a complete AgentStep Gateway setup. No docs nee
 ## Step 1: Check prerequisites
 
 Run these and check the output:
-- `node --version` — must be 18+. If missing or older, tell them to install from https://nodejs.org or run `brew install node`.
+- `node --version` — must be 22+. If missing or older, tell them to install from https://nodejs.org or run `brew install node`.
 - `npm --version` — should come with Node. If missing, something is wrong with the Node install.
 
 ## Step 2: Install dependencies
@@ -22,10 +22,21 @@ If it fails:
 - **EACCES**: Permission issue. Suggest `sudo chown -R $(whoami) ~/.npm` or using nvm.
 - **Network errors**: Check internet connection, try `npm install --prefer-offline` if node_modules partially exists.
 
-## Step 3: Start the server
+## Step 3: Build the UI and CLI
 
 ```
-npm run dev &
+npm run build:ui
+cd packages/gateway && node build.js
+```
+
+The first command builds the React UI (Vite → single HTML → ui.ts). The second bundles the CLI.
+
+If it fails, check for TypeScript errors with `npm run typecheck`.
+
+## Step 4: Start the server
+
+```
+node packages/gateway/dist/gateway.js serve &
 ```
 
 Wait a few seconds, then verify it's running:
@@ -33,91 +44,86 @@ Wait a few seconds, then verify it's running:
 curl -s http://localhost:4000/api/health
 ```
 
+The server auto-creates an API key on first run and writes it to `.env`. Check the console output for the key, or read it from `.env`:
+```
+cat .env | grep SEED_API_KEY
+```
+
 If it fails:
-- **Port in use**: Check `lsof -i :4000` and suggest killing the process or using a different port.
+- **Port in use**: Check `lsof -i :4000` and suggest killing the process.
 - **Database errors**: The SQLite DB auto-creates in `./data/`. Check directory permissions.
 
-## Step 4: Secrets
+## Step 5: Secrets
 
 This step is **blocking** — the user cannot proceed to chat without at least one backend key configured.
 
-First, check if the server already has keys configured (via env vars or the settings DB):
+First, read the API key from `.env`:
 ```
-curl -s http://localhost:4000/api/health 2>/dev/null && echo ""
+source .env 2>/dev/null
+echo "SEED_API_KEY: ${SEED_API_KEY:+set}"
+```
+
+Check if backend keys exist:
+```
+curl -s -H "x-api-key: $SEED_API_KEY" http://localhost:4000/api/health
 echo "ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:+set}"
 echo "OPENAI_API_KEY: ${OPENAI_API_KEY:+set}"
 echo "GEMINI_API_KEY: ${GEMINI_API_KEY:+set}"
 ```
 
-Also check the settings table for server-side keys:
-```
-sqlite3 data/managed-agents.db "SELECT key FROM settings WHERE key IN ('anthropic_api_key','openai_api_key','gemini_api_key') AND value != ''" 2>/dev/null
-```
-
-**If at least one key exists** (either as env var or in settings DB):
-- Tell the user which backends are available
-- Ask if they want to add or override any keys (optional — they can skip)
-
-**If NO keys exist anywhere**:
+**If NO keys exist**:
 - Tell the user they must configure at least one API key to continue
 - Recommend starting with Anthropic: "Paste your ANTHROPIC_API_KEY (get one at https://console.anthropic.com):"
-- When the user provides a key, store it in the settings DB so it persists across restarts:
+- When the user provides a key, store it via the settings API:
   ```
-  sqlite3 data/managed-agents.db "INSERT OR REPLACE INTO settings (key, value) VALUES ('anthropic_api_key', '<the-key>')"
+  curl -s -X PUT -H "x-api-key: $SEED_API_KEY" -H "Content-Type: application/json" \
+    -d '{"key":"anthropic_api_key","value":"<the-key>"}' \
+    http://localhost:4000/v1/settings
   ```
-- Optionally ask if they also want to add OpenAI or Gemini keys
+- Alternatively, add to `.env`: `echo "ANTHROPIC_API_KEY=sk-..." >> .env` and restart the server.
 
-Keys can be stored via:
-- **Settings DB** (persists): `sqlite3 data/managed-agents.db "INSERT OR REPLACE INTO settings (key, value) VALUES ('<key_name>', '<value>')"`
-- **Environment variable** (session only): `export ANTHROPIC_API_KEY=...`
-- **`.env` file** (persists, loaded by server): add to `.env` in project root
-
-The settings DB keys are: `anthropic_api_key`, `openai_api_key`, `gemini_api_key`, `factory_api_key`, `claude_token`.
-
-After storing, invalidate the config cache by restarting the server or waiting 30 seconds.
+Allowed settings keys: `anthropic_api_key`, `openai_api_key`, `gemini_api_key`, `factory_api_key`, `claude_token`, `sprite_token`, `e2b_api_key`, `vercel_token`, `daytona_api_key`, `fly_api_token`, `modal_token_id`.
 
 **Do NOT proceed past this step until at least one backend key is confirmed working.**
-
-## Step 5: Build and typecheck
-
-```
-npm run build -w @agentstep/agent-sdk 2>&1 | tail -5
-```
-
-If it fails, check for TypeScript errors and help fix them.
 
 ## Step 6: Run quickstart
 
 This creates an agent + environment + session and starts an interactive chat:
 ```
-npx @agentstep/gateway quickstart
+node packages/gateway/dist/gateway.js quickstart
 ```
+
+Available provider options:
+- `--provider docker` — local Docker containers
+- `--provider apple-container` — Apple Containers (macOS 26+)
+- `--provider mvm` — Firecracker microVMs via mvm (macOS, requires `npm i -g @agentstep/mvm && mvm init`)
+- `--provider sprites` — sprites.dev cloud (requires SPRITE_TOKEN)
 
 If it works, the user should see an interactive chat session. Let them send a test message and verify they get a response.
 
 If it fails:
-- **No API key**: Go back to Step 4.
-- **Sprite/provider errors**: Suggest using `--provider docker` if they have Docker installed, or check that the default provider is configured.
+- **No API key**: Go back to Step 5.
+- **Provider errors**: Suggest `--provider docker` if Docker is running, or `--provider apple-container` on macOS 26+.
 
 ## Step 7: Done
 
 Tell them:
-- **Server UI**: http://localhost:4000 — web dashboard for managing agents and sessions
+- **Web UI**: http://localhost:4000 — chat interface with sidebar, settings, debug panel
+- **Settings**: http://localhost:4000/settings — manage agents, environments, vaults, memory stores, batch
 - **API docs**: http://localhost:4000/v1/docs — full OpenAPI documentation
 - **CLI commands**:
-  - `gateway agents create --name mybot --model claude-sonnet-4-20250514` — create an agent
-  - `gateway environments create --name dev` — create an environment
-  - `gateway sessions create --agent <id> --environment <id>` — start a session
+  - `gateway agents list` — list agents
+  - `gateway environments list` — list environments
+  - `gateway sessions list` — list sessions
   - `gateway quickstart` — one-command setup for a new chat session
   - `gateway serve` — start the API server
-- **Secrets**: keys are stored in the settings DB. Add more via:
-  - `sqlite3 data/managed-agents.db "INSERT OR REPLACE INTO settings (key, value) VALUES ('openai_api_key', 'sk-...')"`
-  - Or set env vars / add to `.env`
+- **Keyboard shortcuts**: Cmd+K for command palette in the web UI
 
 ## Troubleshooting
 
 If something goes wrong at any point:
-- Check server logs in the terminal where `npm run dev` is running
+- Check server logs in the terminal where `gateway serve` is running
 - Check the database: `ls -la ./data/`
-- Reset everything: `rm -rf ./data/managed-agents.db && npm run dev`
-- Check API key: `curl -s https://api.anthropic.com/v1/messages -H "x-api-key: $ANTHROPIC_API_KEY" -H "anthropic-version: 2023-06-01" | head -1`
+- Reset everything: `rm -rf ./data/ .env && node packages/gateway/dist/gateway.js serve`
+- Check API key: `curl -s -H "x-api-key: $(grep SEED_API_KEY .env | cut -d= -f2)" http://localhost:4000/v1/agents`
+- Run tests: `npm test`

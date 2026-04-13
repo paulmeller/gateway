@@ -1,398 +1,418 @@
 /**
- * LocalBackend — imports @agentstep/agent-sdk directly.
- * No HTTP, no auth, direct DB/bus access.
+ * LocalBackend — routes all operations through @agentstep/agent-sdk handler
+ * functions, using the same code path as the Hono web app.
+ *
+ * A Request object is constructed with the right method/path/headers/body,
+ * the handler is called, and the JSON response is parsed.  For SSE streams the
+ * Response body is consumed directly and yielded as an AsyncGenerator.
  */
 import type { Backend, Paginated } from "./interface.js";
 import { initForCli } from "../lifecycle.js";
 
+// Internal API key resolved once at init time.
+let localApiKey = "";
+
+async function resolveApiKey(): Promise<string> {
+  if (localApiKey) return localApiKey;
+
+  // Prefer the env-var that ensureInitialized() seeds on first boot.
+  if (process.env.SEED_API_KEY) {
+    localApiKey = process.env.SEED_API_KEY;
+    return localApiKey;
+  }
+
+  // Fall back: read the first active key from the DB (raw key not stored,
+  // but the prefix is — so we cannot reconstruct it this way).
+  // ensureInitialized() writes the generated key to .env *and* sets
+  // process.env.SEED_API_KEY only when it creates a new key from SEED_API_KEY.
+  // For a freshly-generated key the value is only available at creation time.
+  // Re-read .env file to pick it up if it was written during this session.
+  try {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const envPath = path.resolve(process.cwd(), ".env");
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, "utf-8");
+      const match = /^SEED_API_KEY=(.+)$/m.exec(content);
+      if (match) {
+        localApiKey = match[1].trim();
+        return localApiKey;
+      }
+    }
+  } catch {
+    // best-effort
+  }
+
+  // Last resort: DB has keys but we don't have the raw key.
+  // Create a new one for CLI use and persist to .env.
+  try {
+    const { createApiKey } = await import("@agentstep/agent-sdk");
+    const { key } = createApiKey({ name: "cli", permissions: ["*"] });
+    const fs = await import("node:fs");
+    const pathMod = await import("node:path");
+    const envPath = pathMod.resolve(process.cwd(), ".env");
+    if (!fs.existsSync(envPath)) {
+      fs.writeFileSync(envPath, `SEED_API_KEY=${key}\n`, "utf-8");
+    } else {
+      fs.appendFileSync(envPath, `\nSEED_API_KEY=${key}\n`, "utf-8");
+    }
+    process.env.SEED_API_KEY = key;
+    localApiKey = key;
+    return localApiKey;
+  } catch {
+    // fall through
+  }
+
+  throw new Error(
+    "No API key available for local backend. Set SEED_API_KEY env var or let the server generate one on first run.",
+  );
+}
+
+/**
+ * Build a Request, call a handler, parse the JSON response.
+ * Throws on non-2xx with the server's error message.
+ */
+async function callHandler<T = unknown>(
+  handler: (req: Request, ...ids: string[]) => Promise<Response>,
+  method: string,
+  url: string,
+  body?: unknown,
+  ...ids: string[]
+): Promise<T> {
+  const apiKey = await resolveApiKey();
+  const init: RequestInit = {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+    },
+  };
+  if (body !== undefined) {
+    (init.headers as Record<string, string>)["Content-Type"] = "application/json";
+    init.body = JSON.stringify(body);
+  }
+
+  const req = new Request(url, init);
+  const res = await handler(req, ...ids);
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    let msg = `HTTP ${res.status}`;
+    try {
+      const err = JSON.parse(text) as { error?: { type?: string; message?: string } };
+      if (err?.error?.message) msg = `${err.error.type ?? "error"}: ${err.error.message}`;
+    } catch { /* use default msg */ }
+    throw new Error(msg);
+  }
+
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
+
+/** Build a localhost URL with optional query params */
+function url(path: string, params?: Record<string, string | number | boolean | undefined>): string {
+  const u = new URL(`http://localhost${path}`);
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined) u.searchParams.set(k, String(v));
+    }
+  }
+  return u.toString();
+}
+
+// ── SSE → AsyncGenerator ──────────────────────────────────────────────────
+
+async function* sseResponseToGenerator(res: Response): AsyncGenerator<unknown> {
+  if (!res.body) return;
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let currentData = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop()!; // keep the incomplete trailing line
+
+      for (const line of lines) {
+        if (line === "") {
+          // Event boundary
+          if (currentData) {
+            try {
+              const parsed = JSON.parse(currentData) as { type?: string };
+              if (parsed.type !== "ping") yield parsed;
+            } catch { /* skip malformed */ }
+            currentData = "";
+          }
+        } else if (line.startsWith("data:")) {
+          currentData = line.slice(5).trimStart();
+        }
+        // ignore id:/event: lines — we don't need them here
+      }
+    }
+  } finally {
+    reader.cancel().catch(() => {});
+  }
+}
+
+// ── LocalBackend ─────────────────────────────────────────────────────────
+
 export class LocalBackend implements Backend {
   async init(): Promise<void> {
     await initForCli();
+    // Resolve (and cache) the API key now so later calls are synchronous.
+    await resolveApiKey();
   }
 
   agents = {
     async create(input: { name: string; model: string; system?: string; backend?: string; confirmation_mode?: boolean }) {
-      const { createAgent } = await import("@agentstep/agent-sdk");
-      return createAgent({
-        name: input.name,
-        model: input.model,
-        system: input.system ?? null,
-        backend: (input.backend as any) ?? "claude",
-        confirmation_mode: input.confirmation_mode ?? false,
-      });
+      const { handleCreateAgent } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler(handleCreateAgent, "POST", url("/v1/agents"), input);
     },
 
     async list(opts?: { limit?: number; order?: string; include_archived?: boolean }): Promise<Paginated<any>> {
-      const { listAgents } = await import("@agentstep/agent-sdk");
-      const data = listAgents({
-        limit: opts?.limit ?? 20,
-        order: (opts?.order as "asc" | "desc") ?? "desc",
-        includeArchived: opts?.include_archived ?? false,
-      });
-      return { data, next_page: data.length > 0 ? data[data.length - 1].id : null };
+      const { handleListAgents } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler<Paginated<any>>(
+        handleListAgents,
+        "GET",
+        url("/v1/agents", {
+          limit: opts?.limit,
+          order: opts?.order,
+          include_archived: opts?.include_archived,
+        }),
+      );
     },
 
     async get(id: string, version?: number) {
-      const { getAgent } = await import("@agentstep/agent-sdk");
-      const agent = getAgent(id, version);
-      if (!agent) throw new Error(`Agent ${id} not found`);
-      return agent;
+      const { handleGetAgent } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler(handleGetAgent, "GET", url(`/v1/agents/${id}`, { version }), undefined, id);
     },
 
     async update(id: string, input: Record<string, unknown>) {
-      const { updateAgent } = await import("@agentstep/agent-sdk");
-      return updateAgent(id, input as any);
+      const { handleUpdateAgent } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler(handleUpdateAgent, "POST", url(`/v1/agents/${id}`), input, id);
     },
 
     async delete(id: string) {
-      const { archiveAgent } = await import("@agentstep/agent-sdk");
-      archiveAgent(id);
-      return { id, type: "agent_deleted" };
+      const { handleDeleteAgent } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler(handleDeleteAgent, "DELETE", url(`/v1/agents/${id}`), undefined, id);
     },
   };
 
   environments = {
     async create(input: { name: string; config: Record<string, unknown> }) {
-      const { createEnvironment, kickoffEnvironmentSetup } = await import("@agentstep/agent-sdk");
-      const env = createEnvironment({ name: input.name, config: input.config as any });
-      void kickoffEnvironmentSetup(env.id).catch((err: unknown) => {
-        console.error(`[cli] environment setup failed:`, err);
-      });
-      return env;
+      const { handleCreateEnvironment } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler(handleCreateEnvironment, "POST", url("/v1/environments"), input);
     },
 
     async list(opts?: { limit?: number; order?: string; include_archived?: boolean }): Promise<Paginated<any>> {
-      const { listEnvironments } = await import("@agentstep/agent-sdk");
-      const data = listEnvironments({
-        limit: opts?.limit ?? 20,
-        order: (opts?.order as "asc" | "desc") ?? "desc",
-        includeArchived: opts?.include_archived ?? false,
-      });
-      return { data, next_page: data.length > 0 ? data[data.length - 1].id : null };
+      const { handleListEnvironments } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler<Paginated<any>>(
+        handleListEnvironments,
+        "GET",
+        url("/v1/environments", {
+          limit: opts?.limit,
+          order: opts?.order,
+          include_archived: opts?.include_archived,
+        }),
+      );
     },
 
     async get(id: string) {
-      const { getEnvironment } = await import("@agentstep/agent-sdk");
-      const env = getEnvironment(id);
-      if (!env) throw new Error(`Environment ${id} not found`);
-      return env;
+      const { handleGetEnvironment } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler(handleGetEnvironment, "GET", url(`/v1/environments/${id}`), undefined, id);
     },
 
     async delete(id: string) {
-      const { deleteEnvironment } = await import("@agentstep/agent-sdk");
-      deleteEnvironment(id);
-      return { id, type: "environment_deleted" };
+      const { handleDeleteEnvironment } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler(handleDeleteEnvironment, "DELETE", url(`/v1/environments/${id}`), undefined, id);
     },
 
     async archive(id: string) {
-      const { archiveEnvironment, getEnvironment } = await import("@agentstep/agent-sdk");
-      archiveEnvironment(id);
-      return getEnvironment(id);
+      const { handleArchiveEnvironment } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler(handleArchiveEnvironment, "POST", url(`/v1/environments/${id}/archive`), undefined, id);
     },
   };
 
   sessions = {
     async create(input: { agent: string | { id: string; version: number; type?: string }; environment_id: string; title?: string; max_budget_usd?: number }) {
-      const { createSession, getAgent } = await import("@agentstep/agent-sdk");
-      let agentId: string;
-      let agentVersion: number;
-
-      if (typeof input.agent === "string") {
-        const agent = getAgent(input.agent);
-        if (!agent) throw new Error(`Agent ${input.agent} not found`);
-        agentId = agent.id;
-        agentVersion = agent.version;
-      } else {
-        agentId = input.agent.id;
-        agentVersion = input.agent.version;
-      }
-
-      return createSession({
-        agent_id: agentId,
-        agent_version: agentVersion,
-        environment_id: input.environment_id,
-        title: input.title ?? null,
-        max_budget_usd: input.max_budget_usd ?? null,
-      });
+      const { handleCreateSession } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler(handleCreateSession, "POST", url("/v1/sessions"), input);
     },
 
     async list(opts?: { limit?: number; order?: string; agent_id?: string; environment_id?: string; status?: string; include_archived?: boolean }): Promise<Paginated<any>> {
-      const { listSessions } = await import("@agentstep/agent-sdk");
-      const data = listSessions({
-        limit: opts?.limit ?? 20,
-        order: (opts?.order as "asc" | "desc") ?? "desc",
-        agent_id: opts?.agent_id,
-        environmentId: opts?.environment_id,
-        status: opts?.status as any,
-        includeArchived: opts?.include_archived ?? false,
-      });
-      return { data, next_page: data.length > 0 ? data[data.length - 1].id : null };
+      const { handleListSessions } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler<Paginated<any>>(
+        handleListSessions,
+        "GET",
+        url("/v1/sessions", {
+          limit: opts?.limit,
+          order: opts?.order,
+          agent_id: opts?.agent_id,
+          environment_id: opts?.environment_id,
+          status: opts?.status,
+          include_archived: opts?.include_archived,
+        }),
+      );
     },
 
     async get(id: string) {
-      const { getSession } = await import("@agentstep/agent-sdk");
-      const session = getSession(id);
-      if (!session) throw new Error(`Session ${id} not found`);
-      return session;
+      const { handleGetSession } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler(handleGetSession, "GET", url(`/v1/sessions/${id}`), undefined, id);
     },
 
     async update(id: string, input: Record<string, unknown>) {
-      const { updateSessionMutable, getSession } = await import("@agentstep/agent-sdk");
-      updateSessionMutable(id, input as any);
-      return getSession(id);
+      const { handleUpdateSession } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler(handleUpdateSession, "POST", url(`/v1/sessions/${id}`), input, id);
     },
 
     async delete(id: string) {
-      const {
-        getSession, getActor, interruptSession, releaseSession,
-        appendEvent, dropActor, dropEmitter, nowMs,
-      } = await import("@agentstep/agent-sdk");
-      const { updateSessionStatus } = await import("@agentstep/agent-sdk/db/sessions");
-
-      const session = getSession(id);
-      if (!session) throw new Error(`Session ${id} not found`);
-
-      // Replicate handleDeleteSession: serialize through actor
-      const actor = getActor(id);
-      await actor.enqueue(async () => {
-        interruptSession(id);
-        await releaseSession(id);
-        appendEvent(id, {
-          type: "session.status_terminated",
-          payload: { reason: "deleted" },
-          origin: "server",
-          processedAt: nowMs(),
-        });
-        updateSessionStatus(id, "terminated", "deleted");
-      });
-      dropActor(id);
-      dropEmitter(id);
-
-      return { id, type: "session_deleted" };
+      const { handleDeleteSession } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler(handleDeleteSession, "DELETE", url(`/v1/sessions/${id}`), undefined, id);
     },
 
     async archive(id: string) {
-      const { archiveSession, getSession } = await import("@agentstep/agent-sdk");
-      archiveSession(id);
-      return getSession(id);
+      const { handleArchiveSession } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler(handleArchiveSession, "POST", url(`/v1/sessions/${id}/archive`), undefined, id);
     },
 
     async threads(id: string, opts?: { limit?: number }): Promise<Paginated<any>> {
-      const { listSessions } = await import("@agentstep/agent-sdk");
-      const data = listSessions({
-        parent_session_id: id,
-        limit: opts?.limit ?? 20,
-      });
-      return { data, next_page: data.length > 0 ? data[data.length - 1].id : null };
+      const { handleListThreads } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler<Paginated<any>>(
+        handleListThreads,
+        "GET",
+        url(`/v1/sessions/${id}/threads`, { limit: opts?.limit }),
+        undefined,
+        id,
+      );
     },
   };
 
   events = {
     async send(sessionId: string, events: Array<Record<string, unknown>>) {
-      const {
-        getSession, getAgent, getSessionRow, getActor,
-        appendEvent, interruptSession, pushPendingUserInput,
-        enqueueTurn, runTurn, writePermissionResponse,
-        setOutcomeCriteria, isProxied, rowToManagedEvent,
-      } = await import("@agentstep/agent-sdk");
-      type TurnInput = import("@agentstep/agent-sdk").TurnInput;
-
-      const session = getSession(sessionId);
-      if (!session) throw new Error(`Session ${sessionId} not found`);
-
-      if (isProxied(sessionId)) {
-        throw new Error("Cannot send events to a proxied session in local mode. Use --remote.");
-      }
-
-      // Pre-validate tool_confirmation
-      for (const evt of events) {
-        if (evt.type === "user.tool_confirmation") {
-          const agent = getAgent(session.agent.id, session.agent.version);
-          if (!agent?.confirmation_mode) {
-            throw new Error("user.tool_confirmation not supported: agent does not have confirmation_mode enabled.");
-          }
-        }
-      }
-
-      // Interrupt eagerly (outside actor)
-      const hasInterrupt = events.some((e) => e.type === "user.interrupt");
-      if (hasInterrupt) interruptSession(sessionId);
-
-      const actor = getActor(sessionId);
-
-      const appended = await actor.enqueue(async () => {
-        const rows: any[] = [];
-        const pendingForTurn: TurnInput[] = [];
-        let sawInterrupt = false;
-
-        for (const event of events) {
-          if (event.type === "user.interrupt") {
-            const row = appendEvent(sessionId, {
-              type: "user.interrupt", payload: {}, origin: "user",
-              idempotencyKey: null, processedAt: Date.now(),
-            });
-            rows.push(row);
-            sawInterrupt = true;
-            continue;
-          }
-
-          if (event.type === "user.message") {
-            const content = event.content as Array<{ type: string; text: string }>;
-            const text = content.map((b) => b.text).join("");
-            const row = appendEvent(sessionId, {
-              type: "user.message", payload: { content },
-              origin: "user", idempotencyKey: null, processedAt: null,
-            });
-            rows.push(row);
-
-            const inp: TurnInput = { kind: "text", eventId: row.id, text };
-            const status = getSessionRow(sessionId)?.status ?? "idle";
-            if (status === "running" || sawInterrupt) {
-              pushPendingUserInput({ sessionId, input: inp });
-            } else {
-              pendingForTurn.push(inp);
-            }
-            continue;
-          }
-
-          if (event.type === "user.tool_confirmation") {
-            const result = (event.result as string) ?? "allow";
-            const row = appendEvent(sessionId, {
-              type: "user.tool_confirmation",
-              payload: {
-                tool_use_id: event.tool_use_id ?? null,
-                result,
-                deny_message: event.deny_message ?? null,
-              },
-              origin: "user", idempotencyKey: null, processedAt: Date.now(),
-            });
-            rows.push(row);
-            void writePermissionResponse(sessionId, result, event.deny_message as string | undefined).catch(() => {});
-            continue;
-          }
-
-          if (event.type === "user.custom_tool_result") {
-            const row = appendEvent(sessionId, {
-              type: "user.custom_tool_result",
-              payload: { custom_tool_use_id: event.custom_tool_use_id, content: event.content },
-              origin: "user", idempotencyKey: null, processedAt: Date.now(),
-            });
-            rows.push(row);
-
-            const inp: TurnInput = {
-              kind: "tool_result", eventId: row.id,
-              custom_tool_use_id: event.custom_tool_use_id as string,
-              content: event.content as unknown[],
-            };
-            const status = getSessionRow(sessionId)?.status ?? "idle";
-            if (status === "running" || sawInterrupt) {
-              pushPendingUserInput({ sessionId, input: inp });
-            } else {
-              pendingForTurn.push(inp);
-            }
-            continue;
-          }
-
-          if (event.type === "user.define_outcome") {
-            const { type: _, ...criteria } = event;
-            const row = appendEvent(sessionId, {
-              type: "user.define_outcome", payload: criteria,
-              origin: "user", idempotencyKey: null, processedAt: Date.now(),
-            });
-            rows.push(row);
-            setOutcomeCriteria(sessionId, criteria as any);
-            continue;
-          }
-        }
-
-        return { rows, pendingForTurn };
-      });
-
-      if (appended.pendingForTurn.length > 0) {
-        const row = getSessionRow(sessionId);
-        if (row) {
-          void enqueueTurn(row.environment_id, () => runTurn(sessionId, appended.pendingForTurn)).catch(
-            (err: unknown) => console.error(`[cli] enqueueTurn failed:`, err),
-          );
-        }
-      }
-
-      return { events: appended.rows.map(rowToManagedEvent) };
+      const { handlePostEvents } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler<{ events: any[] }>(
+        handlePostEvents,
+        "POST",
+        url(`/v1/sessions/${sessionId}/events`),
+        { events },
+        sessionId,
+      );
     },
 
     async list(sessionId: string, opts?: { limit?: number; order?: string; after_seq?: number }): Promise<Paginated<any>> {
-      const { listEvents, rowToManagedEvent } = await import("@agentstep/agent-sdk");
-      const rows = listEvents(sessionId, {
-        limit: opts?.limit ?? 50,
-        order: (opts?.order as "asc" | "desc") ?? "asc",
-        afterSeq: opts?.after_seq ?? 0,
-      });
-      return {
-        data: rows.map(rowToManagedEvent),
-        next_page: rows.length > 0 ? String(rows[rows.length - 1].seq) : null,
-      };
+      const { handleListEvents } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler<Paginated<any>>(
+        handleListEvents,
+        "GET",
+        url(`/v1/sessions/${sessionId}/events`, {
+          limit: opts?.limit,
+          order: opts?.order,
+          after_seq: opts?.after_seq,
+        }),
+        undefined,
+        sessionId,
+      );
     },
 
     async *stream(sessionId: string, afterSeq?: number): AsyncGenerator<any> {
-      const { subscribe } = await import("@agentstep/agent-sdk");
-      const queue: any[] = [];
-      let resolve: (() => void) | null = null;
-
-      const sub = subscribe(sessionId, afterSeq ?? 0, (evt: any) => {
-        queue.push(evt);
-        if (resolve) { resolve(); resolve = null; }
-      });
-
-      try {
-        while (true) {
-          while (queue.length > 0) yield queue.shift()!;
-          await new Promise<void>((r) => { resolve = r; });
-        }
-      } finally {
-        sub.unsubscribe();
+      const { handleSessionStream } = await import("@agentstep/agent-sdk/handlers");
+      const apiKey = await resolveApiKey();
+      const headers: Record<string, string> = {
+        Accept: "text/event-stream",
+        "x-api-key": apiKey,
+      };
+      if (afterSeq != null) {
+        headers["Last-Event-ID"] = String(afterSeq);
       }
+      const req = new Request(
+        url(`/v1/sessions/${sessionId}/stream`, afterSeq != null ? { after_seq: afterSeq } : undefined),
+        { headers },
+      );
+      const res = await handleSessionStream(req, sessionId);
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`stream failed: HTTP ${res.status} ${text}`);
+      }
+      yield* sseResponseToGenerator(res);
     },
   };
 
   vaults = {
     async create(input: { agent_id: string; name: string }) {
-      const { createVault } = await import("@agentstep/agent-sdk");
-      return createVault(input);
+      const { handleCreateVault } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler(handleCreateVault, "POST", url("/v1/vaults"), input);
     },
+
     async list(opts?: { agent_id?: string }) {
-      const { listVaults } = await import("@agentstep/agent-sdk");
-      return { data: listVaults(opts?.agent_id) };
+      const { handleListVaults } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler<{ data: any[] }>(
+        handleListVaults,
+        "GET",
+        url("/v1/vaults", { agent_id: opts?.agent_id }),
+      );
     },
+
     async get(id: string) {
-      const { getVault } = await import("@agentstep/agent-sdk");
-      const v = getVault(id);
-      if (!v) throw new Error(`Vault ${id} not found`);
-      return v;
+      const { handleGetVault } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler(handleGetVault, "GET", url(`/v1/vaults/${id}`), undefined, id);
     },
+
     async delete(id: string) {
-      const { deleteVault } = await import("@agentstep/agent-sdk");
-      deleteVault(id);
-      return { id, type: "vault_deleted" };
+      const { handleDeleteVault } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler(handleDeleteVault, "DELETE", url(`/v1/vaults/${id}`), undefined, id);
     },
+
     entries: {
       async list(vaultId: string) {
-        const { listEntries } = await import("@agentstep/agent-sdk");
-        return { data: listEntries(vaultId) };
+        const { handleListEntries } = await import("@agentstep/agent-sdk/handlers");
+        return callHandler<{ data: any[] }>(
+          handleListEntries,
+          "GET",
+          url(`/v1/vaults/${vaultId}/entries`),
+          undefined,
+          vaultId,
+        );
       },
+
       async get(vaultId: string, key: string) {
-        const { getEntry } = await import("@agentstep/agent-sdk");
-        const e = getEntry(vaultId, key);
-        if (!e) throw new Error(`Entry ${key} not found in vault ${vaultId}`);
-        return e;
+        const { handleGetEntry } = await import("@agentstep/agent-sdk/handlers");
+        return callHandler(
+          handleGetEntry,
+          "GET",
+          url(`/v1/vaults/${vaultId}/entries/${encodeURIComponent(key)}`),
+          undefined,
+          vaultId,
+          key,
+        );
       },
+
       async set(vaultId: string, key: string, value: string) {
-        const { setEntry } = await import("@agentstep/agent-sdk");
-        return setEntry(vaultId, key, value);
+        const { handlePutEntry } = await import("@agentstep/agent-sdk/handlers");
+        return callHandler(
+          handlePutEntry,
+          "PUT",
+          url(`/v1/vaults/${vaultId}/entries/${encodeURIComponent(key)}`),
+          { value },
+          vaultId,
+          key,
+        );
       },
+
       async delete(vaultId: string, key: string) {
-        const { deleteEntry } = await import("@agentstep/agent-sdk");
-        deleteEntry(vaultId, key);
-        return { key, type: "entry_deleted" };
+        const { handleDeleteEntry } = await import("@agentstep/agent-sdk/handlers");
+        return callHandler(
+          handleDeleteEntry,
+          "DELETE",
+          url(`/v1/vaults/${vaultId}/entries/${encodeURIComponent(key)}`),
+          undefined,
+          vaultId,
+          key,
+        );
       },
     },
   };
@@ -400,56 +420,90 @@ export class LocalBackend implements Backend {
   memory = {
     stores: {
       async create(input: { name: string; description?: string }) {
-        const { createMemoryStore } = await import("@agentstep/agent-sdk");
-        return createMemoryStore(input);
+        const { handleCreateMemoryStore } = await import("@agentstep/agent-sdk/handlers");
+        return callHandler(handleCreateMemoryStore, "POST", url("/v1/memory_stores"), input);
       },
+
       async list() {
-        const { listMemoryStores } = await import("@agentstep/agent-sdk");
-        return { data: listMemoryStores() };
+        const { handleListMemoryStores } = await import("@agentstep/agent-sdk/handlers");
+        return callHandler<{ data: any[] }>(handleListMemoryStores, "GET", url("/v1/memory_stores"));
       },
+
       async get(id: string) {
-        const { getMemoryStore } = await import("@agentstep/agent-sdk");
-        const s = getMemoryStore(id);
-        if (!s) throw new Error(`Memory store ${id} not found`);
-        return s;
+        const { handleGetMemoryStore } = await import("@agentstep/agent-sdk/handlers");
+        return callHandler(handleGetMemoryStore, "GET", url(`/v1/memory_stores/${id}`), undefined, id);
       },
+
       async delete(id: string) {
-        const { deleteMemoryStore } = await import("@agentstep/agent-sdk");
-        deleteMemoryStore(id);
-        return { id, type: "memory_store_deleted" };
+        const { handleDeleteMemoryStore } = await import("@agentstep/agent-sdk/handlers");
+        return callHandler(handleDeleteMemoryStore, "DELETE", url(`/v1/memory_stores/${id}`), undefined, id);
       },
     },
+
     memories: {
       async create(storeId: string, input: { path: string; content: string }) {
-        const { createOrUpsertMemory } = await import("@agentstep/agent-sdk");
-        return createOrUpsertMemory(storeId, input.path, input.content);
+        const { handleCreateMemory } = await import("@agentstep/agent-sdk/handlers");
+        return callHandler(handleCreateMemory, "POST", url(`/v1/memory_stores/${storeId}/memories`), input, storeId);
       },
+
       async list(storeId: string) {
-        const { listMemories } = await import("@agentstep/agent-sdk");
-        return { data: listMemories(storeId) };
+        const { handleListMemories } = await import("@agentstep/agent-sdk/handlers");
+        return callHandler<{ data: any[] }>(
+          handleListMemories,
+          "GET",
+          url(`/v1/memory_stores/${storeId}/memories`),
+          undefined,
+          storeId,
+        );
       },
+
       async get(storeId: string, memId: string) {
-        const { getMemory } = await import("@agentstep/agent-sdk");
-        const m = getMemory(memId);
-        if (!m) throw new Error(`Memory ${memId} not found`);
-        return m;
+        const { handleGetMemory } = await import("@agentstep/agent-sdk/handlers");
+        return callHandler(
+          handleGetMemory,
+          "GET",
+          url(`/v1/memory_stores/${storeId}/memories/${memId}`),
+          undefined,
+          storeId,
+          memId,
+        );
       },
+
       async update(storeId: string, memId: string, input: { content: string; content_sha256?: string }) {
-        const { updateMemory } = await import("@agentstep/agent-sdk");
-        return updateMemory(memId, input.content, input.content_sha256);
+        const { handleUpdateMemory } = await import("@agentstep/agent-sdk/handlers");
+        return callHandler(
+          handleUpdateMemory,
+          "POST",
+          url(`/v1/memory_stores/${storeId}/memories/${memId}`),
+          input,
+          storeId,
+          memId,
+        );
       },
+
       async delete(storeId: string, memId: string) {
-        const { deleteMemory } = await import("@agentstep/agent-sdk");
-        deleteMemory(memId);
-        return { id: memId, type: "memory_deleted" };
+        const { handleDeleteMemory } = await import("@agentstep/agent-sdk/handlers");
+        return callHandler(
+          handleDeleteMemory,
+          "DELETE",
+          url(`/v1/memory_stores/${storeId}/memories/${memId}`),
+          undefined,
+          storeId,
+          memId,
+        );
       },
     },
   };
 
   batch = {
     async execute(operations: Array<{ method: string; path: string; body?: unknown }>) {
-      const { executeBatch } = await import("@agentstep/agent-sdk");
-      return executeBatch(operations as any);
+      const { handleBatch } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler<{ results: Array<{ status: number; body: unknown }> }>(
+        handleBatch,
+        "POST",
+        url("/v1/batch"),
+        { operations },
+      );
     },
   };
 }

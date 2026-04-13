@@ -133,8 +133,8 @@ function VaultEntries({ vaultId }: { vaultId: string }) {
         </div>
       ))}
       <div className="flex gap-2">
-        <Input placeholder="Key" value={newKey} onChange={(e) => setNewKey(e.target.value)} className="h-8 w-full font-mono text-xs" />
-        <Input placeholder="Value" type="password" value={newValue} onChange={(e) => setNewValue(e.target.value)} className="h-8 w-full font-mono text-xs" />
+        <Input placeholder="Key" value={newKey} onChange={(e) => setNewKey(e.target.value)} className="h-8 w-full font-mono text-xs text-foreground" />
+        <Input placeholder="Value" type="password" value={newValue} onChange={(e) => setNewValue(e.target.value)} className="h-8 w-full font-mono text-xs text-foreground" />
         <Button size="icon" className="size-8 shrink-0 bg-cta-gradient text-black hover:opacity-90" onClick={handleAdd}>
           <Plus className="size-3" />
         </Button>

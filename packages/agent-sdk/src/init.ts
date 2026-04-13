@@ -125,6 +125,8 @@ function seedDefaultApiKey(): void {
       fs.appendFileSync(envPath, `\nSEED_API_KEY=${key}\n`, "utf-8");
       console.log(`[init] created default API key and appended to ${envPath}`);
     }
+    // Also set in process.env so CLI can pick it up immediately
+    process.env.SEED_API_KEY = key;
     console.log(`  id:  ${id}`);
     console.log(`  key: ${key}`);
   } catch (err) {
