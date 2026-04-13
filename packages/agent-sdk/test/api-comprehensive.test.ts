@@ -1,3 +1,4 @@
+// @ts-nocheck — test file with loose typing on handler responses
 /**
  * Comprehensive API handler tests.
  *

@@ -1,3 +1,4 @@
+// @ts-nocheck — test file with loose typing on handler responses
 /**
  * CLI LocalBackend handler flow tests.
  *
@@ -1047,7 +1048,7 @@ describe("Memory CLI Operations", () => {
       req("/v1/memory_stores", { body: { name: "cli-store" } }),
     );
     expect(res.status).toBe(201);
-    const body = await res.json();
+    const body = await res.json() as { name: string; id: string };
     expect(body.name).toBe("cli-store");
     expect(body.id).toBeTruthy();
   });
