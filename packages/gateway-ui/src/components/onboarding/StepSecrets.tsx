@@ -2,14 +2,14 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ENGINE_KEYS, PROVIDER_TOKENS } from "@/lib/constants";
+import { getEngineKey, PROVIDER_TOKENS } from "@/lib/constants";
 
-interface Props { engine: string; provider: string; onNext: (secrets: Record<string, string>) => void; onSkip: () => void; }
+interface Props { engine: string; model: string; provider: string; onNext: (secrets: Record<string, string>) => void; onSkip: () => void; }
 
-export function StepSecrets({ engine, provider, onNext, onSkip }: Props) {
+export function StepSecrets({ engine, model, provider, onNext, onSkip }: Props) {
   const [values, setValues] = useState<Record<string, string>>({});
   const fields: Array<{ key: string; label: string }> = [];
-  const engineKey = ENGINE_KEYS[engine];
+  const engineKey = getEngineKey(engine, model);
   if (engineKey) fields.push(engineKey);
   const providerToken = PROVIDER_TOKENS[provider];
   if (providerToken) fields.push({ key: providerToken.key, label: providerToken.label });

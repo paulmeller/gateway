@@ -153,6 +153,17 @@ export function createOpencodeTranslator(opts: TranslatorOptions): Translator {
         return out;
       }
 
+      case "error": {
+        const err = raw.error as Record<string, unknown> | undefined;
+        const data = err?.data as Record<string, unknown> | undefined;
+        const msg = (data?.message as string) || (err?.message as string) || (raw.message as string) || "Unknown opencode error";
+        out.push({
+          type: "session.error" as const,
+          payload: { error: { type: "backend_error", message: msg } },
+        });
+        return out;
+      }
+
       default:
         // Unrecognized — drop silently, translator is forward-compatible.
         return out;

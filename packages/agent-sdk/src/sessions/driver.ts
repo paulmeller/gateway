@@ -374,6 +374,7 @@ export async function runTurn(
 
       const batch: TranslatedEvent[] = [];
       buffer = parseNDJSONLines(buffer, (raw) => {
+        if (process.env.DEBUG_NDJSON) console.log("[ndjson]", JSON.stringify(raw));
         const translated = translator.translate(raw);
         for (const t of translated) batch.push(t);
       });

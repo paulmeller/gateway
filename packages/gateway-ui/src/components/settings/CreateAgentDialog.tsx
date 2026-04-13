@@ -21,10 +21,16 @@ export function CreateAgentDialog({ open, onOpenChange }: Props) {
 
   async function handleCreate() {
     if (!name.trim()) return;
-    await create.mutateAsync({ name: name.trim(), engine, model });
-    setName("");
-    toast.success("Agent created");
-    onOpenChange(false);
+    try {
+      await create.mutateAsync({ name: name.trim(), engine, model });
+      setName("");
+      toast.success("Agent created");
+      onOpenChange(false);
+    } catch (err: unknown) {
+      const msg = (err as { body?: { error?: { message?: string } } })?.body?.error?.message
+        || (err instanceof Error ? err.message : "Failed to create agent");
+      toast.error(msg);
+    }
   }
 
   return (

@@ -46,7 +46,7 @@ export function App() {
         <AppShell>
           <Main />
         </AppShell>
-        <Toaster />
+        <Toaster position="top-center" richColors />
         <CommandPalette />
       </TooltipProvider>
     </QueryClientProvider>

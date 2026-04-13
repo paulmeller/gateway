@@ -28,7 +28,14 @@ export function useSSE(sessionId: string | null) {
         headers: { "x-api-key": apiKey },
       })
         .then(async (res) => {
-          if (!res.ok || !res.body) throw new Error(`SSE ${res.status}`);
+          if (!res.ok || !res.body) {
+            if (res.status === 404) {
+              // Session doesn't exist — stop reconnecting
+              console.warn("[sse] session not found, stopping");
+              return;
+            }
+            throw new Error(`SSE ${res.status}`);
+          }
           delayRef.current = 1000;
 
           const reader = res.body.getReader();

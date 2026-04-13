@@ -187,7 +187,23 @@ export function createCodexTranslator(opts: TranslatorOptions): Translator {
     }
 
     if (type === "error") {
-      // Stream-level error — driver will catch + surface via session.error.
+      const msg = (typeof raw.message === "string" ? raw.message : null)
+        || ((raw.error as Record<string, unknown>)?.message as string)
+        || "Unknown codex error";
+      out.push({
+        type: "session.error" as const,
+        payload: { error: { type: "backend_error", message: msg } },
+      });
+      return out;
+    }
+
+    if (type === "turn.failed") {
+      const err = raw.error as Record<string, unknown> | undefined;
+      const msg = (err?.message as string) || "Turn failed";
+      out.push({
+        type: "session.error" as const,
+        payload: { error: { type: "backend_error", message: msg } },
+      });
       return out;
     }
 

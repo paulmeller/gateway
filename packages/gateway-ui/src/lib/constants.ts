@@ -33,8 +33,16 @@ export const PROVIDER_TOKENS: Record<string, { key: string; label: string; place
 
 export const ENGINE_KEYS: Record<string, { key: string; label: string }> = {
   claude: { key: "ANTHROPIC_API_KEY", label: "Anthropic API Key" },
-  opencode: { key: "ANTHROPIC_API_KEY", label: "Anthropic API Key" },
   codex: { key: "OPENAI_API_KEY", label: "OpenAI API Key" },
   gemini: { key: "GEMINI_API_KEY", label: "Gemini API Key" },
   factory: { key: "ANTHROPIC_API_KEY", label: "Anthropic API Key" },
 };
+
+/** OpenCode supports multiple providers — key depends on the model prefix */
+export function getEngineKey(engine: string, model: string): { key: string; label: string } | undefined {
+  if (engine === "opencode") {
+    if (model.startsWith("openai/")) return { key: "OPENAI_API_KEY", label: "OpenAI API Key" };
+    return { key: "ANTHROPIC_API_KEY", label: "Anthropic API Key" };
+  }
+  return ENGINE_KEYS[engine];
+}
