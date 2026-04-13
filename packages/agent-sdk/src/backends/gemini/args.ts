@@ -1,8 +1,8 @@
 /**
- * Build the `gemini -p` argv for one turn.
+ * Build the `gemini --prompt` argv for one turn.
  *
  * Gemini CLI constraints:
- * - `-p` flag for prompt mode (reads prompt from stdin)
+ * - `--prompt <text>` for non-interactive mode (text passed as arg value)
  * - `--output-format stream-json` for NDJSON streaming
  * - `--yolo` to bypass permission prompts in headless mode
  * - `--max-turns <N>` to cap reasoning turns
@@ -19,17 +19,15 @@ export interface BuildGeminiArgsInput {
   /** Prior turn's gemini session ID, if any, for --resume */
   backendSessionId: string | null;
   maxTurns?: number;
+  /** The prompt text to pass via --prompt */
+  prompt?: string;
 }
 
 export function buildGeminiArgs(input: BuildGeminiArgsInput): string[] {
-  const cfg = getConfig();
   const args: string[] = [
-    "-p",
-    "--output-format",
-    "stream-json",
+    "--prompt", input.prompt || "",
+    "--output-format", "stream-json",
     "--yolo",
-    "--max-turns",
-    String(input.maxTurns ?? cfg.agentMaxTurns),
   ];
 
   if (input.backendSessionId) {

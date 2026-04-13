@@ -28,10 +28,11 @@ function buildTurn(input: BuildTurnInput): BuildTurnResult {
       "gemini backend does not support user.custom_tool_result re-entry in v1",
     );
   }
-  const argv = buildGeminiArgs({ agent, backendSessionId });
-  const env = buildGeminiAuthEnv();
   const wrappedPrompt = wrapPromptWithSystem(promptText, agent.system);
-  return { argv, env, stdin: wrappedPrompt };
+  const argv = buildGeminiArgs({ agent, backendSessionId, prompt: wrappedPrompt });
+  const env = buildGeminiAuthEnv();
+  // Gemini --prompt takes the text as an arg value, not stdin
+  return { argv, env, stdin: "" };
 }
 
 export const geminiBackend: Backend = {

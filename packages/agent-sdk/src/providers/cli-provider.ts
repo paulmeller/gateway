@@ -214,8 +214,19 @@ export function createCliProvider(cfg: CliProviderConfig): ContainerProvider {
     containerName: string,
     opts: ExecOptions,
   ): ExecSession {
-    const proc = spawn(binary, cfg.execArgs(containerName, opts.argv), {
+    const args = cfg.execArgs(containerName, opts.argv);
+    if (process.env.DEBUG_NDJSON) {
+      console.log(`[exec] ${binary} ${args.map(a => a.includes(" ") ? `"${a}"` : a).join(" ")}`);
+      if (opts.stdin) console.log(`[exec] stdin: ${opts.stdin.slice(0, 200)}...`);
+    }
+    const proc = spawn(binary, args, {
       stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    // Capture stderr for debugging
+    let stderrBuf = "";
+    proc.stderr?.on("data", (chunk: Buffer) => {
+      stderrBuf += chunk.toString();
     });
 
     // Pipe stdin
@@ -240,6 +251,9 @@ export function createCliProvider(cfg: CliProviderConfig): ContainerProvider {
 
     proc.on("close", (code) => {
       if (escalationTimer) clearTimeout(escalationTimer);
+      if (process.env.DEBUG_NDJSON && code !== 0 && stderrBuf) {
+        console.log(`[exec] exit ${code}, stderr: ${stderrBuf.slice(0, 500)}`);
+      }
       exitResolve({ code: code ?? 1 });
     });
     proc.on("error", (err) => {

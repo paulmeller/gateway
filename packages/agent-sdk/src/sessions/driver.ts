@@ -408,7 +408,20 @@ export async function runTurn(
         }
       }
     }
-    await exec.exit;
+    const exitResult = await exec.exit;
+    if (process.env.DEBUG_NDJSON && exitResult) {
+      console.log(`[driver] ${sessionId} exit code: ${(exitResult as { code?: number }).code}`);
+    }
+    // If the process exited with non-zero and produced no output, surface an error
+    if ((exitResult as { code?: number })?.code !== 0 && buffer.trim() === "" && toolCallsInTurn === 0) {
+      const code = (exitResult as { code?: number })?.code ?? "unknown";
+      appendEvent(sessionId, {
+        type: "session.error",
+        payload: { error: { type: "backend_error", message: `Backend CLI exited with code ${code} and no output. Check that the engine is installed and the API key is valid.` } },
+        origin: "server",
+        processedAt: nowMs(),
+      });
+    }
   } catch (err) {
     if (controller.signal.aborted) {
       aborted = true;
