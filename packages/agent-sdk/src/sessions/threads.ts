@@ -1,0 +1,126 @@
+/**
+ * Multi-agent thread orchestrator.
+ *
+ * When a parent session's agent calls `spawn_agent`, the driver delegates
+ * to this module. It creates a child session, runs it to completion, and
+ * returns the child's final agent.message text as the tool result.
+ *
+ * Depth is capped at MAX_THREAD_DEPTH to prevent infinite recursion.
+ */
+import { createSession, getSessionRow } from "../db/sessions";
+import { getAgent } from "../db/agents";
+import { getSession } from "../db/sessions";
+import { listEvents } from "../db/events";
+import { appendEvent } from "./bus";
+import { getActor } from "./actor";
+import { runTurn } from "./driver";
+import { nowMs } from "../util/clock";
+import { ApiError } from "../errors";
+
+const MAX_THREAD_DEPTH = 3;
+
+/**
+ * Spawn a child agent session, run it to completion, and return the
+ * child's final agent.message text.
+ */
+export async function handleSpawnAgent(
+  parentSessionId: string,
+  agentId: string,
+  prompt: string,
+  parentDepth: number,
+): Promise<string> {
+  if (parentDepth >= MAX_THREAD_DEPTH) {
+    throw new ApiError(
+      400,
+      "invalid_request_error",
+      `thread depth limit reached (max ${MAX_THREAD_DEPTH})`,
+    );
+  }
+
+  const parentSession = getSession(parentSessionId);
+  if (!parentSession) {
+    throw new ApiError(404, "not_found_error", `parent session not found: ${parentSessionId}`);
+  }
+
+  const agent = getAgent(agentId);
+  if (!agent) {
+    throw new ApiError(404, "not_found_error", `agent not found: ${agentId}`);
+  }
+
+  // Create child session with parent reference and incremented depth
+  const childSession = createSession({
+    agent_id: agent.id,
+    agent_version: agent.version,
+    environment_id: parentSession.environment_id,
+    title: `Thread from ${parentSessionId}`,
+    metadata: { parent_session_id: parentSessionId },
+    parent_session_id: parentSessionId,
+    thread_depth: parentDepth + 1,
+    vault_ids: parentSession.vault_ids,
+  });
+
+  // Emit thread_started on parent
+  appendEvent(parentSessionId, {
+    type: "session.thread_started",
+    payload: { child_session_id: childSession.id, agent_id: agentId },
+    origin: "server",
+    processedAt: nowMs(),
+  });
+
+  // Spawn the child actor
+  getActor(childSession.id);
+
+  // Run the child turn
+  const eventId = `thread_${childSession.id}_${nowMs()}`;
+  await runTurn(childSession.id, [
+    { kind: "text", eventId, text: prompt },
+  ]);
+
+  // Wait for completion: poll until session is idle
+  const maxWaitMs = 300_000; // 5 minutes
+  const pollIntervalMs = 500;
+  const startMs = nowMs();
+  let childRow = getSessionRow(childSession.id);
+  while (childRow && childRow.status === "running" && nowMs() - startMs < maxWaitMs) {
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    childRow = getSessionRow(childSession.id);
+  }
+
+  // If timed out, interrupt and clean up the child
+  if (childRow && childRow.status === "running") {
+    const { interruptSession } = await import("./interrupt");
+    interruptSession(childSession.id);
+  }
+
+  // Extract the last agent.message text from the child's events
+  let resultText = "";
+  const events = listEvents(childSession.id, { limit: 100, order: "desc" });
+  for (const evt of events) {
+    if (evt.type === "agent.message") {
+      const payload = JSON.parse(evt.payload_json) as {
+        content?: Array<{ type: string; text?: string }>;
+      };
+      const text = (payload.content ?? [])
+        .filter((b) => b.type === "text" && b.text)
+        .map((b) => b.text!)
+        .join("");
+      if (text) {
+        resultText = text;
+        break;
+      }
+    }
+  }
+
+  // Emit thread_completed on parent
+  appendEvent(parentSessionId, {
+    type: "session.thread_completed",
+    payload: {
+      child_session_id: childSession.id,
+      result: resultText || "(no response from sub-agent)",
+    },
+    origin: "server",
+    processedAt: nowMs(),
+  });
+
+  return resultText || "(no response from sub-agent)";
+}

@@ -1,0 +1,34 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: cd packages/gateway && node build.js
+      - name: Publish @agentstep/agent-sdk
+        run: cd packages/agent-sdk && npm publish --access public || echo "Version already published, skipping"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish @agentstep/gateway
+        run: cd packages/gateway && npm publish --access public || echo "Version already published, skipping"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: GitHub Release
+        run: gh release create ${{ github.ref_name }} --generate-notes || echo "Release already exists, skipping"
+        env:
+          GH_TOKEN: ${{ github.token }}

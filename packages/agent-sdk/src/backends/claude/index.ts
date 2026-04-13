@@ -1,0 +1,193 @@
+/**
+ * Claude backend: drives `claude -p` on sprites.dev containers.
+ *
+ * Implements the Backend interface over the existing claude-specific
+ * args/translator/wrapper modules. `buildTurn` owns the stream-json
+ * tool_result re-entry path — if `toolResults` is non-empty, it builds a
+ * `{type: "user", message: {role, content: [tool_result, ...]}}` frame and
+ * flips the argv to include `--input-format stream-json`.
+ */
+import { ApiError } from "../../errors";
+import { getConfig } from "../../config";
+import type { CustomTool } from "../../types";
+import type { ContainerProvider } from "../../providers/types";
+import type { Backend, BuildTurnInput, BuildTurnResult } from "../types";
+import type { TranslatorOptions } from "../shared/translator-types";
+import { buildClaudeArgs, buildClaudeAuthEnv } from "./args";
+import { createClaudeTranslator } from "./translator";
+import { CLAUDE_WRAPPER_PATH, installClaudeWrapper } from "./wrapper-script";
+import {
+  generateBridgeScript,
+  buildBridgeMcpConfig,
+  toolsToJson,
+  TOOL_BRIDGE_DIR,
+  TOOL_BRIDGE_SCRIPT_PATH,
+  TOOL_BRIDGE_TOOLS_PATH,
+} from "./tool-bridge";
+import {
+  generatePermissionHookScript,
+  buildPermissionHooksConfig,
+  PERMISSION_BRIDGE_DIR,
+  PERMISSION_HOOK_SCRIPT_PATH,
+} from "./permission-hook";
+
+function buildTurn(input: BuildTurnInput): BuildTurnResult {
+  const { agent, backendSessionId, promptText, toolResults } = input;
+
+  const argsBase = buildClaudeArgs({
+    agent,
+    claudeSessionId: backendSessionId,
+    confirmationMode: agent.confirmation_mode,
+  });
+  const env = buildClaudeAuthEnv();
+
+  // If the agent has custom tools or threads_enabled (which adds spawn_agent
+  // as a bridge tool), inject the tool bridge MCP server into --mcp-config.
+  // The bridge script + tools.json are installed on the sprite by prepareOnSprite.
+  // This overrides any existing --mcp-config in argsBase — we find it and merge.
+  const customTools = agent.tools.filter((t): t is CustomTool => t.type === "custom");
+  const hasBridgeTools = customTools.length > 0 || agent.threads_enabled;
+  if (hasBridgeTools) {
+    const mcpIdx = argsBase.indexOf("--mcp-config");
+    let existingServers: Record<string, unknown> = {};
+    if (mcpIdx >= 0 && mcpIdx + 1 < argsBase.length) {
+      try {
+        const existing = JSON.parse(argsBase[mcpIdx + 1]) as { mcpServers?: Record<string, unknown> };
+        existingServers = existing.mcpServers ?? {};
+      } catch {}
+      // Remove the old --mcp-config pair
+      argsBase.splice(mcpIdx, 2);
+    }
+    const merged = buildBridgeMcpConfig(existingServers);
+    argsBase.push("--mcp-config", JSON.stringify({ mcpServers: merged }));
+  }
+
+  if (toolResults.length > 0) {
+    // Stream-json re-entry: claude accepts a user frame on stdin that mixes
+    // text and tool_result content blocks. Spike S5 verified this works with
+    // --resume + --input-format stream-json.
+    const args = [...argsBase, "--input-format", "stream-json"];
+    const content: Array<Record<string, unknown>> = [];
+    if (promptText) {
+      content.push({ type: "text", text: promptText });
+    }
+    for (const r of toolResults) {
+      content.push({
+        type: "tool_result",
+        tool_use_id: r.custom_tool_use_id,
+        content: r.content,
+      });
+    }
+    const userFrame = JSON.stringify({
+      type: "user",
+      message: { role: "user", content },
+    });
+    return { argv: args, env, stdin: userFrame };
+  }
+
+  return { argv: argsBase, env, stdin: promptText };
+}
+
+function validateRuntime(): string | null {
+  const cfg = getConfig();
+  if (!cfg.anthropicApiKey && !cfg.claudeToken) {
+    return "claude backend requires ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN to be set";
+  }
+  return null;
+}
+
+/**
+ * Install the bridge script and tools.json on the sprite if the agent has
+ * custom tools. Called from the lifecycle after the base prepareOnSprite.
+ */
+async function installToolBridge(
+  spriteName: string,
+  customTools: CustomTool[],
+  provider: ContainerProvider,
+): Promise<void> {
+  if (customTools.length === 0) return;
+
+  await provider.exec(spriteName, ["mkdir", "-p", TOOL_BRIDGE_DIR]);
+  await provider.exec(
+    spriteName,
+    ["bash", "-c", `cat > ${TOOL_BRIDGE_SCRIPT_PATH}`],
+    { stdin: generateBridgeScript() },
+  );
+  await provider.exec(
+    spriteName,
+    ["bash", "-c", `cat > ${TOOL_BRIDGE_TOOLS_PATH}`],
+    { stdin: toolsToJson(customTools) },
+  );
+  await provider.exec(spriteName, ["chmod", "+x", TOOL_BRIDGE_SCRIPT_PATH]);
+}
+
+/**
+ * Install the permission hook script and configure Claude Code's settings
+ * to use it. Called from the lifecycle after prepareOnSprite when the agent
+ * has confirmation_mode enabled.
+ */
+async function installPermissionHook(
+  spriteName: string,
+  provider: ContainerProvider,
+): Promise<void> {
+  // Create the bridge directory
+  await provider.exec(spriteName, ["mkdir", "-p", PERMISSION_BRIDGE_DIR]);
+
+  // Write the hook script
+  await provider.exec(
+    spriteName,
+    ["bash", "-c", `cat > ${PERMISSION_HOOK_SCRIPT_PATH}`],
+    { stdin: generatePermissionHookScript() },
+  );
+  await provider.exec(spriteName, ["chmod", "+x", PERMISSION_HOOK_SCRIPT_PATH]);
+
+  // Write the hooks config to $HOME/.claude/settings.json.
+  // Claude Code reads hooks from the user's settings file at startup.
+  // We need to merge with any existing settings (e.g. from prior setup).
+  const hooksConfig = buildPermissionHooksConfig();
+  const settingsPath = "/home/sprite/.claude/settings.json";
+
+  // Read existing settings if any, merge hooks config
+  let existingSettings: Record<string, unknown> = {};
+  try {
+    const result = await provider.exec(
+      spriteName,
+      ["cat", settingsPath],
+    );
+    if (result.stdout.trim()) {
+      existingSettings = JSON.parse(result.stdout) as Record<string, unknown>;
+    }
+  } catch {
+    // No existing settings — that's fine
+  }
+
+  const merged = { ...existingSettings, ...hooksConfig };
+  await provider.exec(
+    spriteName,
+    ["bash", "-c", `mkdir -p /home/sprite/.claude && cat > ${settingsPath}`],
+    { stdin: JSON.stringify(merged, null, 2) },
+  );
+}
+
+export const claudeBackend: Backend = {
+  name: "claude",
+  wrapperPath: CLAUDE_WRAPPER_PATH,
+  buildTurn,
+  createTranslator: (opts: TranslatorOptions) => createClaudeTranslator(opts),
+  prepareOnSprite: (name: string, provider: ContainerProvider) => installClaudeWrapper(name, provider),
+  validateRuntime,
+};
+
+// Re-export utilities needed by tests or other modules that historically
+// imported them from lib/claude/*.
+export {
+  buildClaudeArgs,
+  buildClaudeAuthEnv,
+  createClaudeTranslator,
+  installClaudeWrapper,
+  installToolBridge,
+  installPermissionHook,
+  CLAUDE_WRAPPER_PATH,
+};
+// Re-export ApiError so the driver doesn't need to handle this indirection
+export { ApiError };

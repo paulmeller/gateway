@@ -1,0 +1,14 @@
+node_modules/
+.next/
+.turbo/
+*.tsbuildinfo
+.env
+.env.local
+.env.production
+data/*.db*
+data/.api-key
+*.DS_Store
+dist/
+
+# Local Claude Code settings (may contain API keys)
+.claude/settings.local.json

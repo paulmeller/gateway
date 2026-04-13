@@ -1,0 +1,27 @@
+{
+  "license": "Apache-2.0",
+  "name": "@agentstep/gateway-hono",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "tsx watch src/start.ts",
+    "start": "node --import tsx src/start.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.14.0",
+    "@agentstep/agent-sdk": "*",
+    "dotenv": "^16.4.7",
+    "hono": "^4.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.3"
+  }
+}

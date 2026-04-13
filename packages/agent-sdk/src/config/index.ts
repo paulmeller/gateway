@@ -1,0 +1,120 @@
+/**
+ * Config cascade: env → settings table → defaults, 30s cache.
+ *
+ * Inspired by 
+ */
+import { getDb } from "../db/client";
+import { nowMs } from "../util/clock";
+
+export interface Config {
+  spriteToken: string | undefined;
+  spriteApi: string;
+  anthropicApiKey: string | undefined;
+  claudeToken: string | undefined;
+  openAiApiKey: string | undefined;
+  geminiApiKey: string | undefined;
+  factoryApiKey: string | undefined;
+  defaultModel: string;
+  agentMaxTurns: number;
+  agentTimeoutMs: number;
+  spriteTimeoutMs: number;
+  concurrency: number;
+  maxSpritesPerEnv: number;
+  sessionMaxAgeMs: number;
+  sweeperIntervalMs: number;
+}
+
+type GlobalCache = typeof globalThis & {
+  __caConfigCache?: { at: number; value: Config };
+};
+const g = globalThis as GlobalCache;
+
+const CACHE_MS = 30_000;
+
+function readSetting(key: string): string | undefined {
+  try {
+    const db = getDb();
+    const row = db
+      .prepare(
+        `SELECT value FROM settings WHERE key = ?`,
+      )
+      .get(key) as { value: string | null } | undefined;
+    return row?.value ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function num(env: string | undefined, fallback: number): number {
+  if (env == null) return fallback;
+  const n = Number(env);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function loadConfig(): Config {
+  return {
+    spriteToken: process.env.SPRITE_TOKEN || readSetting("sprite_token"),
+    spriteApi:
+      process.env.SPRITE_API || readSetting("sprite_api") || "https://api.sprites.dev",
+    anthropicApiKey:
+      process.env.ANTHROPIC_API_KEY || readSetting("anthropic_api_key"),
+    claudeToken:
+      process.env.CLAUDE_CODE_OAUTH_TOKEN || readSetting("claude_token"),
+    openAiApiKey:
+      process.env.OPENAI_API_KEY || readSetting("openai_api_key"),
+    geminiApiKey:
+      process.env.GEMINI_API_KEY || readSetting("gemini_api_key") || undefined,
+    factoryApiKey:
+      process.env.FACTORY_API_KEY || readSetting("factory_api_key") || undefined,
+    defaultModel:
+      process.env.DEFAULT_MODEL ||
+      readSetting("default_model") ||
+      "claude-sonnet-4-6",
+    agentMaxTurns: num(process.env.AGENT_MAX_TURNS, 10),
+    agentTimeoutMs: num(process.env.AGENT_TIMEOUT_MS, 600_000),
+    spriteTimeoutMs: num(process.env.SPRITE_TIMEOUT_MS, 30_000),
+    concurrency: num(process.env.CONCURRENCY, 4),
+    maxSpritesPerEnv: num(process.env.MAX_SPRITES_PER_ENV, 8),
+    sessionMaxAgeMs: num(process.env.SESSION_MAX_AGE_MS, 7 * 24 * 3600 * 1000),
+    sweeperIntervalMs: num(process.env.SWEEPER_INTERVAL_MS, 60_000),
+  };
+}
+
+export function getConfig(): Config {
+  const now = nowMs();
+  if (g.__caConfigCache && now - g.__caConfigCache.at < CACHE_MS) {
+    return g.__caConfigCache.value;
+  }
+  const value = loadConfig();
+  g.__caConfigCache = { at: now, value };
+  return value;
+}
+
+export function invalidateConfigCache(): void {
+  g.__caConfigCache = undefined;
+}
+
+export function writeSetting(key: string, value: string): void {
+  const db = getDb();
+  const now = nowMs();
+  db.prepare(
+    `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+  ).run(key, value, now);
+  invalidateConfigCache();
+}
+
+/** Map of provider token env var names → settings DB keys */
+const TOKEN_TO_SETTING: Record<string, string> = {
+  SPRITE_TOKEN: "sprite_token",
+  ANTHROPIC_API_KEY: "anthropic_api_key",
+  OPENAI_API_KEY: "openai_api_key",
+  GEMINI_API_KEY: "gemini_api_key",
+  FACTORY_API_KEY: "factory_api_key",
+};
+
+export function writeTokenSetting(envVarName: string, value: string): void {
+  const settingKey = TOKEN_TO_SETTING[envVarName];
+  if (settingKey) {
+    writeSetting(settingKey, value);
+  }
+}
