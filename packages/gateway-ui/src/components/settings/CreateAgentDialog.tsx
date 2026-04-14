@@ -42,19 +42,19 @@ export function CreateAgentDialog({ open, onOpenChange }: Props) {
         <div className="flex flex-col gap-4 pt-2">
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs text-muted-foreground">Name</Label>
-            <Input placeholder="My Agent" value={name} onChange={(e) => setName(e.target.value)} className="w-full" />
+            <Input placeholder="My Agent" value={name} onChange={(e) => setName(e.target.value)} className="w-full text-foreground" />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs text-muted-foreground">Engine</Label>
             <Select value={engine} onValueChange={(v) => { setEngine(v); setModel(MODELS[v][0]); }}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full text-foreground"><SelectValue /></SelectTrigger>
               <SelectContent>{ENGINES.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs text-muted-foreground">Model</Label>
             <Select value={model} onValueChange={setModel}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full text-foreground"><SelectValue /></SelectTrigger>
               <SelectContent>{(MODELS[engine] ?? []).map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
             </Select>
           </div>

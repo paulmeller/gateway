@@ -62,12 +62,12 @@ export function CreateEnvironmentDialog({ open, onOpenChange }: Props) {
         <div className="flex flex-col gap-4 pt-2">
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs text-muted-foreground">Name</Label>
-            <Input placeholder="my-env" value={name} onChange={(e) => setName(e.target.value)} className="w-full" />
+            <Input placeholder="my-env" value={name} onChange={(e) => setName(e.target.value)} className="w-full text-foreground" />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs text-muted-foreground">Provider</Label>
             <Select value={provider} onValueChange={(v) => { setProvider(v); setToken(""); }}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full text-foreground"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectGroup>
                   <SelectLabel>Local</SelectLabel>
@@ -83,7 +83,7 @@ export function CreateEnvironmentDialog({ open, onOpenChange }: Props) {
           {needsToken && (
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs text-muted-foreground">{tokenInfo.label}</Label>
-              <Input type="password" placeholder={tokenInfo.placeholder} value={token} onChange={(e) => setToken(e.target.value)} className="w-full font-mono" />
+              <Input type="password" placeholder={tokenInfo.placeholder} value={token} onChange={(e) => setToken(e.target.value)} className="w-full font-mono text-foreground" />
               <p className="text-xs text-muted-foreground/60">Saved to server settings for provider access.</p>
             </div>
           )}

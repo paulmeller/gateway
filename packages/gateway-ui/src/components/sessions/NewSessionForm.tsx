@@ -30,7 +30,7 @@ export function NewSessionForm({ onCreated }: { onCreated: () => void }) {
   return (
     <div className="mt-2 flex flex-col gap-2">
       <Select value={agentId} onValueChange={setAgentId}>
-        <SelectTrigger className="h-8 w-full border-border bg-muted text-xs text-muted-foreground">
+        <SelectTrigger className="h-8 w-full border-border bg-muted text-xs text-foreground">
           <SelectValue placeholder="Agent" />
         </SelectTrigger>
         <SelectContent>
@@ -38,7 +38,7 @@ export function NewSessionForm({ onCreated }: { onCreated: () => void }) {
         </SelectContent>
       </Select>
       <Select value={envId} onValueChange={setEnvId}>
-        <SelectTrigger className="h-8 w-full border-border bg-muted text-xs text-muted-foreground">
+        <SelectTrigger className="h-8 w-full border-border bg-muted text-xs text-foreground">
           <SelectValue placeholder="Environment" />
         </SelectTrigger>
         <SelectContent>
