@@ -1,7 +1,7 @@
 /**
  * M5 sweeper eviction tests — no real sprites.
  *
- * Mocks @/lib/sprite/lifecycle so releaseSession / reconcileOrphans are
+ * Mocks containers/lifecycle (formerly sprite/lifecycle) so releaseSession / reconcileOrphans are
  * no-op spies. Seeds session rows directly and exercises the sweep loop.
  *
  * Covered:
@@ -22,7 +22,7 @@ const reconcileOrphansMock = vi.fn(async () => ({ deleted: 0, kept: 0 }));
 const reconcileDockerOrphansMock = vi.fn(async () => ({ deleted: 0, kept: 0 }));
 
 // Hoisted mock — must be at module top.
-vi.mock("../src/sprite/lifecycle", () => ({
+vi.mock("../src/containers/lifecycle", () => ({
   releaseSession: releaseSessionMock,
   reconcileOrphans: reconcileOrphansMock,
   reconcileDockerOrphans: reconcileDockerOrphansMock,

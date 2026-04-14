@@ -23,13 +23,13 @@ import { runSweep } from "./sessions/sweeper";
 import { getRuntime } from "./state";
 import { runTurn } from "./sessions/driver";
 import { enqueueTurn } from "./queue";
-import { reconcileOrphans, reconcileDockerOrphans } from "./sprite/lifecycle";
+import { reconcileOrphans, reconcileDockerOrphans } from "./containers/lifecycle";
 import { installShutdownHandlers } from "./shutdown";
 import { nowMs } from "./util/clock";
 import { resolveContainerProvider } from "./providers/registry";
 import { getEnvironment } from "./db/environments";
 import { setSessionSprite } from "./db/sessions";
-import * as pool from "./sprite/pool";
+import * as pool from "./containers/pool";
 import type { SessionRow } from "./types";
 
 type GlobalInit = typeof globalThis & {

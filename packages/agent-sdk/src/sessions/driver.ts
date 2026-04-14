@@ -30,8 +30,8 @@ import { getSession, setBackendSessionId, updateSessionStatus, updateSessionMuta
 import { getAgent } from "../db/agents";
 import { getEnvironment } from "../db/environments";
 import { markUserEventProcessed, listEvents } from "../db/events";
-import { acquireForFirstTurn, installSkills } from "../sprite/lifecycle";
-import * as pool from "../sprite/pool";
+import { acquireForFirstTurn, installSkills } from "../containers/lifecycle";
+import * as pool from "../containers/pool";
 import { resolveBackend } from "../backends/registry";
 import { resolveContainerProvider } from "../providers/registry";
 import { BLOCKED_ENV_KEYS } from "../providers/resolve-secrets";

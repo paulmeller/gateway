@@ -1,9 +1,9 @@
 /**
  * Sprites.dev container provider.
  *
- * Wraps the existing `lib/sprite/client.ts` + `lib/sprite/exec.ts`
- * functions behind the `ContainerProvider` interface. No logic changes —
- * just delegation with secrets threading.
+ * Wraps the existing `containers/client.ts` + `containers/exec.ts`
+ * (formerly `sprite/`) functions behind the `ContainerProvider` interface.
+ * No logic changes — just delegation with secrets threading.
  */
 import type { ContainerProvider, ProviderSecrets } from "./types";
 import {
@@ -11,8 +11,8 @@ import {
   deleteSprite,
   listSprites,
   httpExec,
-} from "../sprite/client";
-import { startExec } from "../sprite/exec";
+} from "../containers/client";
+import { startExec } from "../containers/exec";
 import { getConfig } from "../config/index";
 
 export const spritesProvider: ContainerProvider = {

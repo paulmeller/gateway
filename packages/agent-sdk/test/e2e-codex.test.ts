@@ -10,12 +10,12 @@ import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
 
-vi.mock("../src/sprite/exec", async () => {
+vi.mock("../src/containers/exec", async () => {
   const fake = await import("./helpers/fake-exec");
   return { startExec: fake.startExec };
 });
 
-vi.mock("../src/sprite/lifecycle", () => ({
+vi.mock("../src/containers/lifecycle", () => ({
   acquireForFirstTurn: vi.fn(async () => "ca-sess-fake"),
   releaseSession: vi.fn(async () => {}),
   reconcileOrphans: vi.fn(async () => ({ deleted: 0, kept: 0 })),

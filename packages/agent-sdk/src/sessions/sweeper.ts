@@ -28,7 +28,7 @@ import {
   getSessionRow,
   updateSessionStatus,
 } from "../db/sessions";
-import { releaseSession, reconcileOrphans, reconcileDockerOrphans } from "../sprite/lifecycle";
+import { releaseSession, reconcileOrphans, reconcileDockerOrphans } from "../containers/lifecycle";
 
 let sweeping = false;
 let stopping = false;

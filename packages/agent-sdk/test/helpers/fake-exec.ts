@@ -1,12 +1,12 @@
 /**
- * In-process fake of `lib/sprite/exec.startExec` for deterministic driver
- * tests. Tests enqueue scripted NDJSON turns ahead of time; each `startExec`
- * call consumes one turn from the queue, streams it as if it came from
- * claude, and resolves `exit` with code 0.
+ * In-process fake of `containers/exec.startExec` (formerly `sprite/exec`)
+ * for deterministic driver tests. Tests enqueue scripted NDJSON turns ahead
+ * of time; each `startExec` call consumes one turn from the queue, streams
+ * it as if it came from claude, and resolves `exit` with code 0.
  *
  * Usage:
  *
- *   vi.mock("../../src/sprite/exec", async () => {
+ *   vi.mock("../../src/containers/exec", async () => {
  *     const fake = await import("./helpers/fake-exec");
  *     return { startExec: fake.startExec };
  *   });
@@ -15,7 +15,7 @@
  *   fake.enqueueTurn({ ndjson: [...], onStdin: (body) => capture = body });
  *   await runTurn(sessionId, [...]);
  */
-import type { ExecSession } from "../../src/sprite/exec";
+import type { ExecSession } from "../../src/containers/exec";
 
 export interface FakeTurn {
   ndjson: string[];

@@ -8,7 +8,7 @@ import {
   deleteEnvironment,
   hasSessionsAttached,
 } from "../db/environments";
-import { kickoffEnvironmentSetup } from "../sprite/setup";
+import { kickoffEnvironmentSetup } from "../containers/setup";
 import { resolveContainerProvider as resolveProvider } from "../providers/registry";
 import { isProxied, markProxied, unmarkProxied } from "../db/proxy";
 import { forwardToAnthropic } from "../proxy/forward";

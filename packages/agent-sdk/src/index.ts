@@ -91,9 +91,9 @@ export { resolveContainerProvider } from "./providers/registry";
 // Proxy
 export { forwardToAnthropic, validateAnthropicProxy } from "./proxy/forward";
 
-// Sprite/lifecycle
-export { releaseSession } from "./sprite/lifecycle";
-export { kickoffEnvironmentSetup } from "./sprite/setup";
+// Container lifecycle
+export { releaseSession } from "./containers/lifecycle";
+export { kickoffEnvironmentSetup } from "./containers/setup";
 
 // OpenAPI
 export { buildOpenApiDocument } from "./openapi/spec";

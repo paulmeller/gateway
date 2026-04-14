@@ -13,7 +13,7 @@ import { getEnvironment } from "../db/environments";
 import { getActor, dropActor } from "../sessions/actor";
 import { appendEvent, dropEmitter } from "../sessions/bus";
 import { interruptSession } from "../sessions/interrupt";
-import { releaseSession } from "../sprite/lifecycle";
+import { releaseSession } from "../containers/lifecycle";
 import { isProxied, markProxied, unmarkProxied } from "../db/proxy";
 import { forwardToAnthropic } from "../proxy/forward";
 import { badRequest, notFound } from "../errors";
