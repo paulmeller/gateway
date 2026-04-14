@@ -56,7 +56,6 @@ export function registerServeCommand(parent: Command): void {
       console.log("");
       console.log(`  → Website: https://www.agentstep.com`);
       console.log(`  → Docs:    https://www.agentstep.com/docs`);
-      console.log(`  → Skills:  https://skills.sh`);
       console.log("");
 
       serve({ fetch: app.fetch, port });
