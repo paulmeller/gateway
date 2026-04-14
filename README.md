@@ -8,11 +8,11 @@ The harness that harnesses other harnesses! Run AI agents across multiple backen
 
 - **Multi-backend** — Claude, Codex, OpenCode, Gemini, Factory behind one API
 - **Claude Managed Agents compatible** — implements the Anthropic Managed Agents API
-- **Sandboxed environments** — 10 providers: local (Docker, Podman, Apple Container, AgentStep Firecracker microVM) and cloud (Sprites, E2B, Fly, Vercel, Daytona, Modal)
+- **Sandboxed environments** — 11 providers: local (Docker, Podman, Apple Container, mvm/Firecracker) and cloud (Sprites, E2B, Fly, Vercel, Daytona, Modal)
 - **Multi-agent threads** — agents can spawn other agents, max depth 3
 - **Self-hosted** — runs on your infrastructure, data never leaves your machine
-- **CLI-first** — `gateway quickstart` gets you chatting in under 5 minutes
-- **Built-in web UI** — dashboard at localhost:4000
+- **CLI-first** — `gateway quickstart` with interactive prompts, markdown rendering, and rich tool output
+- **Built-in web UI** — React + shadcn/ui dashboard at localhost:4000 with chat, settings, debug panel
 - **Open source** — Apache 2.0 license, no CLA
 
 ## Quick Start (AI-Guided)
@@ -49,7 +49,7 @@ Server starts at http://localhost:4000 with UI, API (`/v1`), and docs (`/v1/docs
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 22+
 - At least one API key: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY`
 
 ### Install the CLI
@@ -82,9 +82,10 @@ Creates an agent + environment + session and drops you into an interactive chat.
 |---------|-----|-------------|
 | `packages/agent-sdk` | [`@agentstep/agent-sdk`](https://www.npmjs.com/package/@agentstep/agent-sdk) | Engine — backends, providers, DB, session management |
 | `packages/gateway` | [`@agentstep/gateway`](https://www.npmjs.com/package/@agentstep/gateway) | CLI tool (`gateway`) |
-| `packages/gateway-hono` | `@agentstep/gateway-hono` | Example: Hono server (used by `gateway serve`) |
-| `packages/gateway-fastify` | `@agentstep/gateway-fastify` | Example: Fastify server |
-| `packages/gateway-next` | `@agentstep/gateway-next` | Example: Next.js integration |
+| `packages/gateway-ui` | `@agentstep/gateway-ui` | React + shadcn/ui web app (built into CLI) |
+| `packages/gateway-hono` | `@agentstep/gateway-hono` | Hono server adapter (used by `gateway serve`) |
+| `packages/gateway-fastify` | `@agentstep/gateway-fastify` | Fastify server adapter |
+| `packages/gateway-next` | `@agentstep/gateway-next` | Next.js integration |
 
 The server packages are reference implementations. The hosted product ([agentstep.com](https://www.agentstep.com)) uses `@agentstep/agent-sdk` directly.
 
@@ -94,12 +95,13 @@ Claude, Codex, OpenCode, Gemini, Factory.
 
 ### Environment Providers
 
-Sprites (default), Docker, Apple Container, Apple Firecracker, Podman, E2B, Vercel, Daytona, Fly, Modal.
+**Local:** Docker, Apple Container, Apple Firecracker (mvm), Podman
+**Cloud:** Sprites (default), E2B, Vercel, Daytona, Fly, Modal
 
 ## CLI
 
 ```bash
-gateway agents create --name mybot --model claude-sonnet-4-20250514
+gateway agents create --name mybot --model claude-sonnet-4-6
 gateway environments create --name dev --provider docker
 gateway sessions create --agent <id> --environment <id>
 gateway quickstart                    # one-command agent + env + session

@@ -82,9 +82,20 @@ All handlers use `routeWrap()` from `http.ts` which handles init-on-first-reques
 
 libsql (SQLite) with WAL mode. Schema is idempotent (`CREATE TABLE IF NOT EXISTS` in `db/migrations.ts`). On first run, auto-seeds an API key and writes it to `.env`.
 
+### CLI features
+
+- **Interactive quickstart**: `@clack/prompts` with arrow-key selection for agents, environments, providers
+- **Rich chat output**: Markdown rendering via custom chalk renderer, box-drawn tool call sections, token usage display
+- **Multi-line input**: Type `"""` to enter/exit multi-line mode in chat
+- **Session info header**: Shows agent name, model, environment on chat start
+- **Elapsed time spinner**: "Agent is thinking... (3s)"
+- **Debug**: `DEBUG_NDJSON=1` shows raw NDJSON, exec argv, and stderr from backends
+
 ### Tests
 
-280+ tests across two main test files:
-- `test/api-comprehensive.test.ts` (144 tests) — full API surface coverage
-- `test/cli-local-backend.test.ts` (63 tests) — CLI handler-based flow
-- Plus 73 existing unit/integration tests
+340 tests across 19 test files:
+- `test/api-comprehensive.test.ts` (150) — full API surface + createApiKey + writeSetting
+- `test/cli-local-backend.test.ts` (63) — CLI handler-based flow
+- `test/translator-*.test.ts` (64) — all 5 backend translators + error handling
+- `test/sdk-exports.test.ts` (13) — SDK exports + provider registry
+- Plus existing unit tests for bus, actor, tools, sweeper, ndjson
