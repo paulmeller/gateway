@@ -141,6 +141,15 @@ export async function runTurn(
   // Mark each pending input as processed-now
   for (const p of inputs) markUserEventProcessed(p.eventId, nowMs());
 
+  // Auto-title from first user message if session has no title yet
+  const row = getSessionRow(sessionId);
+  if (row && row.title == null) {
+    const firstText = inputs.find((i): i is Extract<TurnInput, { kind: "text" }> => i.kind === "text");
+    if (firstText?.text) {
+      updateSessionMutable(sessionId, { title: firstText.text.slice(0, 60) });
+    }
+  }
+
   // Acquire sprite if needed
   console.log(`[driver] ${sessionId} acquiring container...`);
   let spriteName: string;
@@ -148,11 +157,13 @@ export async function runTurn(
     spriteName = await acquireForFirstTurn(sessionId);
     console.log(`[driver] ${sessionId} container ready: ${spriteName}`);
 
-    // Re-inject skills if agent has been updated with new skills since container creation
+    // Re-inject skills if agent has been updated (new or changed skills)
     const latestAgent = getAgent(session.agent.id);
     if (latestAgent && latestAgent.skills && latestAgent.skills.length > 0) {
-      const currentSkillNames = new Set(agent.skills?.map(s => s.name) ?? []);
-      const newSkills = latestAgent.skills.filter(s => !currentSkillNames.has(s.name));
+      const currentSkills = new Map((agent.skills ?? []).map(s => [s.name, s.content.length]));
+      const newSkills = latestAgent.skills.filter(s =>
+        !currentSkills.has(s.name) || currentSkills.get(s.name) !== s.content.length
+      );
       if (newSkills.length > 0) {
         console.log(`[driver] ${sessionId} injecting ${newSkills.length} new skill(s)...`);
         const envRow = getEnvironment(session.environment_id);
@@ -405,21 +416,6 @@ export async function runTurn(
           };
         });
         appendEventsBatch(sessionId, batchInputs);
-
-        // Auto-generate session title from first agent.message text
-        for (const t of batch) {
-          if (t.type === "agent.message") {
-            const row = getSessionRow(sessionId);
-            if (row && row.title == null) {
-              const content = t.payload.content as Array<{ type: string; text?: string }> | undefined;
-              const text = content?.find((c) => c.type === "text" && c.text)?.text;
-              if (text) {
-                updateSessionMutable(sessionId, { title: text.slice(0, 60) });
-              }
-            }
-            break; // only need the first agent.message
-          }
-        }
       }
     }
     const exitResult = await exec.exit;

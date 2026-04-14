@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { ArrowUp, AlertTriangle } from "lucide-react";
+import { ArrowUp, Square, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAppStore } from "@/stores/app-store";
@@ -24,6 +24,7 @@ export function ChatInput() {
   const providerName = env?.config?.provider || "sprites";
   const status = providerStatus?.[providerName];
   const providerAvailable = status?.available ?? true;
+  const isRunning = session?.status === "running";
 
   async function handleSend() {
     if (!sessionId || !text.trim() || sending || !providerAvailable) return;
@@ -40,6 +41,16 @@ export function ChatInput() {
       setSending(false);
       textareaRef.current?.focus();
     }
+  }
+
+  async function handleStop() {
+    if (!sessionId) return;
+    try {
+      await api(`/sessions/${sessionId}/events`, {
+        method: "POST",
+        body: JSON.stringify({ events: [{ type: "interrupt" }] }),
+      });
+    } catch { /* best effort */ }
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -67,14 +78,24 @@ export function ChatInput() {
           className="min-h-[44px] max-h-[200px] resize-none border-border bg-muted text-sm text-foreground placeholder:text-muted-foreground focus-visible:ring-ring disabled:opacity-50"
           rows={1}
         />
-        <Button
-          size="icon"
-          className="size-[44px] shrink-0 bg-cta-gradient text-black hover:opacity-90 disabled:opacity-30"
-          onClick={handleSend}
-          disabled={!text.trim() || sending || !providerAvailable}
-        >
-          <ArrowUp className="size-4" />
-        </Button>
+        {isRunning ? (
+          <Button
+            size="icon"
+            className="size-[44px] shrink-0 bg-red-500 text-white hover:bg-red-600 animate-pulse"
+            onClick={handleStop}
+          >
+            <Square className="size-3.5" />
+          </Button>
+        ) : (
+          <Button
+            size="icon"
+            className="size-[44px] shrink-0 bg-cta-gradient text-black hover:opacity-90 disabled:opacity-30"
+            onClick={handleSend}
+            disabled={!text.trim() || sending || !providerAvailable}
+          >
+            <ArrowUp className="size-4" />
+          </Button>
+        )}
       </div>
     </div>
   );

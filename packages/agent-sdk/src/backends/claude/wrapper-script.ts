@@ -37,8 +37,11 @@ if [ "$(id -u)" = "0" ]; then
   chown agent "$ENV_FILE" "$PROMPT_FILE"
   exec su -s /bin/sh agent -c ". $ENV_FILE && HOME=/home/agent claude $* < $PROMPT_FILE; rm -f $ENV_FILE $PROMPT_FILE"
 fi
-exec claude "$@" < "$PROMPT_FILE"
+# Run claude and clean up temp file (no exec — let cleanup run)
+claude "$@" < "$PROMPT_FILE"
+EXIT_CODE=$?
 rm -f "$PROMPT_FILE"
+exit $EXIT_CODE
 `;
 
 export async function installClaudeWrapper(spriteName: string, provider: ContainerProvider): Promise<void> {

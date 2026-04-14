@@ -2,7 +2,7 @@ import { z } from "zod";
 import { routeWrap, jsonOk } from "../http";
 import { createVault, getVault, deleteVault, listVaults, listEntries, getEntry, setEntry, deleteEntry } from "../db/vaults";
 import { getAgent } from "../db/agents";
-import { badRequest, notFound } from "../errors";
+import { badRequest, notFound, conflict } from "../errors";
 
 const CreateVaultSchema = z.object({
   agent_id: z.string().min(1),
@@ -21,6 +21,12 @@ export function handleCreateVault(request: Request): Promise<Response> {
 
     const agent = getAgent(parsed.data.agent_id);
     if (!agent) throw notFound(`agent not found: ${parsed.data.agent_id}`);
+
+    // Check for duplicate vault name on same agent
+    const existing = listVaults({ agent_id: parsed.data.agent_id });
+    if (existing.some(v => v.name === parsed.data.name)) {
+      throw conflict(`Vault "${parsed.data.name}" already exists for this agent`);
+    }
 
     const vault = createVault({
       agent_id: parsed.data.agent_id,
@@ -84,7 +90,7 @@ export function handlePutEntry(request: Request, vaultId: string, key: string): 
     if (!parsed.success) throw badRequest(parsed.error.message);
 
     setEntry(vaultId, key, parsed.data.value);
-    return jsonOk({ key, value: parsed.data.value });
+    return jsonOk({ key, ok: true });
   });
 }
 

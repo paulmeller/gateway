@@ -60,7 +60,7 @@ import {
 const app = new Hono();
 
 // ── Built-in Web UI (SPA — serve index for all client routes) ────────────
-const serveUI = () => handleGetUI({ apiKey: process.env.SEED_API_KEY, version: process.env.GATEWAY_VERSION });
+const serveUI = () => handleGetUI({ apiKey: process.env.SEED_API_KEY, version: process.env.GATEWAY_VERSION, sentryDsn: process.env.SENTRY_DSN });
 app.get("/", serveUI);
 app.get("/settings", serveUI);
 app.get("/settings/agents/:id", serveUI);

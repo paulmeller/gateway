@@ -25,7 +25,7 @@ const output = `// AUTO-GENERATED — do not edit. Run: npm run build:ui
 const HTML_TEMPLATE = \`${escaped}\`;
 const UI_VERSION = "${hash}";
 
-export async function handleGetUI(opts?: { apiKey?: string; version?: string }): Promise<Response> {
+export async function handleGetUI(opts?: { apiKey?: string; version?: string; sentryDsn?: string }): Promise<Response> {
   let body = HTML_TEMPLATE;
   const scripts: string[] = [];
   if (opts?.apiKey) {
@@ -39,6 +39,9 @@ export async function handleGetUI(opts?: { apiKey?: string; version?: string }):
   }
   if (opts?.version) {
     scripts.push(\`window.__MA_VERSION__="\${opts.version}";\`);
+  }
+  if (opts?.sentryDsn) {
+    scripts.push(\`window.__MA_SENTRY_DSN__="\${opts.sentryDsn}";\`);
   }
   body = body.replace(
     "__INJECT__",

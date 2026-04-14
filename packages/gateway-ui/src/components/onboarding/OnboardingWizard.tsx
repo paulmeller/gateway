@@ -118,18 +118,30 @@ export function OnboardingWizard() {
       } else {
         const secretEntries = Object.entries(secrets).filter(([, v]) => v.trim());
         if (secretEntries.length > 0) {
+          // Find or create a vault for this agent
+          let vaultId: string;
           if (existingVaultIds.length > 0) {
-            const vaultId = existingVaultIds[0];
-            for (const [key, value] of secretEntries) {
-              await putEntry.mutateAsync({ vaultId, key, value });
-            }
+            vaultId = existingVaultIds[0];
           } else {
-            const vault = await createVault.mutateAsync({ name: "default", agent_id: agentId });
-            for (const [key, value] of secretEntries) {
-              await putEntry.mutateAsync({ vaultId: vault.id, key, value });
+            // Check if agent already has a "default" vault from a previous run
+            try {
+              const res = await api<{ data: Array<{ id: string; name: string }> }>(`/vaults?agent_id=${agentId}`);
+              const existing = res.data.find(v => v.name === "default");
+              if (existing) {
+                vaultId = existing.id;
+              } else {
+                const vault = await createVault.mutateAsync({ name: "default", agent_id: agentId });
+                vaultId = vault.id;
+              }
+            } catch {
+              const vault = await createVault.mutateAsync({ name: `vault-${Date.now()}`, agent_id: agentId });
+              vaultId = vault.id;
             }
-            vaultIds = [vault.id];
           }
+          for (const [key, value] of secretEntries) {
+            await putEntry.mutateAsync({ vaultId, key, value });
+          }
+          vaultIds = [vaultId];
         }
       }
 

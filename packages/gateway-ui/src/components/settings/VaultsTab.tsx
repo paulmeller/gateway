@@ -4,7 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useVaults, useVaultEntries, useDeleteVault, usePutVaultEntry, useDeleteVaultEntry } from "@/hooks/use-vaults";
+import { useVaults, useVaultEntries, useCreateVault, useDeleteVault, usePutVaultEntry, useDeleteVaultEntry } from "@/hooks/use-vaults";
+import { useAgents } from "@/hooks/use-agents";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { PageHeader } from "./PageHeader";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -25,12 +30,16 @@ export function VaultsTab() {
   const { data: vaults } = useVaults();
   const deleteVault = useDeleteVault();
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [deleteVaultTarget, setDeleteVaultTarget] = useState<{ id: string; name: string } | null>(null);
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Credential vaults"
         description="Manage credential vaults that provide agents with access to APIs and services."
+        actionLabel="New vault"
+        onAction={() => setCreateOpen(true)}
       />
 
       {vaults && vaults.length > 0 ? (
@@ -54,7 +63,7 @@ export function VaultsTab() {
                   vault={v}
                   expanded={expandedId === v.id}
                   onToggle={() => setExpandedId(expandedId === v.id ? null : v.id)}
-                  onDelete={() => deleteVault.mutate(v.id)}
+                  onDelete={() => setDeleteVaultTarget({ id: v.id, name: v.name })}
                 />
               ))}
             </TableBody>
@@ -62,10 +71,81 @@ export function VaultsTab() {
         </div>
       ) : (
         <p className="py-8 text-center text-sm text-muted-foreground">
-          No vaults yet. Vaults are created automatically during onboarding or environment setup.
+          No vaults yet. Create one to store API keys and credentials.
         </p>
       )}
+
+      <CreateVaultDialog open={createOpen} onOpenChange={setCreateOpen} />
+
+      <AlertDialog open={!!deleteVaultTarget} onOpenChange={(open) => !open && setDeleteVaultTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete vault "{deleteVaultTarget?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>This will permanently delete the vault and all its entries. This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={() => { if (deleteVaultTarget) deleteVault.mutate(deleteVaultTarget.id); setDeleteVaultTarget(null); }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
+  );
+}
+
+function CreateVaultDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const create = useCreateVault();
+  const { data: agents } = useAgents();
+  const [name, setName] = useState("");
+  const [agentId, setAgentId] = useState("");
+
+  async function handleCreate() {
+    if (!name.trim() || !agentId) return;
+    try {
+      await create.mutateAsync({ name: name.trim(), agent_id: agentId });
+      setName("");
+      setAgentId("");
+      toast.success("Vault created");
+      onOpenChange(false);
+    } catch (err: unknown) {
+      const msg = (err as { body?: { error?: { message?: string } } })?.body?.error?.message
+        || (err instanceof Error ? err.message : "Failed to create vault");
+      toast.error(msg);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>New vault</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-4 pt-2">
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs text-muted-foreground">Name</Label>
+            <Input placeholder="default" value={name} onChange={(e) => setName(e.target.value)} className="w-full text-foreground" />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs text-muted-foreground">Agent</Label>
+            <Select value={agentId} onValueChange={setAgentId}>
+              <SelectTrigger className="w-full text-foreground"><SelectValue placeholder="Select an agent" /></SelectTrigger>
+              <SelectContent>
+                {agents?.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button className="bg-cta-gradient text-black hover:opacity-90" onClick={handleCreate} disabled={!name.trim() || !agentId || create.isPending}>Create</Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

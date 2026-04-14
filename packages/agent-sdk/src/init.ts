@@ -28,6 +28,7 @@ import { installShutdownHandlers } from "./shutdown";
 import { nowMs } from "./util/clock";
 import { resolveContainerProvider } from "./providers/registry";
 import { getEnvironment } from "./db/environments";
+import { initSentry } from "./sentry";
 import { setSessionSprite } from "./db/sessions";
 import * as pool from "./containers/pool";
 import type { SessionRow } from "./types";
@@ -45,6 +46,9 @@ export async function ensureInitialized(): Promise<void> {
 }
 
 async function doInit(): Promise<void> {
+  // 0. Sentry (no-op if SENTRY_DSN not set)
+  initSentry();
+
   // 1. Bootstrap DB + migrations
   getDb();
 

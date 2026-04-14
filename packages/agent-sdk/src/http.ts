@@ -9,7 +9,8 @@
  */
 import { ensureInitialized } from "./init";
 import { authenticate } from "./auth/middleware";
-import { toResponse } from "./errors";
+import { toResponse, ApiError } from "./errors";
+import { captureException } from "./sentry";
 import type { AuthContext } from "./types";
 
 export interface RouteContext {
@@ -26,6 +27,10 @@ export async function routeWrap(
     const auth = await authenticate(request);
     return await handler({ auth, request });
   } catch (err) {
+    // Report unexpected errors to Sentry (skip expected API errors like 400/404)
+    if (!(err instanceof ApiError) || err.status >= 500) {
+      captureException(err);
+    }
     return toResponse(err);
   }
 }

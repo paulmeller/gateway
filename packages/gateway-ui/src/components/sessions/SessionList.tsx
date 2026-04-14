@@ -12,7 +12,11 @@ export function SessionList() {
   }
 
   if (!sessions?.length) {
-    return <p className="px-4 py-2 text-xs text-muted-foreground">No sessions yet</p>;
+    return (
+      <p className="px-4 py-3 text-xs text-sidebar-foreground/30">
+        Complete the setup to start your first session.
+      </p>
+    );
   }
 
   const active = sessions.filter((s) => s.status === "running");

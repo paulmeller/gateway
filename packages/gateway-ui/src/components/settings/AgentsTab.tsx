@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useAgents, useDeleteAgent } from "@/hooks/use-agents";
 import { useAppStore } from "@/stores/app-store";
 import { CreateAgentDialog } from "./CreateAgentDialog";
@@ -26,6 +27,7 @@ export function AgentsTab() {
   const del = useDeleteAgent();
   const setSelectedAgentId = useAppStore((s) => s.setSelectedAgentId);
   const [createOpen, setCreateOpen] = useState(false);
+  const [deleteAgent, setDeleteAgent] = useState<{ id: string; name: string } | null>(null);
 
   return (
     <div className="flex flex-col gap-6">
@@ -70,7 +72,7 @@ export function AgentsTab() {
                         <DropdownMenuItem onSelect={() => setTimeout(() => setSelectedAgentId(a.id), 0)}>
                           <Pencil className="mr-2 size-3.5" /> Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onSelect={() => { del.mutate(a.id); }}>
+                        <DropdownMenuItem className="text-destructive" onSelect={() => setDeleteAgent({ id: a.id, name: a.name })}>
                           <Trash2 className="mr-2 size-3.5" /> Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -86,6 +88,24 @@ export function AgentsTab() {
       )}
 
       <CreateAgentDialog open={createOpen} onOpenChange={setCreateOpen} />
+
+      <AlertDialog open={!!deleteAgent} onOpenChange={(open) => !open && setDeleteAgent(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {deleteAgent?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={() => { if (deleteAgent) del.mutate(deleteAgent.id); setDeleteAgent(null); }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

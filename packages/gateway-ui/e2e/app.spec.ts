@@ -267,3 +267,92 @@ test.describe("URL Routing", () => {
     expect(page.url()).not.toContain("/settings");
   });
 });
+
+test.describe("UX Polish", () => {
+  test("empty state shows setup hint", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+    // Should show either "Complete the setup" hint or wizard
+    const hasHint = await page.getByText("Complete the setup").isVisible().catch(() => false);
+    const hasWizard = await page.getByText("Step 1 of 4").isVisible().catch(() => false);
+    expect(hasHint || hasWizard).toBe(true);
+  });
+
+  test("keyboard shortcut Cmd+, opens settings", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+    await page.keyboard.press("Meta+,");
+    await page.waitForTimeout(500);
+    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  });
+
+  test("keyboard shortcut Escape closes settings", async ({ page }) => {
+    await page.goto("/settings");
+    await page.waitForLoadState("networkidle");
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(500);
+    expect(page.url()).not.toContain("/settings");
+  });
+
+  test("agent delete shows confirmation dialog", async ({ page }) => {
+    await page.goto("/settings");
+    await page.waitForLoadState("networkidle");
+    // If agents exist, try to delete one
+    const moreBtn = page.locator("table button").last();
+    if (await moreBtn.isVisible().catch(() => false)) {
+      await moreBtn.click();
+      const deleteItem = page.getByText("Delete").last();
+      if (await deleteItem.isVisible().catch(() => false)) {
+        await deleteItem.click();
+        await page.waitForTimeout(300);
+        // Should show AlertDialog
+        const hasDialog = await page.getByText("cannot be undone").isVisible().catch(() => false);
+        expect(hasDialog).toBe(true);
+        // Cancel it
+        await page.getByRole("button", { name: "Cancel" }).click();
+      }
+    }
+  });
+
+  test("vaults page has New vault button", async ({ page }) => {
+    await page.goto("/settings");
+    await page.waitForLoadState("networkidle");
+    await page.getByRole("tab", { name: "Vaults" }).click();
+    await page.waitForTimeout(300);
+    await expect(page.getByText("New vault")).toBeVisible();
+  });
+});
+
+test.describe("Vault API — Duplicate Prevention", () => {
+  test.beforeAll(async () => {
+    if (!apiKey) apiKey = await getApiKey("http://localhost:4111");
+  });
+
+  test("rejects duplicate vault name on same agent", async ({ request }) => {
+    // Create agent first
+    const agentRes = await request.post("/v1/agents", {
+      headers: { "x-api-key": apiKey, "content-type": "application/json" },
+      data: { name: `vault-test-agent-${Date.now()}`, model: "claude-sonnet-4-6" },
+    });
+    const agent = await agentRes.json();
+
+    // Create first vault
+    const v1 = await request.post("/v1/vaults", {
+      headers: { "x-api-key": apiKey, "content-type": "application/json" },
+      data: { name: "default", agent_id: agent.id },
+    });
+    expect(v1.status()).toBe(201);
+
+    // Try duplicate
+    const v2 = await request.post("/v1/vaults", {
+      headers: { "x-api-key": apiKey, "content-type": "application/json" },
+      data: { name: "default", agent_id: agent.id },
+    });
+    expect(v2.status()).toBe(409);
+
+    // Cleanup
+    const v1Body = await v1.json();
+    await request.delete(`/v1/vaults/${v1Body.id}`, { headers: { "x-api-key": apiKey } });
+    await request.delete(`/v1/agents/${agent.id}`, { headers: { "x-api-key": apiKey } });
+  });
+});

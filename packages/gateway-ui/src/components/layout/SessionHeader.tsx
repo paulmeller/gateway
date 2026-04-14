@@ -13,6 +13,8 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useAppStore } from "@/stores/app-store";
 import { useSession } from "@/hooks/use-sessions";
+import { useAgent } from "@/hooks/use-agents";
+import { useEnvironments } from "@/hooks/use-environments";
 import { AgentPopover } from "@/components/popovers/AgentPopover";
 import { EnvironmentPopover } from "@/components/popovers/EnvironmentPopover";
 
@@ -20,6 +22,9 @@ export function SessionHeader() {
   const sessionId = useAppStore((s) => s.activeSessionId);
   const { debugOpen, toggleDebug } = useAppStore();
   const { data: session } = useSession(sessionId);
+  const { data: agent } = useAgent(session?.agent?.id ?? null);
+  const { data: environments } = useEnvironments();
+  const env = environments?.find((e) => e.id === session?.environment_id);
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">
@@ -32,7 +37,7 @@ export function SessionHeader() {
               <BreadcrumbItem className="hidden md:block">
                 <AgentPopover agentId={session.agent.id}>
                   <button className="text-sm font-medium hover:text-foreground transition-colors">
-                    {session.title || "Agent"}
+                    {agent?.name || "Agent"}
                   </button>
                 </AgentPopover>
               </BreadcrumbItem>
@@ -40,7 +45,7 @@ export function SessionHeader() {
               <BreadcrumbItem>
                 <EnvironmentPopover envId={session.environment_id}>
                   <BreadcrumbPage className="font-mono text-xs cursor-pointer hover:text-foreground transition-colors">
-                    env
+                    {env?.name || "env"}
                   </BreadcrumbPage>
                 </EnvironmentPopover>
               </BreadcrumbItem>

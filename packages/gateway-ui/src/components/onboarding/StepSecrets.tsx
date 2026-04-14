@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,7 +18,7 @@ interface Props {
 
 export function StepSecrets({ engine, model, provider, hasExistingVaults, onNext, onSkip, onSelectVault }: Props) {
   const [values, setValues] = useState<Record<string, string>>({});
-  const [mode, setMode] = useState<"existing" | "vault" | "new">(hasExistingVaults ? "existing" : "vault");
+  const [mode, setMode] = useState<"existing" | "vault" | "new">(hasExistingVaults ? "existing" : "new");
   const [selectedVaultId, setSelectedVaultId] = useState("");
   const { data: vaults } = useVaults();
   // Deduplicate by name — keep the most recent (first in list, API returns desc)
@@ -49,6 +49,12 @@ export function StepSecrets({ engine, model, provider, hasExistingVaults, onNext
   }
 
   const showVaultOption = availableVaults.length > 0;
+
+  // If current mode isn't available, fall back to "new"
+  useEffect(() => {
+    if (mode === "existing" && !hasExistingVaults) setMode("new");
+    if (mode === "vault" && !showVaultOption) setMode("new");
+  }, [mode, hasExistingVaults, showVaultOption]);
 
   return (
     <div className="w-full max-w-md flex flex-col gap-6">
@@ -88,6 +94,7 @@ export function StepSecrets({ engine, model, provider, hasExistingVaults, onNext
           </button>
         </div>
       )}
+
 
       {mode === "existing" && hasExistingVaults && (
         <div className="flex flex-col gap-3">

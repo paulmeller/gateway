@@ -1,7 +1,8 @@
+import { useState } from "react";
 import Markdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
-import { Terminal } from "lucide-react";
+import { Terminal, Brain, ChevronRight } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ToolCallCard } from "./ToolCallCard";
 import type { SessionEvent } from "@/hooks/use-events";
@@ -25,8 +26,9 @@ export function MessageBubble({ event }: Props) {
   if (type === "agent.message") {
     const text = extractText(event);
     return (
-      <div className="py-1.5">
-        <div className="prose prose-sm prose-invert max-w-none text-sm leading-relaxed">
+      <div className="py-1.5 flex gap-2.5">
+        <span className="size-1.5 mt-2 shrink-0 rounded-full bg-lime-400 shadow-[0_0_4px_rgba(163,230,53,0.4)]" />
+        <div className="prose prose-sm prose-invert max-w-none text-sm leading-relaxed min-w-0">
           <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>{text}</Markdown>
         </div>
       </div>
@@ -34,12 +36,7 @@ export function MessageBubble({ event }: Props) {
   }
 
   if (type === "agent.thinking") {
-    const text = extractText(event);
-    return (
-      <div className="py-1">
-        <p className="text-xs italic text-muted-foreground">{text}</p>
-      </div>
-    );
+    return <ThinkingBlock event={event} />;
   }
 
   if (type === "agent.tool_use" || type === "agent.custom_tool_use") {
@@ -88,6 +85,28 @@ export function MessageBubble({ event }: Props) {
   }
 
   return null;
+}
+
+function ThinkingBlock({ event }: { event: SessionEvent }) {
+  const [open, setOpen] = useState(false);
+  const text = extractText(event);
+  return (
+    <div className="py-1">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <Brain className="size-3 text-muted-foreground/60" />
+        <span>Thinking...</span>
+        <ChevronRight className={`size-3 transition-transform ${open ? "rotate-90" : ""}`} />
+      </button>
+      {open && (
+        <div className="mt-1.5 rounded bg-muted px-3 py-2">
+          <p className="text-xs text-muted-foreground whitespace-pre-wrap">{text}</p>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function extractText(event: SessionEvent): string {

@@ -69,6 +69,23 @@ interface CacheEntry<T> {
 const feedCache: CacheEntry<FeedData> = { data: null, fetchedAt: 0, etag: null, promise: null };
 const indexCache: CacheEntry<IndexData> = { data: null, fetchedAt: 0, etag: null, promise: null };
 
+// Pre-sorted views — built once when index loads, avoids re-sorting 72k items per search
+let sortedViews: {
+  allTime: IndexSkill[];
+  trending: IndexSkill[];
+  hot: IndexSkill[];
+  newest: IndexSkill[];
+} | null = null;
+
+function buildSortedViews(items: IndexSkill[]) {
+  sortedViews = {
+    allTime: [...items].sort((a, b) => b.installsAllTime - a.installsAllTime),
+    trending: [...items].sort((a, b) => b.installsTrending - a.installsTrending),
+    hot: [...items].sort((a, b) => b.installsHot - a.installsHot),
+    newest: [...items].sort((a, b) => new Date(b.firstSeenAt).getTime() - new Date(a.firstSeenAt).getTime()),
+  };
+}
+
 // --- Feed ---
 
 async function fetchFeed(): Promise<FeedData> {
@@ -127,6 +144,7 @@ async function fetchIndex(): Promise<IndexData> {
     indexCache.data = data;
     indexCache.fetchedAt = Date.now();
     indexCache.etag = etag;
+    buildSortedViews(data.items);
     return data;
   } finally {
     clearTimeout(timeout);
@@ -193,12 +211,17 @@ export async function searchSkills(opts: SearchOptions): Promise<SearchResult> {
     items = items.filter((s) => s.source.toLowerCase() === src);
   }
 
-  // Sort
+  // Sort — use pre-sorted views when no filters applied (fast path)
   const sort = opts.sort ?? "allTime";
-  if (sort === "trending") items = [...items].sort((a, b) => b.installsTrending - a.installsTrending);
-  else if (sort === "hot") items = [...items].sort((a, b) => b.installsHot - a.installsHot);
-  else if (sort === "newest") items = [...items].sort((a, b) => new Date(b.firstSeenAt).getTime() - new Date(a.firstSeenAt).getTime());
-  else items = [...items].sort((a, b) => b.installsAllTime - a.installsAllTime);
+  const hasFilters = opts.q || opts.owner || opts.source || opts.repo;
+  if (!hasFilters && sortedViews) {
+    items = sortedViews[sort];
+  } else {
+    if (sort === "trending") items = [...items].sort((a, b) => b.installsTrending - a.installsTrending);
+    else if (sort === "hot") items = [...items].sort((a, b) => b.installsHot - a.installsHot);
+    else if (sort === "newest") items = [...items].sort((a, b) => new Date(b.firstSeenAt).getTime() - new Date(a.firstSeenAt).getTime());
+    else items = [...items].sort((a, b) => b.installsAllTime - a.installsAllTime);
+  }
 
   const total = items.length;
   const limit = Math.min(opts.limit ?? 50, 200);

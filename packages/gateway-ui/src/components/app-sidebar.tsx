@@ -28,12 +28,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <a href="/">
-                <div className="size-8 rounded-full bg-cta-gradient" />
-                <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="font-semibold">AgentStep</span>
-                  <span className="text-xs">Gateway</span>
-                </div>
+              <a href="/" className="flex items-center gap-1.5">
+                <span className="size-2 rounded-full bg-lime-400 shadow-[0_0_8px_2px_rgba(163,230,53,0.6),0_0_20px_4px_rgba(163,230,53,0.3)] shrink-0" />
+                <span className="font-semibold tracking-tight font-mono text-[15px] text-foreground">agentstep</span>
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
