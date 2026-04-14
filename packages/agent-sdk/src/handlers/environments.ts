@@ -75,12 +75,16 @@ export function handleCreateEnvironment(request: Request): Promise<Response> {
     }
 
     // Pre-flight: check provider is available before creating the environment
+    // Skip for cloud providers — their API keys are configured separately (vaults/secrets)
     const providerName = parsed.data.config.provider ?? "sprites";
-    const provider = await resolveProvider(providerName);
-    if (provider.checkAvailability) {
-      const result = await provider.checkAvailability();
-      if (!result.available) {
-        throw badRequest(`Provider "${providerName}" is not available: ${result.message}`);
+    const CLOUD_PROVIDERS = new Set(["sprites", "e2b", "vercel", "daytona", "fly", "modal"]);
+    if (!CLOUD_PROVIDERS.has(providerName)) {
+      const provider = await resolveProvider(providerName);
+      if (provider.checkAvailability) {
+        const result = await provider.checkAvailability();
+        if (!result.available) {
+          throw badRequest(`Provider "${providerName}" is not available: ${result.message}`);
+        }
       }
     }
 

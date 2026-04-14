@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -14,14 +14,15 @@ interface Props { onNext: (result: AgentResult) => void; }
 export function StepAgent({ onNext }: Props) {
   const { data: agents, isLoading } = useAgents();
   const hasExisting = !isLoading && agents && agents.length > 0;
-  const [mode, setMode] = useState<"select" | "create">(hasExisting ? "select" : "create");
+  const [mode, setMode] = useState<"select" | "create">("create");
   const [selectedId, setSelectedId] = useState("");
   const [name, setName] = useState("Coder");
   const [engine, setEngine] = useState("claude");
   const [model, setModel] = useState(MODELS.claude[0]);
 
-  // Update mode when agents load
-  if (!isLoading && !hasExisting && mode === "select") setMode("create");
+  useEffect(() => {
+    if (!isLoading) setMode(hasExisting ? "select" : "create");
+  }, [isLoading, hasExisting]);
 
   function handleSelectContinue() {
     const agent = agents?.find(a => a.id === selectedId);

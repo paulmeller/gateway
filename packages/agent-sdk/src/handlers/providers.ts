@@ -3,7 +3,7 @@ import { resolveContainerProvider } from "../providers/registry";
 import { getConfig } from "../config/index";
 import type { AvailabilityResult, ProviderName } from "../providers/types";
 
-const LOCAL_PROVIDERS: ProviderName[] = ["docker", "apple-container", "podman", "mvm"];
+const LOCAL_PROVIDERS: ProviderName[] = ["docker", "apple-container", "podman"];
 const CLOUD_PROVIDERS: ProviderName[] = ["sprites", "e2b", "vercel", "daytona", "fly", "modal"];
 
 const CLOUD_KEY_MAP: Record<string, string> = {
@@ -42,6 +42,21 @@ function checkCloudProvider(name: string): AvailabilityResult {
     available: false,
     message: `Requires ${envVar} — add it in Settings > Vaults`,
   };
+}
+
+export async function handleGetSkillsCatalog(request: Request): Promise<Response> {
+  return routeWrap(request, async ({ request: req }) => {
+    const url = new URL(req.url);
+    const leaderboard = url.searchParams.get("leaderboard") || "trending";
+    const limit = url.searchParams.get("limit") || "12";
+    const upstream = `https://www.agentstep.com/v1/skills/top?leaderboard=${encodeURIComponent(leaderboard)}&limit=${encodeURIComponent(limit)}`;
+    const res = await fetch(upstream);
+    if (!res.ok) {
+      return jsonOk({ skills: [], total: 0 });
+    }
+    const data = await res.json();
+    return jsonOk(data);
+  });
 }
 
 export async function handleGetProviderStatus(request: Request): Promise<Response> {

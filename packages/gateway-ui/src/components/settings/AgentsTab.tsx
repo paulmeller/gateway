@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useAgents, useDeleteAgent } from "@/hooks/use-agents";
-import { AgentEditorDialog } from "./AgentEditorDialog";
+import { useAppStore } from "@/stores/app-store";
 import { CreateAgentDialog } from "./CreateAgentDialog";
 import { PageHeader } from "./PageHeader";
 
@@ -24,8 +24,8 @@ function timeAgo(ts: number | string): string {
 export function AgentsTab() {
   const { data: agents } = useAgents();
   const del = useDeleteAgent();
+  const setSelectedAgentId = useAppStore((s) => s.setSelectedAgentId);
   const [createOpen, setCreateOpen] = useState(false);
-  const [editAgent, setEditAgent] = useState<Record<string, unknown> | null>(null);
 
   return (
     <div className="flex flex-col gap-6">
@@ -51,7 +51,7 @@ export function AgentsTab() {
             </TableHeader>
             <TableBody>
               {agents.map((a) => (
-                <TableRow key={a.id} className="cursor-pointer" onClick={() => setEditAgent(a as Record<string, unknown>)}>
+                <TableRow key={a.id} className="cursor-pointer" onClick={() => setSelectedAgentId(a.id)}>
                   <TableCell className="font-mono text-xs text-muted-foreground">{a.id.slice(0, 16)}...</TableCell>
                   <TableCell className="font-medium text-foreground">{a.name}</TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{a.model}</TableCell>
@@ -59,7 +59,7 @@ export function AgentsTab() {
                     <Badge variant="outline" className="border-lime-400/20 bg-lime-400/10 text-lime-400 text-xs">Active</Badge>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{timeAgo(a.created_at)}</TableCell>
-                  <TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="size-7 text-muted-foreground">
@@ -67,10 +67,10 @@ export function AgentsTab() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onSelect={() => setTimeout(() => setEditAgent(a as Record<string, unknown>), 0)}>
+                        <DropdownMenuItem onSelect={() => setTimeout(() => setSelectedAgentId(a.id), 0)}>
                           <Pencil className="mr-2 size-3.5" /> Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onSelect={() => del.mutate(a.id)}>
+                        <DropdownMenuItem className="text-destructive" onSelect={() => { del.mutate(a.id); }}>
                           <Trash2 className="mr-2 size-3.5" /> Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -86,11 +86,6 @@ export function AgentsTab() {
       )}
 
       <CreateAgentDialog open={createOpen} onOpenChange={setCreateOpen} />
-      <AgentEditorDialog
-        agent={editAgent as { id: string; name: string; [key: string]: unknown } | null}
-        open={!!editAgent}
-        onOpenChange={(open) => !open && setEditAgent(null)}
-      />
     </div>
   );
 }

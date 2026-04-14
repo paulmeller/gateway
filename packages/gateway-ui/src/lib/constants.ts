@@ -8,7 +8,7 @@ export const MODELS: Record<string, string[]> = {
 
 export const ENGINES = Object.keys(MODELS);
 
-export const LOCAL_PROVIDERS = ["docker", "apple-container", "apple-firecracker", "podman", "mvm"] as const;
+export const LOCAL_PROVIDERS = ["docker", "apple-container", "podman"] as const;
 export const CLOUD_PROVIDERS = ["sprites", "e2b", "vercel", "daytona", "fly", "modal"] as const;
 export const PROVIDERS = [...LOCAL_PROVIDERS, ...CLOUD_PROVIDERS] as const;
 

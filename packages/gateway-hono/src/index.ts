@@ -49,6 +49,7 @@ import {
   handleGetUI,
   handlePutSetting,
   handleGetProviderStatus,
+  handleGetSkillsCatalog,
 } from "@agentstep/agent-sdk/handlers";
 
 const app = new Hono();
@@ -125,6 +126,9 @@ app.put("/v1/settings", (c) => handlePutSetting(c.req.raw));
 
 // ── Providers ─────────────────────────────────────────────────────────────
 app.get("/v1/providers/status", (c) => handleGetProviderStatus(c.req.raw));
+
+// ── Skills Catalog ────────────────────────────────────────────────────
+app.get("/v1/skills/catalog", (c) => handleGetSkillsCatalog(c.req.raw));
 
 // ── Batch ────────────────────────────────────────────────────────────────
 app.post("/v1/batch", (c) => handleBatch(c.req.raw));

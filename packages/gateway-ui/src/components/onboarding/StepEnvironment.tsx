@@ -1,10 +1,24 @@
 import { useState, useEffect } from "react";
+import { Check, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { LOCAL_PROVIDERS, CLOUD_PROVIDERS } from "@/lib/constants";
 import { useEnvironments } from "@/hooks/use-environments";
-import { useProviderStatus } from "@/hooks/use-providers";
+import { useProviderStatus, type ProviderStatus } from "@/hooks/use-providers";
+
+const PROVIDER_DOMAINS: Record<string, string> = {
+  docker: "docker.com",
+  "apple-container": "apple.com",
+  podman: "podman.io",
+  sprites: "sprites.dev",
+  e2b: "e2b.dev",
+  vercel: "vercel.com",
+  daytona: "daytona.io",
+  fly: "fly.io",
+  modal: "modal.com",
+};
 
 type EnvResult =
   | { mode: "create"; data: { name: string; provider: string } }
@@ -96,75 +110,87 @@ export function StepEnvironment({ onNext }: Props) {
           <Input placeholder="Environment name" value={name} onChange={(e) => setName(e.target.value)}
             className="h-10 w-full text-foreground" />
 
-          <div className="flex flex-col gap-1">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Local</p>
-            <div className="flex flex-col gap-1">
-              {LOCAL_PROVIDERS.map((p) => {
-                const status = providerStatus?.[p];
-                const available = status?.available ?? true;
-                const isSelected = provider === p;
-                return (
-                  <button
-                    key={p}
-                    disabled={!available}
-                    onClick={() => available && setProvider(p)}
-                    className={`flex flex-col items-start rounded-lg border px-3 py-2 text-left transition-colors ${
-                      isSelected
-                        ? "border-lime-400/50 bg-lime-400/10"
-                        : available
-                          ? "border-border hover:border-muted-foreground/50"
-                          : "border-border opacity-50 cursor-not-allowed"
-                    }`}
-                  >
-                    <span className={`text-sm font-medium ${isSelected ? "text-foreground" : available ? "text-foreground" : "text-muted-foreground"}`}>
-                      {p}
-                    </span>
-                    {!available && status?.message && (
-                      <span className="text-xs text-muted-foreground mt-0.5">{status.message}</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Cloud</p>
-            <div className="flex flex-col gap-1">
-              {CLOUD_PROVIDERS.map((p) => {
-                const status = providerStatus?.[p];
-                const available = status?.available ?? true;
-                const isSelected = provider === p;
-                return (
-                  <button
-                    key={p}
-                    disabled={!available}
-                    onClick={() => available && setProvider(p)}
-                    className={`flex flex-col items-start rounded-lg border px-3 py-2 text-left transition-colors ${
-                      isSelected
-                        ? "border-lime-400/50 bg-lime-400/10"
-                        : available
-                          ? "border-border hover:border-muted-foreground/50"
-                          : "border-border opacity-50 cursor-not-allowed"
-                    }`}
-                  >
-                    <span className={`text-sm font-medium ${isSelected ? "text-foreground" : available ? "text-foreground" : "text-muted-foreground"}`}>
-                      {p}
-                    </span>
-                    {!available && status?.message && (
-                      <span className="text-xs text-muted-foreground mt-0.5">{status.message}</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          <ProviderGroup label="Local" providers={LOCAL_PROVIDERS} providerStatus={providerStatus} selected={provider} onSelect={setProvider} />
+          <ProviderGroup label="Cloud" providers={CLOUD_PROVIDERS} providerStatus={providerStatus} selected={provider} onSelect={setProvider} cloud />
 
           <Button className="w-full h-10 bg-cta-gradient text-sm font-medium text-black hover:opacity-90" onClick={handleCreate} disabled={!name.trim() || !provider}>
             Continue
           </Button>
         </div>
       )}
+    </div>
+  );
+}
+
+function ProviderGroup({
+  label,
+  providers,
+  providerStatus,
+  selected,
+  onSelect,
+  cloud,
+}: {
+  label: string;
+  providers: readonly string[];
+  providerStatus: Record<string, ProviderStatus> | undefined;
+  selected: string;
+  onSelect: (p: string) => void;
+  cloud?: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
+      <div className="grid grid-cols-3 gap-1.5">
+        {providers.map((p) => {
+          const status = providerStatus?.[p];
+          const available = cloud ? true : (status?.available ?? true);
+          const isSelected = selected === p;
+          return (
+            <button
+              key={p}
+              disabled={!available}
+              onClick={() => available && onSelect(p)}
+              className={`relative flex flex-col items-center justify-center rounded-lg border px-2 py-2.5 text-center transition-colors ${
+                isSelected
+                  ? "border-lime-400/50 bg-lime-400/10"
+                  : available
+                    ? "border-border hover:border-muted-foreground/50"
+                    : "border-border opacity-40 cursor-not-allowed"
+              }`}
+            >
+              {isSelected && (
+                <Check className="absolute top-1 right-1 size-3 text-lime-400" />
+              )}
+              {!cloud && !available && status?.message && (
+                <Tooltip>
+                  <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <div className="absolute top-1 left-1 rounded-full p-0.5 text-muted-foreground hover:text-foreground">
+                      <Info className="size-3" />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <p className="text-xs">{status.message}</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
+              <img
+                src={`https://www.google.com/s2/favicons?domain=${PROVIDER_DOMAINS[p] ?? ""}&sz=32`}
+                alt=""
+                className="size-4 mb-1"
+              />
+              <span className={`text-xs font-medium ${isSelected ? "text-foreground" : available ? "text-foreground" : "text-muted-foreground"}`}>
+                {p}
+              </span>
+              {cloud && (
+                <span className="text-[10px] text-muted-foreground mt-0.5">API key required</span>
+              )}
+              {!cloud && !available && (
+                <span className="text-[10px] text-destructive/70 mt-0.5">Unavailable</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

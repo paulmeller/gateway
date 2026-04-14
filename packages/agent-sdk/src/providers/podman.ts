@@ -38,6 +38,6 @@ export const podmanProvider = createCliProvider({
   checkCmd: ["version", "--format", "{{.Version}}"],
   checkFailMsg: (msg) =>
     msg.includes("ENOENT")
-      ? "Podman CLI is not installed. Install it from https://podman.io/docs/installation"
-      : `Podman is not running or not accessible: ${msg}`,
+      ? "Podman not installed. Run: brew install podman"
+      : "Podman not running — run: podman machine start",
 });

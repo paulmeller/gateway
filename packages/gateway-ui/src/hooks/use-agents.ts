@@ -1,7 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
 
-interface Agent {
+export interface AgentSkill {
+  name: string;
+  source: string;
+  content: string;
+  installed_at: string;
+}
+
+export interface Agent {
   id: string;
   name: string;
   model: string;
@@ -11,6 +18,10 @@ interface Agent {
   mcp_servers?: unknown[];
   threads_enabled?: boolean;
   confirmation_mode?: boolean;
+  skills: AgentSkill[];
+  webhook_url?: string;
+  webhook_events?: string[];
+  callable_agents?: string[];
   created_at: number;
   updated_at: number;
 }

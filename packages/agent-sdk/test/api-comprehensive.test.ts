@@ -2311,7 +2311,6 @@ describe("Provider Status", () => {
     expect(body.data.docker).toBeDefined();
     expect(body.data["apple-container"]).toBeDefined();
     expect(body.data.podman).toBeDefined();
-    expect(body.data.mvm).toBeDefined();
     expect(body.data.sprites).toBeDefined();
     expect(body.data.e2b).toBeDefined();
     expect(body.data.vercel).toBeDefined();

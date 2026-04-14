@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useState } from "react";
-import { Settings, Plus, Eye, EyeOff, Sun, Moon } from "lucide-react";
+import { Settings, Plus, Eye, EyeOff, Sun, Moon, ExternalLink, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SessionList } from "@/components/sessions/SessionList";
@@ -75,6 +75,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             >
               {showKey ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
             </Button>
+          </div>
+          <div className="flex gap-1.5 text-xs">
+            <a href="https://www.agentstep.com" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
+              <ExternalLink className="size-3" /> agentstep.com
+            </a>
+            <span className="text-muted-foreground/30">·</span>
+            <a href="https://www.agentstep.com/docs" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
+              <BookOpen className="size-3" /> Docs
+            </a>
           </div>
           <div className="flex gap-2">
             <Button

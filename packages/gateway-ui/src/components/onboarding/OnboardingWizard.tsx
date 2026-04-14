@@ -13,16 +13,20 @@ import { toast } from "sonner";
 
 interface VaultListResponse { data: Array<{ id: string; entry_count: number }> }
 
+type AgentChoice =
+  | { mode: "select"; agent: { id: string; name: string; engine: string; model: string } }
+  | { mode: "create"; data: { name: string; engine: string; model: string } };
+
+type EnvChoice =
+  | { mode: "select"; env: { id: string; name: string; provider: string } }
+  | { mode: "create"; data: { name: string; provider: string } };
+
 export function OnboardingWizard() {
   const [step, setStep] = useState(0);
-  const [agentData, setAgentData] = useState({ name: "", engine: "claude", model: "" });
-  const [envData, setEnvData] = useState({ name: "", provider: "docker" });
+  const [agentChoice, setAgentChoice] = useState<AgentChoice | null>(null);
+  const [envChoice, setEnvChoice] = useState<EnvChoice | null>(null);
   const [secrets, setSecrets] = useState<Record<string, string>>({});
-  const [agentId, setAgentId] = useState("");
-  const [envId, setEnvId] = useState("");
   const [existingVaultIds, setExistingVaultIds] = useState<string[]>([]);
-  const [isExistingAgent, setIsExistingAgent] = useState(false);
-  const [isExistingEnv, setIsExistingEnv] = useState(false);
   const [loading, setLoading] = useState(false);
   const createAgent = useCreateAgent();
   const createEnv = useCreateEnvironment();
@@ -31,70 +35,83 @@ export function OnboardingWizard() {
   const createSession = useCreateSession();
   const setActiveSessionId = useAppStore((s) => s.setActiveSessionId);
 
-  async function handleAgentNext(result: { mode: "select"; agent: { id: string; name: string; engine: string; model: string } } | { mode: "create"; data: { name: string; engine: string; model: string } }) {
+  // Derived display data for later steps
+  const agentData = agentChoice?.mode === "select"
+    ? { name: agentChoice.agent.name, engine: agentChoice.agent.engine, model: agentChoice.agent.model }
+    : agentChoice?.mode === "create"
+      ? agentChoice.data
+      : { name: "", engine: "claude", model: "" };
+
+  const envData = envChoice?.mode === "select"
+    ? { name: envChoice.env.name, provider: envChoice.env.provider }
+    : envChoice?.mode === "create"
+      ? envChoice.data
+      : { name: "", provider: "docker" };
+
+  const isExistingAgent = agentChoice?.mode === "select";
+  const isExistingEnv = envChoice?.mode === "select";
+
+  async function handleAgentNext(result: AgentChoice) {
+    setAgentChoice(result);
     if (result.mode === "select") {
-      const { agent } = result;
-      setAgentId(agent.id);
-      setAgentData({ name: agent.name, engine: agent.engine, model: agent.model });
-      setIsExistingAgent(true);
-      // Check for existing vaults
+      // Check for existing vaults on selected agent
       try {
-        const res = await api<VaultListResponse>(`/vaults?agent_id=${agent.id}`);
+        const res = await api<VaultListResponse>(`/vaults?agent_id=${result.agent.id}`);
         const ids = res.data.filter(v => v.entry_count > 0).map(v => v.id);
         setExistingVaultIds(ids);
       } catch { /* ignore */ }
-      setStep(1);
     } else {
-      try {
-        const agent = await createAgent.mutateAsync(result.data);
-        setAgentData(result.data);
-        setAgentId(agent.id);
-        setIsExistingAgent(false);
-        setExistingVaultIds([]);
-        setStep(1);
-      } catch {
-        toast.error("Failed to create agent");
-      }
+      setExistingVaultIds([]);
     }
+    setStep(1);
   }
 
-  async function handleEnvNext(result: { mode: "select"; env: { id: string; name: string; provider: string } } | { mode: "create"; data: { name: string; provider: string } }) {
-    if (result.mode === "select") {
-      const { env } = result;
-      setEnvId(env.id);
-      setEnvData({ name: env.name, provider: env.provider });
-      setIsExistingEnv(true);
-      setStep(2);
-    } else {
-      try {
-        const env = await createEnv.mutateAsync({ name: result.data.name, config: { provider: result.data.provider } });
-        setEnvData(result.data);
-        setEnvId(env.id);
-        setIsExistingEnv(false);
-        setStep(2);
-      } catch {
-        toast.error("Failed to create environment");
-      }
-    }
+  function handleEnvNext(result: EnvChoice) {
+    setEnvChoice(result);
+    setStep(2);
   }
 
-  async function handleSecretsNext(s: Record<string, string>) { setSecrets(s); setStep(3); }
+  function handleSecretsNext(s: Record<string, string>) {
+    setSecrets(s);
+    setStep(3);
+  }
 
   async function handleStart() {
+    if (!agentChoice || !envChoice) return;
     setLoading(true);
     try {
+      // 1. Create or resolve agent
+      let agentId: string;
+      if (agentChoice.mode === "select") {
+        agentId = agentChoice.agent.id;
+      } else {
+        const agent = await createAgent.mutateAsync(agentChoice.data);
+        agentId = agent.id;
+      }
+
+      // 2. Create or resolve environment
+      let envId: string;
+      if (envChoice.mode === "select") {
+        envId = envChoice.env.id;
+      } else {
+        const env = await createEnv.mutateAsync({
+          name: envChoice.data.name,
+          config: { provider: envChoice.data.provider },
+        });
+        envId = env.id;
+      }
+
+      // 3. Create vault + secrets if needed
       const secretEntries = Object.entries(secrets).filter(([, v]) => v.trim());
       let vaultIds = [...existingVaultIds];
 
       if (secretEntries.length > 0) {
         if (existingVaultIds.length > 0) {
-          // Add new entries to existing vault
           const vaultId = existingVaultIds[0];
           for (const [key, value] of secretEntries) {
             await putEntry.mutateAsync({ vaultId, key, value });
           }
         } else {
-          // Create new vault
           const vault = await createVault.mutateAsync({ name: "default", agent_id: agentId });
           for (const [key, value] of secretEntries) {
             await putEntry.mutateAsync({ vaultId: vault.id, key, value });
@@ -103,14 +120,17 @@ export function OnboardingWizard() {
         }
       }
 
+      // 4. Create session
       const session = await createSession.mutateAsync({
         agent_id: agentId,
         environment_id: envId,
         vault_ids: vaultIds.length > 0 ? vaultIds : undefined,
       });
       setActiveSessionId(session.id);
-    } catch {
-      toast.error("Failed to create session");
+    } catch (err: unknown) {
+      const msg = (err as { body?: { error?: { message?: string } } })?.body?.error?.message
+        || (err instanceof Error ? err.message : "Failed to start session");
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

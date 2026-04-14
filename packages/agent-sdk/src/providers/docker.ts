@@ -39,6 +39,6 @@ export const dockerProvider = createCliProvider({
   checkCmd: ["version", "--format", "{{.Server.Version}}"],
   checkFailMsg: (msg) =>
     msg.includes("ENOENT")
-      ? "Docker CLI is not installed. Install it from https://docs.docker.com/get-docker/"
-      : `Docker is not running or not accessible: ${msg}`,
+      ? "Docker not installed. Run: brew install --cask docker"
+      : "Docker not running — launch Docker Desktop",
 });

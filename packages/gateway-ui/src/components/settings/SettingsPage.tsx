@@ -6,10 +6,13 @@ import { AgentsTab } from "./AgentsTab";
 import { EnvironmentsTab } from "./EnvironmentsTab";
 import { VaultsTab } from "./VaultsTab";
 import { MemoryStoresTab } from "./MemoryStoresTab";
-import { BatchTab } from "./BatchTab";
+import { AgentDetailPage } from "./AgentDetailPage";
 
 export function SettingsPage() {
   const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
+  const selectedAgentId = useAppStore((s) => s.selectedAgentId);
+
+  if (selectedAgentId) return <AgentDetailPage />;
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">

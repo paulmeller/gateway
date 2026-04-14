@@ -71,7 +71,7 @@ export const appleProvider = createCliProvider({
       if (msg.includes("ENOENT")) {
         return {
           available: false,
-          message: "Apple Containers CLI not found. Requires macOS 26+",
+          message: "Apple Containers CLI not found. Run: brew install container (requires macOS 26+)",
         };
       }
       return {

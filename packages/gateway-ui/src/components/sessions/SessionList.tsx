@@ -28,7 +28,7 @@ export function SessionList() {
   );
 }
 
-function Group({ label, sessions }: { label: string; sessions: Array<{ id: string; status: string; title: string | null; created_at: number; archived_at: number | null }> }) {
+function Group({ label, sessions }: { label: string; sessions: Array<{ id: string; status: string; title: string | null; created_at: number; archived_at: number | null; agent?: { id: string; version: number }; environment_id?: string }> }) {
   return (
     <div className="mb-1">
       <p className="px-3 py-1 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/25">
