@@ -131,9 +131,9 @@ export const AgentSchema = registry.register(
     system: z.string().nullable(),
     tools: z.array(ToolConfigSchema),
     mcp_servers: z.record(McpServerConfigSchema),
-    engine: z.enum(["claude", "opencode", "codex", "anthropic", "gemini", "factory"]).openapi({
+    engine: z.enum(["claude", "opencode", "codex", "anthropic", "gemini", "factory", "pi"]).openapi({
       description:
-        "Which agent harness powers this agent. `claude` drives `claude -p`; `opencode` drives sst/opencode-ai's `opencode run`; `gemini` drives Google's `gemini -p`; `factory` drives Factory's `droid exec`. Immutable after agent creation.",
+        "Which agent harness powers this agent. `claude` drives `claude -p`; `opencode` drives sst/opencode-ai's `opencode run`; `gemini` drives Google's `gemini -p`; `factory` drives Factory's `droid exec`; `pi` drives the pi.dev coding agent (`pi --mode json`). Immutable after agent creation.",
     }),
     webhook_url: z.string().nullable().openapi({
       description: "URL to POST webhook notifications to. Best-effort delivery with 5s timeout.",
@@ -164,9 +164,9 @@ export const CreateAgentRequestSchema = registry.register(
       system: z.string().nullish().openapi({ example: "You are a helpful assistant." }),
       tools: z.array(ToolConfigSchema).optional(),
       mcp_servers: z.record(McpServerConfigSchema).optional(),
-      engine: z.enum(["claude", "opencode", "codex", "anthropic", "gemini", "factory"]).optional().openapi({
+      engine: z.enum(["claude", "opencode", "codex", "anthropic", "gemini", "factory", "pi"]).optional().openapi({
         description:
-          "Agent harness. Defaults to `claude`. Opencode agents must set `model` to a `provider/model` string (e.g. `anthropic/claude-sonnet-4-6`) and must NOT declare `tools` — opencode manages its tool surface internally. Gemini agents require GEMINI_API_KEY. Factory agents require FACTORY_API_KEY.",
+          "Agent harness. Defaults to `claude`. Opencode agents must set `model` to a `provider/model` string (e.g. `anthropic/claude-sonnet-4-6`) and must NOT declare `tools` — opencode manages its tool surface internally. Gemini agents require GEMINI_API_KEY. Factory agents require FACTORY_API_KEY. Pi agents (pi.dev) require at least one of ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY.",
         example: "claude",
       }),
       webhook_url: z.string().url().optional().openapi({

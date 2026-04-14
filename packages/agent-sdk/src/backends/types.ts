@@ -23,7 +23,7 @@ import type { ContainerProvider } from "../providers/types";
 import type { Translator, TranslatorOptions } from "./shared/translator-types";
 
 /** CLI backends that have a Backend implementation in the registry */
-export type CliBackendName = "claude" | "opencode" | "codex" | "gemini" | "factory";
+export type CliBackendName = "claude" | "opencode" | "codex" | "gemini" | "factory" | "pi";
 /** All backend names including proxy-only backends */
 export type AnyBackendName = CliBackendName | "anthropic";
 

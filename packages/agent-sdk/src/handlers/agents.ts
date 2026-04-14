@@ -46,7 +46,7 @@ const CreateSchema = z.object({
   system: z.string().nullish(),
   tools: z.array(ToolSchema).optional(),
   mcp_servers: McpServerSchema.optional(),
-  engine: z.enum(["claude", "opencode", "codex", "anthropic", "gemini", "factory"]).optional(),
+  engine: z.enum(["claude", "opencode", "codex", "anthropic", "gemini", "factory", "pi"]).optional(),
   webhook_url: z.string().url().optional(),
   webhook_events: z.array(z.string()).optional(),
   threads_enabled: z.boolean().optional(),

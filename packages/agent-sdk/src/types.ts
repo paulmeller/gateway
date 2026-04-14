@@ -56,7 +56,7 @@ export interface McpServerConfig {
  * from lib/backends/types.ts) to avoid a circular import between types and
  * the backend registry.
  */
-export type BackendName = "claude" | "opencode" | "codex" | "anthropic" | "gemini" | "factory";
+export type BackendName = "claude" | "opencode" | "codex" | "anthropic" | "gemini" | "factory" | "pi";
 /** API-facing alias for BackendName. */
 export type EngineName = BackendName;
 

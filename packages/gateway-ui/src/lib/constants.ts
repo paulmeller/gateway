@@ -4,6 +4,7 @@ export const MODELS: Record<string, string[]> = {
   codex: ["gpt-5.4-mini", "gpt-5.4"],
   gemini: ["gemini-3.1-pro-preview", "gemini-3", "gemini-2.5-flash"],
   factory: ["claude-sonnet-4-6", "gpt-5.4", "gemini-3.1-pro-preview"],
+  pi: ["anthropic/claude-sonnet-4-6", "openai/gpt-4o-mini", "google/gemini-2.5-flash"],
 };
 
 export const ENGINES = Object.keys(MODELS);
@@ -26,12 +27,16 @@ export const ENGINE_KEYS: Record<string, { key: string; label: string }> = {
   codex: { key: "OPENAI_API_KEY", label: "OpenAI API Key" },
   gemini: { key: "GEMINI_API_KEY", label: "Gemini API Key" },
   factory: { key: "ANTHROPIC_API_KEY", label: "Anthropic API Key" },
+  pi: { key: "ANTHROPIC_API_KEY", label: "Anthropic API Key" },
 };
 
-/** OpenCode supports multiple providers — key depends on the model prefix */
+/** OpenCode and pi support multiple providers — key depends on the model prefix */
 export function getEngineKey(engine: string, model: string): { key: string; label: string } | undefined {
-  if (engine === "opencode") {
+  if (engine === "opencode" || engine === "pi") {
     if (model.startsWith("openai/")) return { key: "OPENAI_API_KEY", label: "OpenAI API Key" };
+    if (model.startsWith("google/") || model.startsWith("gemini/")) {
+      return { key: "GEMINI_API_KEY", label: "Gemini API Key" };
+    }
     return { key: "ANTHROPIC_API_KEY", label: "Anthropic API Key" };
   }
   return ENGINE_KEYS[engine];
