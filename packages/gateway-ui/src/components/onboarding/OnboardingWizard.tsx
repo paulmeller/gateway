@@ -26,6 +26,7 @@ export function OnboardingWizard() {
   const [agentChoice, setAgentChoice] = useState<AgentChoice | null>(null);
   const [envChoice, setEnvChoice] = useState<EnvChoice | null>(null);
   const [secrets, setSecrets] = useState<Record<string, string>>({});
+  const [selectedVaultId, setSelectedVaultId] = useState<string | null>(null);
   const [existingVaultIds, setExistingVaultIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const createAgent = useCreateAgent();
@@ -73,6 +74,13 @@ export function OnboardingWizard() {
 
   function handleSecretsNext(s: Record<string, string>) {
     setSecrets(s);
+    setSelectedVaultId(null);
+    setStep(3);
+  }
+
+  function handleSelectVault(vaultId: string) {
+    setSelectedVaultId(vaultId);
+    setSecrets({});
     setStep(3);
   }
 
@@ -101,22 +109,27 @@ export function OnboardingWizard() {
         envId = env.id;
       }
 
-      // 3. Create vault + secrets if needed
-      const secretEntries = Object.entries(secrets).filter(([, v]) => v.trim());
+      // 3. Resolve vault — from selection, new secrets, or existing agent vaults
       let vaultIds = [...existingVaultIds];
 
-      if (secretEntries.length > 0) {
-        if (existingVaultIds.length > 0) {
-          const vaultId = existingVaultIds[0];
-          for (const [key, value] of secretEntries) {
-            await putEntry.mutateAsync({ vaultId, key, value });
+      if (selectedVaultId) {
+        // User picked an existing vault from the picker
+        vaultIds = [selectedVaultId];
+      } else {
+        const secretEntries = Object.entries(secrets).filter(([, v]) => v.trim());
+        if (secretEntries.length > 0) {
+          if (existingVaultIds.length > 0) {
+            const vaultId = existingVaultIds[0];
+            for (const [key, value] of secretEntries) {
+              await putEntry.mutateAsync({ vaultId, key, value });
+            }
+          } else {
+            const vault = await createVault.mutateAsync({ name: "default", agent_id: agentId });
+            for (const [key, value] of secretEntries) {
+              await putEntry.mutateAsync({ vaultId: vault.id, key, value });
+            }
+            vaultIds = [vault.id];
           }
-        } else {
-          const vault = await createVault.mutateAsync({ name: "default", agent_id: agentId });
-          for (const [key, value] of secretEntries) {
-            await putEntry.mutateAsync({ vaultId: vault.id, key, value });
-          }
-          vaultIds = [vault.id];
         }
       }
 
@@ -140,8 +153,8 @@ export function OnboardingWizard() {
     <div className="flex flex-1 items-center justify-center p-8">
       {step === 0 && <StepAgent onNext={handleAgentNext} />}
       {step === 1 && <StepEnvironment onNext={handleEnvNext} />}
-      {step === 2 && <StepSecrets engine={agentData.engine} model={agentData.model} provider={envData.provider} hasExistingVaults={existingVaultIds.length > 0} onNext={handleSecretsNext} onSkip={() => setStep(3)} />}
-      {step === 3 && <StepReady agentName={agentData.name} envName={envData.name} hasSecrets={Object.values(secrets).some((v) => v.trim()) || existingVaultIds.length > 0} onStart={handleStart} loading={loading} isExistingAgent={isExistingAgent} isExistingEnv={isExistingEnv} />}
+      {step === 2 && <StepSecrets engine={agentData.engine} model={agentData.model} provider={envData.provider} hasExistingVaults={existingVaultIds.length > 0} onNext={handleSecretsNext} onSkip={() => setStep(3)} onSelectVault={handleSelectVault} />}
+      {step === 3 && <StepReady agentName={agentData.name} envName={envData.name} hasSecrets={Object.values(secrets).some((v) => v.trim()) || existingVaultIds.length > 0 || !!selectedVaultId} onStart={handleStart} loading={loading} isExistingAgent={isExistingAgent} isExistingEnv={isExistingEnv} />}
     </div>
   );
 }
