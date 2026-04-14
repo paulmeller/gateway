@@ -48,6 +48,7 @@ import {
   handleGetDocs,
   handleGetUI,
   handlePutSetting,
+  handleGetProviderStatus,
 } from "@agentstep/agent-sdk/handlers";
 
 const app = new Hono();
@@ -56,6 +57,7 @@ const app = new Hono();
 const serveUI = () => handleGetUI({ apiKey: process.env.SEED_API_KEY });
 app.get("/", serveUI);
 app.get("/settings", serveUI);
+app.get("/settings/agents/:id", serveUI);
 app.get("/sessions/:id", serveUI);
 
 // ── Health ────────────────────────────────────────────────────────────────
@@ -120,6 +122,9 @@ app.delete("/v1/memory_stores/:id/memories/:memId", (c) => handleDeleteMemory(c.
 
 // ── Settings ─────────────────────────────────────────────────────────────
 app.put("/v1/settings", (c) => handlePutSetting(c.req.raw));
+
+// ── Providers ─────────────────────────────────────────────────────────────
+app.get("/v1/providers/status", (c) => handleGetProviderStatus(c.req.raw));
 
 // ── Batch ────────────────────────────────────────────────────────────────
 app.post("/v1/batch", (c) => handleBatch(c.req.raw));
