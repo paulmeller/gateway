@@ -19,7 +19,11 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
-      - run: cd packages/gateway && node build.js
+      - name: Build UI (Vite → ui.ts → gateway bundle)
+        run: |
+          cd packages/gateway-ui && npx vite build
+          cd ../.. && npx tsx scripts/build-ui.ts
+          cd packages/gateway && node build.js
       - name: Publish @agentstep/agent-sdk
         run: cd packages/agent-sdk && npm publish --access public || echo "Version already published, skipping"
         env:
