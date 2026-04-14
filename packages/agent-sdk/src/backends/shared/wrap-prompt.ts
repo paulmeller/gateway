@@ -5,13 +5,25 @@
  * unchanged.
  *
  * Pattern from
- * 
+ *
  * (opencode) and 253-256 (codex) — both use the identical wrapping format.
  */
 export function wrapPromptWithSystem(
   prompt: string,
   systemPrompt: string | null | undefined,
+  skills?: Array<{ name: string; content: string }>,
 ): string {
-  if (!systemPrompt) return prompt;
-  return `Instructions: ${systemPrompt}\n\n---\n\n${prompt}`;
+  let systemBlock = systemPrompt || "";
+
+  if (skills && skills.length > 0) {
+    const skillsText = skills.map(s =>
+      `<skill name="${s.name}">\n${s.content}\n</skill>`
+    ).join("\n\n");
+    systemBlock = systemBlock
+      ? `${systemBlock}\n\n## Agent Skills\n\n${skillsText}`
+      : `## Agent Skills\n\n${skillsText}`;
+  }
+
+  if (!systemBlock) return prompt;
+  return `Instructions: ${systemBlock}\n\n---\n\n${prompt}`;
 }

@@ -37,7 +37,7 @@ function buildTurn(input: BuildTurnInput): BuildTurnResult {
   }
 
   const argv = buildOpencodeArgs({ agent, backendSessionId });
-  const wrappedPrompt = wrapPromptWithSystem(promptText, agent.system);
+  const wrappedPrompt = wrapPromptWithSystem(promptText, agent.system, agent.skills);
   const env = {
     ...buildOpencodeAuthEnv(),
     ...buildOpencodeMcpEnv(agent),

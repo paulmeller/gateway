@@ -28,9 +28,52 @@ import { nowMs } from "../util/clock";
 import { resolveContainerProvider } from "../providers/registry";
 import { dockerProvider } from "../providers/docker";
 import { resolveVaultSecrets } from "../providers/resolve-secrets";
-import type { SessionResource } from "../types";
+import type { SessionResource, AgentSkill } from "../types";
 
 const SPRITE_NAME_PREFIX = "ca-sess-";
+
+/**
+ * Install agent skills into the container.
+ *
+ * For Claude backend: writes skills to /home/agent/.claude/skills/<name>/SKILL.md
+ * For all backends: also writes to /home/agent/.agents/skills/<name>/SKILL.md
+ */
+export async function installSkills(
+  spriteName: string,
+  provider: import("../providers/types").ContainerProvider,
+  skills: AgentSkill[],
+  engine: string,
+): Promise<void> {
+  if (!skills || skills.length === 0) return;
+
+  if (engine === "claude") {
+    // Claude Code reads from .claude/skills/ directory
+    await provider.exec(spriteName, ["bash", "-c", "mkdir -p /home/agent/.claude/skills"]);
+
+    for (const skill of skills) {
+      // Write each skill as a SKILL.md file in its own directory
+      const dirPath = `/home/agent/.claude/skills/${skill.name}`;
+      const filePath = `${dirPath}/SKILL.md`;
+      await provider.exec(spriteName, ["bash", "-c", `mkdir -p ${dirPath}`]);
+
+      // Use stdin to write content (safe for special characters)
+      await provider.exec(spriteName, ["bash", "-c", `cat > ${filePath}`], {
+        stdin: skill.content,
+      });
+    }
+  }
+
+  // Also write to .agents/skills/ for universal agent compatibility
+  await provider.exec(spriteName, ["bash", "-c", "mkdir -p /home/agent/.agents/skills"]);
+  for (const skill of skills) {
+    const dirPath = `/home/agent/.agents/skills/${skill.name}`;
+    const filePath = `${dirPath}/SKILL.md`;
+    await provider.exec(spriteName, ["bash", "-c", `mkdir -p ${dirPath}`]);
+    await provider.exec(spriteName, ["bash", "-c", `cat > ${filePath}`], {
+      stdin: skill.content,
+    });
+  }
+}
 
 function deriveSpriteName(sessionId: string): string {
   // Stable prefix + ULID tail, lowercased (sprites.dev requires lowercase names).
@@ -165,6 +208,13 @@ export async function acquireForFirstTurn(sessionId: string): Promise<string> {
         const { installPermissionHook } = await import("../backends/claude/index");
         await installPermissionHook(name, sp);
       }
+    }
+
+    // Install agent skills into the container
+    if (agent.skills && agent.skills.length > 0) {
+      console.log(`[lifecycle] ${sessionId} installing ${agent.skills.length} skill(s)...`);
+      await installSkills(name, sp, agent.skills, agent.engine);
+      console.log(`[lifecycle] ${sessionId} skills installed`);
     }
   } catch (err) {
     await sp.delete(name).catch(() => {});

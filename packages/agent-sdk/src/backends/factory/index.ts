@@ -30,7 +30,7 @@ function buildTurn(input: BuildTurnInput): BuildTurnResult {
   }
   const argv = buildFactoryArgs({ agent, backendSessionId });
   const env = buildFactoryAuthEnv();
-  const wrappedPrompt = wrapPromptWithSystem(promptText, agent.system);
+  const wrappedPrompt = wrapPromptWithSystem(promptText, agent.system, agent.skills);
   // stdin is the raw wrapped prompt — the driver prepends the env block.
   // The factory wrapper script captures this via PROMPT=$(cat) and
   // re-passes it to `droid exec` as a trailing positional argv.

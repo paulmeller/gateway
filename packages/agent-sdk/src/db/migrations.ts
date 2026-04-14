@@ -292,4 +292,10 @@ export function runMigrations(db: InstanceType<typeof Database>): void {
       `ALTER TABLE agent_versions ADD COLUMN callable_agents_json TEXT`,
     );
   }
+
+  // Add skills_json column to agent_versions (idempotent)
+  const avCols = db.prepare("PRAGMA table_info(agent_versions)").all() as Array<{ name: string }>;
+  if (!avCols.some(c => c.name === "skills_json")) {
+    db.exec("ALTER TABLE agent_versions ADD COLUMN skills_json TEXT NOT NULL DEFAULT '[]'");
+  }
 }

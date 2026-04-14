@@ -34,7 +34,7 @@ function buildTurn(input: BuildTurnInput): BuildTurnResult {
   }
   const argv = buildCodexArgs({ agent });
   const env = buildCodexAuthEnv();
-  const wrappedPrompt = wrapPromptWithSystem(promptText, agent.system);
+  const wrappedPrompt = wrapPromptWithSystem(promptText, agent.system, agent.skills);
   return { argv, env, stdin: wrappedPrompt };
 }
 

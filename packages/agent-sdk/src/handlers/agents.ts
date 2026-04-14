@@ -6,6 +6,13 @@ import { isProxied, markProxied, unmarkProxied } from "../db/proxy";
 import { forwardToAnthropic, validateAnthropicProxy } from "../proxy/forward";
 import { badRequest, notFound, conflict } from "../errors";
 
+const SkillSchema = z.object({
+  name: z.string().min(1),
+  source: z.string().min(1),
+  content: z.string().min(1).max(256 * 1024), // 256KB per skill
+  installed_at: z.string().optional(),
+});
+
 const ToolSchema = z.union([
   z.object({
     type: z.literal("agent_toolset_20260401"),
@@ -49,7 +56,12 @@ const CreateSchema = z.object({
     id: z.string(),
     version: z.number().int().optional(),
   })).optional(),
-});
+  skills: z.array(SkillSchema).max(20).optional(),
+}).refine(data => {
+  if (!data.skills) return true;
+  const total = data.skills.reduce((sum, s) => sum + s.content.length, 0);
+  return total <= 1024 * 1024; // 1MB total
+}, "Total skills content exceeds 1MB limit");
 
 const UpdateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -65,7 +77,12 @@ const UpdateSchema = z.object({
     id: z.string(),
     version: z.number().int().optional(),
   })).optional(),
-});
+  skills: z.array(SkillSchema).max(20).optional(),
+}).refine(data => {
+  if (!data.skills) return true;
+  const total = data.skills.reduce((sum, s) => sum + s.content.length, 0);
+  return total <= 1024 * 1024; // 1MB total
+}, "Total skills content exceeds 1MB limit");
 
 export function handleCreateAgent(request: Request): Promise<Response> {
   return routeWrap(request, async () => {
@@ -108,6 +125,7 @@ export function handleCreateAgent(request: Request): Promise<Response> {
     const createErr = backend.validateAgentCreation?.();
     if (createErr) throw badRequest(createErr);
 
+    const nowIso = new Date().toISOString();
     const agent = createAgent({
       name: parsed.data.name,
       model: parsed.data.model,
@@ -120,6 +138,10 @@ export function handleCreateAgent(request: Request): Promise<Response> {
       threads_enabled: parsed.data.threads_enabled ?? false,
       confirmation_mode: parsed.data.confirmation_mode ?? false,
       callable_agents: parsed.data.callable_agents,
+      skills: parsed.data.skills?.map(s => ({
+        ...s,
+        installed_at: s.installed_at ?? nowIso,
+      })),
     });
     return jsonOk(agent, 201);
   });
@@ -170,6 +192,7 @@ export function handleUpdateAgent(request: Request, id: string): Promise<Respons
     const parsed = UpdateSchema.safeParse(body);
     if (!parsed.success) throw badRequest(parsed.error.message);
 
+    const nowIso = new Date().toISOString();
     const updated = updateAgent(id, {
       name: parsed.data.name,
       model: parsed.data.model,
@@ -180,6 +203,10 @@ export function handleUpdateAgent(request: Request, id: string): Promise<Respons
       webhook_events: parsed.data.webhook_events,
       confirmation_mode: parsed.data.confirmation_mode,
       callable_agents: parsed.data.callable_agents,
+      skills: parsed.data.skills?.map(s => ({
+        ...s,
+        installed_at: s.installed_at ?? nowIso,
+      })),
     });
     if (!updated) throw notFound(`agent ${id} not found`);
     return jsonOk(updated);

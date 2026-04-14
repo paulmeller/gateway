@@ -5,6 +5,7 @@ import type {
   Agent,
   AgentRow,
   AgentVersionRow,
+  AgentSkill,
   BackendName,
   McpServerConfig,
   ToolConfig,
@@ -25,6 +26,7 @@ function hydrate(row: AgentRow, ver: AgentVersionRow): Agent {
     threads_enabled: Boolean(ver.threads_enabled),
     confirmation_mode: Boolean(ver.confirmation_mode),
     callable_agents: ver.callable_agents_json ? JSON.parse(ver.callable_agents_json) : [],
+    skills: ver.skills_json ? (JSON.parse(ver.skills_json) as AgentSkill[]) : [],
     created_at: toIso(row.created_at),
     updated_at: toIso(row.updated_at),
   };
@@ -42,6 +44,7 @@ export function createAgent(input: {
   threads_enabled?: boolean;
   confirmation_mode?: boolean;
   callable_agents?: Array<{ type: "agent"; id: string; version?: number }>;
+  skills?: AgentSkill[];
 }): Agent {
   const db = getDb();
   const id = newId("agent");
@@ -55,8 +58,8 @@ export function createAgent(input: {
 
     db.prepare(
       `INSERT INTO agent_versions
-         (agent_id, version, model, system, tools_json, mcp_servers_json, backend, webhook_url, webhook_events_json, threads_enabled, confirmation_mode, callable_agents_json, created_at)
-       VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (agent_id, version, model, system, tools_json, mcp_servers_json, backend, webhook_url, webhook_events_json, threads_enabled, confirmation_mode, callable_agents_json, skills_json, created_at)
+       VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       id,
       input.model,
@@ -69,6 +72,7 @@ export function createAgent(input: {
       input.threads_enabled ? 1 : 0,
       input.confirmation_mode ? 1 : 0,
       input.callable_agents?.length ? JSON.stringify(input.callable_agents) : null,
+      JSON.stringify(input.skills ?? []),
       now,
     );
   });
@@ -108,6 +112,7 @@ export function updateAgent(
     threads_enabled?: boolean;
     confirmation_mode?: boolean;
     callable_agents?: Array<{ type: "agent"; id: string; version?: number }>;
+    skills?: AgentSkill[];
   },
 ): Agent | null {
   const db = getDb();
@@ -120,8 +125,8 @@ export function updateAgent(
   const tx = db.transaction(() => {
     db.prepare(
       `INSERT INTO agent_versions
-         (agent_id, version, model, system, tools_json, mcp_servers_json, backend, webhook_url, webhook_events_json, threads_enabled, confirmation_mode, callable_agents_json, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (agent_id, version, model, system, tools_json, mcp_servers_json, backend, webhook_url, webhook_events_json, threads_enabled, confirmation_mode, callable_agents_json, skills_json, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       id,
       newVersion,
@@ -135,6 +140,7 @@ export function updateAgent(
       input.threads_enabled !== undefined ? (input.threads_enabled ? 1 : 0) : (existing.threads_enabled ? 1 : 0),
       input.confirmation_mode !== undefined ? (input.confirmation_mode ? 1 : 0) : (existing.confirmation_mode ? 1 : 0),
       input.callable_agents !== undefined ? (input.callable_agents.length ? JSON.stringify(input.callable_agents) : null) : (existing.callable_agents.length ? JSON.stringify(existing.callable_agents) : null),
+      JSON.stringify(input.skills ?? existing.skills),
       now,
     );
 

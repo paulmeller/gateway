@@ -104,6 +104,20 @@ export const McpServerConfigSchema = registry.register(
 );
 
 // ---------------------------------------------------------------------------
+// Agent Skill
+// ---------------------------------------------------------------------------
+
+export const AgentSkillSchema = registry.register(
+  "AgentSkill",
+  z.object({
+    name: z.string().openapi({ description: "Unique skill name used as directory name." }),
+    source: z.string().openapi({ description: "Source identifier for the skill (e.g. a registry URL or package name)." }),
+    content: z.string().openapi({ description: "Markdown content of the skill, written as SKILL.md into the container." }),
+    installed_at: z.string().openapi({ description: "ISO timestamp when the skill was installed." }),
+  }),
+);
+
+// ---------------------------------------------------------------------------
 // Agent
 // ---------------------------------------------------------------------------
 
@@ -132,6 +146,9 @@ export const AgentSchema = registry.register(
     }),
     confirmation_mode: z.boolean().openapi({
       description: "Whether this agent requires tool confirmation via user.tool_confirmation events. When true, claude runs with --permission-mode default and a PermissionRequest hook bridges tool approvals to the MA API.",
+    }),
+    skills: z.array(AgentSkillSchema).openapi({
+      description: "Skills injected into the container at session start. For Claude backend, written to .claude/skills/<name>/SKILL.md. For all backends, also written to .agents/skills/<name>/SKILL.md. Non-Claude backends also receive skills prepended to the system prompt.",
     }),
     created_at: IsoTimestamp,
     updated_at: IsoTimestamp,
@@ -164,6 +181,9 @@ export const CreateAgentRequestSchema = registry.register(
       confirmation_mode: z.boolean().optional().openapi({
         description: "Enable tool confirmation mode. When true, claude requires explicit user approval for tool calls via user.tool_confirmation events.",
       }),
+      skills: z.array(AgentSkillSchema).max(20).optional().openapi({
+        description: "Skills to inject into the container at session start. Maximum 20 skills, 256KB per skill, 1MB total. For Claude: written to .claude/skills/<name>/SKILL.md. All backends: also written to .agents/skills/<name>/SKILL.md.",
+      }),
     })
     .openapi({
       example: {
@@ -183,6 +203,9 @@ export const UpdateAgentRequestSchema = registry.register(
     system: z.string().nullish(),
     tools: z.array(ToolConfigSchema).optional(),
     mcp_servers: z.record(McpServerConfigSchema).optional(),
+    skills: z.array(AgentSkillSchema).max(20).optional().openapi({
+      description: "Updated skills list. Replaces the existing skills entirely.",
+    }),
   }),
 );
 

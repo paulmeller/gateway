@@ -82,7 +82,15 @@ export interface AgentVersionRow {
   threads_enabled: number;
   confirmation_mode: number;
   callable_agents_json: string | null;
+  skills_json: string;
   created_at: number;
+}
+
+export interface AgentSkill {
+  name: string;
+  source: string;
+  content: string;
+  installed_at: string;
 }
 
 export interface Agent {
@@ -99,6 +107,7 @@ export interface Agent {
   threads_enabled: boolean;
   confirmation_mode: boolean;
   callable_agents: Array<{ type: "agent"; id: string; version?: number }>;
+  skills: AgentSkill[];
   created_at: string;
   updated_at: string;
 }
