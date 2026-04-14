@@ -2297,3 +2297,60 @@ describe("Config Settings Roundtrip", () => {
     }
   });
 });
+
+describe("Provider Status", () => {
+  beforeEach(() => freshDbEnv());
+
+  it("returns status for all providers", async () => {
+    await bootDb();
+    const { handleGetProviderStatus } = await import("../src/handlers/providers");
+    const res = await handleGetProviderStatus(req("/v1/providers/status"));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: Record<string, { available: boolean; message?: string }> };
+    expect(body.data).toBeDefined();
+    expect(body.data.docker).toBeDefined();
+    expect(body.data["apple-container"]).toBeDefined();
+    expect(body.data.podman).toBeDefined();
+    expect(body.data.mvm).toBeDefined();
+    expect(body.data.sprites).toBeDefined();
+    expect(body.data.e2b).toBeDefined();
+    expect(body.data.vercel).toBeDefined();
+    expect(body.data.daytona).toBeDefined();
+    expect(body.data.fly).toBeDefined();
+    expect(body.data.modal).toBeDefined();
+    for (const [, status] of Object.entries(body.data)) {
+      expect(typeof status.available).toBe("boolean");
+      if (!status.available) {
+        expect(typeof status.message).toBe("string");
+      }
+    }
+  });
+
+  it("cloud providers without keys report unavailable", async () => {
+    await bootDb();
+    const saved = { ...process.env };
+    delete process.env.SPRITE_TOKEN;
+    delete process.env.E2B_API_KEY;
+    delete process.env.VERCEL_TOKEN;
+    const g = globalThis as typeof globalThis & { __caConfigCache?: unknown };
+    delete g.__caConfigCache;
+    try {
+      const { handleGetProviderStatus } = await import("../src/handlers/providers");
+      const res = await handleGetProviderStatus(req("/v1/providers/status"));
+      const body = await res.json() as { data: Record<string, { available: boolean; message?: string }> };
+      expect(body.data.sprites.available).toBe(false);
+      expect(body.data.sprites.message).toContain("SPRITE_TOKEN");
+      expect(body.data.e2b.available).toBe(false);
+      expect(body.data.e2b.message).toContain("E2B_API_KEY");
+    } finally {
+      Object.assign(process.env, saved);
+    }
+  });
+
+  it("requires auth", async () => {
+    await bootDb();
+    const { handleGetProviderStatus } = await import("../src/handlers/providers");
+    const res = await handleGetProviderStatus(req("/v1/providers/status", { apiKey: "" }));
+    expect(res.status).toBe(401);
+  });
+});
