@@ -298,4 +298,35 @@ export function runMigrations(db: InstanceType<typeof Database>): void {
   if (!avCols.some(c => c.name === "skills_json")) {
     db.exec("ALTER TABLE agent_versions ADD COLUMN skills_json TEXT NOT NULL DEFAULT '[]'");
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Observability: trace/span columns on events
+  //
+  // Every event produced during a turn carries a trace_id. Span boundary
+  // events (`span.*_start` / `span.*_end`) also carry span_id and the
+  // parent_span_id that nests them into the trace tree. Non-span events
+  // inherit the current open span via `span_id` so reconstructing the tree
+  // from a trace_id is a single indexed scan.
+  //
+  // Trace propagation:
+  //   - A fresh trace_id is minted per top-level runTurn invocation.
+  //   - tool_result re-entry and grader recursion reuse the parent trace_id.
+  //   - Sub-agent threads (handleSpawnAgent) inherit the parent's trace_id
+  //     and nest under the parent's current span_id; the child session's
+  //     events query the same trace_id for a cross-session waterfall.
+  // ─────────────────────────────────────────────────────────────────────────
+  const eventCols = db.prepare(`PRAGMA table_info(events)`).all() as Array<{ name: string }>;
+  if (!eventCols.some((c) => c.name === "trace_id")) {
+    db.exec(`ALTER TABLE events ADD COLUMN trace_id TEXT`);
+  }
+  if (!eventCols.some((c) => c.name === "span_id")) {
+    db.exec(`ALTER TABLE events ADD COLUMN span_id TEXT`);
+  }
+  if (!eventCols.some((c) => c.name === "parent_span_id")) {
+    db.exec(`ALTER TABLE events ADD COLUMN parent_span_id TEXT`);
+  }
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_events_trace
+       ON events(trace_id) WHERE trace_id IS NOT NULL`,
+  );
 }

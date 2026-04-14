@@ -14,6 +14,7 @@ import { listEvents } from "../db/events";
 import { appendEvent } from "./bus";
 import { getActor } from "./actor";
 import { runTurn } from "./driver";
+import type { TraceContext } from "./trace";
 import { nowMs } from "../util/clock";
 import { ApiError } from "../errors";
 
@@ -22,12 +23,18 @@ const MAX_THREAD_DEPTH = 3;
 /**
  * Spawn a child agent session, run it to completion, and return the
  * child's final agent.message text.
+ *
+ * `parentTrace` (when provided) propagates the parent turn's trace id and
+ * current span id into the child's `runTurn`, so events emitted by the
+ * child session share the same trace and render as nested spans in the
+ * cross-session waterfall.
  */
 export async function handleSpawnAgent(
   parentSessionId: string,
   agentId: string,
   prompt: string,
   parentDepth: number,
+  parentTrace?: TraceContext,
 ): Promise<string> {
   if (parentDepth >= MAX_THREAD_DEPTH) {
     throw new ApiError(
@@ -59,22 +66,28 @@ export async function handleSpawnAgent(
     vault_ids: parentSession.vault_ids,
   });
 
-  // Emit thread_started on parent
+  // Emit thread_started on parent — tagged with the parent turn's trace
+  // context so it threads into the waterfall under the spawning span.
   appendEvent(parentSessionId, {
     type: "session.thread_started",
     payload: { child_session_id: childSession.id, agent_id: agentId },
     origin: "server",
     processedAt: nowMs(),
+    traceId: parentTrace?.trace_id ?? null,
+    spanId: parentTrace?.span_id ?? null,
+    parentSpanId: parentTrace?.parent_span_id ?? null,
   });
 
   // Spawn the child actor
   getActor(childSession.id);
 
-  // Run the child turn
+  // Run the child turn. Pass the parent's trace context so the child's
+  // runTurn mints a span nested under the parent's current span — the
+  // whole cross-session fan-out renders as one trace tree.
   const eventId = `thread_${childSession.id}_${nowMs()}`;
   await runTurn(childSession.id, [
     { kind: "text", eventId, text: prompt },
-  ]);
+  ], 0, parentTrace);
 
   // Wait for completion: poll until session is idle
   const maxWaitMs = 300_000; // 5 minutes
@@ -111,7 +124,7 @@ export async function handleSpawnAgent(
     }
   }
 
-  // Emit thread_completed on parent
+  // Emit thread_completed on parent — same trace tagging as thread_started.
   appendEvent(parentSessionId, {
     type: "session.thread_completed",
     payload: {
@@ -120,6 +133,9 @@ export async function handleSpawnAgent(
     },
     origin: "server",
     processedAt: nowMs(),
+    traceId: parentTrace?.trace_id ?? null,
+    spanId: parentTrace?.span_id ?? null,
+    parentSpanId: parentTrace?.parent_span_id ?? null,
   });
 
   return resultText || "(no response from sub-agent)";

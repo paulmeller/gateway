@@ -9,6 +9,12 @@ export interface AppendInput {
   origin: EventOrigin;
   idempotencyKey?: string | null;
   processedAt?: number | null;
+  /** OTel-style trace id — every event in one top-level run shares it. */
+  traceId?: string | null;
+  /** Span the event belongs to. On span.*_start/_end this is the boundary. */
+  spanId?: string | null;
+  /** Only meaningful on span.*_start events. */
+  parentSpanId?: string | null;
 }
 
 /**
@@ -50,8 +56,9 @@ export function appendEvent(sessionId: string, input: AppendInput): EventRow {
     db.prepare(
       `INSERT INTO events (
          id, session_id, seq, type, payload_json,
-         processed_at, received_at, origin, idempotency_key
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         processed_at, received_at, origin, idempotency_key,
+         trace_id, span_id, parent_span_id
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       id,
       sessionId,
@@ -62,6 +69,9 @@ export function appendEvent(sessionId: string, input: AppendInput): EventRow {
       receivedAt,
       input.origin,
       input.idempotencyKey ?? null,
+      input.traceId ?? null,
+      input.spanId ?? null,
+      input.parentSpanId ?? null,
     );
 
     db.prepare(`UPDATE sessions SET last_seq = ?, updated_at = ? WHERE id = ?`).run(
@@ -80,6 +90,9 @@ export function appendEvent(sessionId: string, input: AppendInput): EventRow {
       received_at: receivedAt,
       origin: input.origin,
       idempotency_key: input.idempotencyKey ?? null,
+      trace_id: input.traceId ?? null,
+      span_id: input.spanId ?? null,
+      parent_span_id: input.parentSpanId ?? null,
     };
   })();
 }
@@ -87,42 +100,52 @@ export function appendEvent(sessionId: string, input: AppendInput): EventRow {
 /**
  * Append multiple events in a single transaction. Returns the inserted rows
  * in input order. Same idempotency semantics per row.
+ *
+ * The `last_seq` counter is read ONCE at the start of the transaction and
+ * incremented in-memory across the batch — an earlier version re-read
+ * `sessions.last_seq` for every row, which is O(N) SELECTs on the hot
+ * NDJSON stream path.
  */
 export function appendEventsBatch(sessionId: string, inputs: AppendInput[]): EventRow[] {
   const db = getDb();
 
   return db.transaction(() => {
     const rows: EventRow[] = [];
+
+    // Read last_seq once per transaction and track it in memory.
+    const cur = db
+      .prepare(`SELECT last_seq FROM sessions WHERE id = ?`)
+      .get(sessionId) as { last_seq: number } | undefined;
+    if (!cur) throw new Error(`session not found: ${sessionId}`);
+    let seq = cur.last_seq;
+
+    const dupeStmt = db.prepare(
+      `SELECT * FROM events WHERE session_id = ? AND idempotency_key = ?`,
+    );
+    const insertStmt = db.prepare(
+      `INSERT INTO events (
+         id, session_id, seq, type, payload_json,
+         processed_at, received_at, origin, idempotency_key,
+         trace_id, span_id, parent_span_id
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+
     for (const input of inputs) {
       if (input.idempotencyKey) {
-        const dupe = db
-          .prepare(
-            `SELECT * FROM events WHERE session_id = ? AND idempotency_key = ?`,
-          )
-          .get(sessionId, input.idempotencyKey) as EventRow | undefined;
+        const dupe = dupeStmt.get(sessionId, input.idempotencyKey) as
+          | EventRow
+          | undefined;
         if (dupe) {
           rows.push(dupe);
           continue;
         }
       }
 
-      const cur = db
-        .prepare(
-          `SELECT last_seq FROM sessions WHERE id = ?`,
-        )
-        .get(sessionId) as { last_seq: number } | undefined;
-      if (!cur) throw new Error(`session not found: ${sessionId}`);
-
-      const seq = cur.last_seq + 1;
+      seq += 1;
       const id = newId("evt");
       const receivedAt = nowMs();
 
-      db.prepare(
-        `INSERT INTO events (
-           id, session_id, seq, type, payload_json,
-           processed_at, received_at, origin, idempotency_key
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ).run(
+      insertStmt.run(
         id,
         sessionId,
         seq,
@@ -132,12 +155,9 @@ export function appendEventsBatch(sessionId: string, inputs: AppendInput[]): Eve
         receivedAt,
         input.origin,
         input.idempotencyKey ?? null,
-      );
-
-      db.prepare(`UPDATE sessions SET last_seq = ?, updated_at = ? WHERE id = ?`).run(
-        seq,
-        receivedAt,
-        sessionId,
+        input.traceId ?? null,
+        input.spanId ?? null,
+        input.parentSpanId ?? null,
       );
 
       rows.push({
@@ -150,8 +170,21 @@ export function appendEventsBatch(sessionId: string, inputs: AppendInput[]): Eve
         received_at: receivedAt,
         origin: input.origin,
         idempotency_key: input.idempotencyKey ?? null,
+        trace_id: input.traceId ?? null,
+        span_id: input.spanId ?? null,
+        parent_span_id: input.parentSpanId ?? null,
       });
     }
+
+    // Single trailing update for the session's seq counter.
+    if (seq !== cur.last_seq) {
+      db.prepare(`UPDATE sessions SET last_seq = ?, updated_at = ? WHERE id = ?`).run(
+        seq,
+        nowMs(),
+        sessionId,
+      );
+    }
+
     return rows;
   })();
 }
@@ -195,9 +228,27 @@ export function getLastUnprocessedUserMessage(sessionId: string): EventRow | nul
   );
 }
 
+/**
+ * Fetch every event that shares a trace_id, ordered by (session_id, seq).
+ *
+ * Cross-session: sub-agent threads inherit their parent's trace_id, so a
+ * single trace scan returns the full waterfall including spawned children.
+ */
+export function listEventsByTrace(traceId: string, limit = 2000): EventRow[] {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT * FROM events
+         WHERE trace_id = ?
+         ORDER BY received_at ASC, session_id ASC, seq ASC
+         LIMIT ?`,
+    )
+    .all(traceId, Math.min(Math.max(limit, 1), 10000)) as EventRow[];
+}
+
 export function rowToManagedEvent(row: EventRow): ManagedEvent {
   const payload = JSON.parse(row.payload_json) as Record<string, unknown>;
-  return {
+  const base: ManagedEvent = {
     id: row.id,
     seq: row.seq,
     session_id: row.session_id,
@@ -205,4 +256,8 @@ export function rowToManagedEvent(row: EventRow): ManagedEvent {
     processed_at: row.processed_at != null ? toIso(row.processed_at) : null,
     ...payload,
   };
+  if (row.trace_id != null) base.trace_id = row.trace_id;
+  if (row.span_id != null) base.span_id = row.span_id;
+  if (row.parent_span_id != null) base.parent_span_id = row.parent_span_id;
+  return base;
 }

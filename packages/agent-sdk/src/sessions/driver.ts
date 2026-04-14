@@ -25,6 +25,8 @@
  *      are enqueued as the next turn.
  */
 import { appendEventsBatch, appendEvent } from "./bus";
+import { newTrace, childSpan, type TraceContext } from "./trace";
+import type { AppendInput } from "../db/events";
 import { getRuntime, drainPendingUserInputs, type TurnInput } from "../state";
 import { getSession, setBackendSessionId, updateSessionStatus, updateSessionMutable, bumpSessionStats, setIdleSince, getSessionRow, getOutcomeCriteria, setOutcomeCriteria } from "../db/sessions";
 import { getAgent } from "../db/agents";
@@ -53,9 +55,33 @@ export async function runTurn(
   sessionId: string,
   inputs: TurnInput[],
   _depth = 0,
+  parentTrace?: TraceContext,
 ): Promise<void> {
+  // Resolve trace context up front so even the early-return error paths below
+  // carry a trace id. If this is a top-level turn (no parent), mint a fresh
+  // trace; otherwise nest under the parent's current span.
+  const trace: TraceContext = parentTrace ? childSpan(parentTrace) : newTrace();
+
+  /**
+   * Append a single event with this turn's trace + span ids baked in.
+   * Used for every driver-emitted event during the turn so the trace tree
+   * can be reconstructed from a single indexed scan on `events.trace_id`.
+   */
+  const emit = (type: string, payload: Record<string, unknown>, opts: { at?: number; parentOverride?: string | null } = {}): void => {
+    const input: AppendInput = {
+      type,
+      payload,
+      origin: "server",
+      processedAt: opts.at ?? nowMs(),
+      traceId: trace.trace_id,
+      spanId: trace.span_id,
+      parentSpanId: opts.parentOverride !== undefined ? opts.parentOverride : trace.parent_span_id,
+    };
+    appendEvent(sessionId, input);
+  };
+
   if (_depth > 25) {
-    appendEvent(sessionId, { type: "session.error", payload: { error: { type: "server_error", message: "max recursion depth exceeded" } }, origin: "server", processedAt: nowMs() });
+    emit("session.error", { error: { type: "server_error", message: "max recursion depth exceeded" } });
     updateSessionStatus(sessionId, "idle", "error");
     return;
   }
@@ -65,18 +91,8 @@ export async function runTurn(
 
   const agent = getAgent(session.agent.id, session.agent.version);
   if (!agent) {
-    appendEvent(sessionId, {
-      type: "session.error",
-      payload: { error: { type: "server_error", message: "agent not found" } },
-      origin: "server",
-      processedAt: nowMs(),
-    });
-    appendEvent(sessionId, {
-      type: "session.status_idle",
-      payload: { stop_reason: "error" },
-      origin: "server",
-      processedAt: nowMs(),
-    });
+    emit("session.error", { error: { type: "server_error", message: "agent not found" } });
+    emit("session.status_idle", { stop_reason: "error" });
     updateSessionStatus(sessionId, "idle", "error");
     return;
   }
@@ -102,18 +118,8 @@ export async function runTurn(
   if (!hasVaultKeys) {
     const runtimeErr = backend.validateRuntime?.();
     if (runtimeErr) {
-      appendEvent(sessionId, {
-        type: "session.error",
-        payload: { error: { type: "invalid_request_error", message: runtimeErr } },
-        origin: "server",
-        processedAt: nowMs(),
-      });
-      appendEvent(sessionId, {
-        type: "session.status_idle",
-        payload: { stop_reason: "error" },
-        origin: "server",
-        processedAt: nowMs(),
-      });
+      emit("session.error", { error: { type: "invalid_request_error", message: runtimeErr } });
+      emit("session.status_idle", { stop_reason: "error" });
       updateSessionStatus(sessionId, "idle", "error");
       return;
     }
@@ -122,18 +128,13 @@ export async function runTurn(
   // Budget check: if max_budget_usd is set and usage has exceeded it, refuse the turn
   const budgetRow = getSessionRow(sessionId);
   if (budgetRow?.max_budget_usd != null && budgetRow.usage_cost_usd >= budgetRow.max_budget_usd) {
-    appendEvent(sessionId, {
-      type: "session.error",
-      payload: { error: { type: "budget_exceeded", message: `usage $${budgetRow.usage_cost_usd.toFixed(4)} >= budget $${budgetRow.max_budget_usd.toFixed(4)}` } },
-      origin: "server",
-      processedAt: nowMs(),
+    emit("session.error", {
+      error: {
+        type: "budget_exceeded",
+        message: `usage $${budgetRow.usage_cost_usd.toFixed(4)} >= budget $${budgetRow.max_budget_usd.toFixed(4)}`,
+      },
     });
-    appendEvent(sessionId, {
-      type: "session.status_idle",
-      payload: { stop_reason: "error" },
-      origin: "server",
-      processedAt: nowMs(),
-    });
+    emit("session.status_idle", { stop_reason: "error" });
     updateSessionStatus(sessionId, "idle", "error");
     return;
   }
@@ -174,18 +175,8 @@ export async function runTurn(
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    appendEvent(sessionId, {
-      type: "session.error",
-      payload: { error: { type: "server_error", message: `container creation failed: ${msg}` } },
-      origin: "server",
-      processedAt: nowMs(),
-    });
-    appendEvent(sessionId, {
-      type: "session.status_idle",
-      payload: { stop_reason: "error" },
-      origin: "server",
-      processedAt: nowMs(),
-    });
+    emit("session.error", { error: { type: "server_error", message: `container creation failed: ${msg}` } });
+    emit("session.status_idle", { stop_reason: "error" });
     updateSessionStatus(sessionId, "idle", "error");
     return;
   }
@@ -193,18 +184,11 @@ export async function runTurn(
   // Flip running + emit status_running + span start
   updateSessionStatus(sessionId, "running");
   const turnStartMs = nowMs();
-  appendEvent(sessionId, {
-    type: "session.status_running",
-    payload: {},
-    origin: "server",
-    processedAt: turnStartMs,
-  });
-  appendEvent(sessionId, {
-    type: "span.model_request_start",
-    payload: { model: agent.model },
-    origin: "server",
-    processedAt: turnStartMs,
-  });
+  emit("session.status_running", {}, { at: turnStartMs });
+  // The span_start event is the formal open of this turn's root span. After
+  // this point every error path MUST emit a matching span_end (status=error
+  // or status=interrupted) or the trace tree is left dangling.
+  emit("span.model_request_start", { model: agent.model }, { at: turnStartMs });
 
   // Build argv + env + stdin via the backend. buildTurn may throw an
   // ApiError (e.g. opencode rejects tool_result re-entry) — catch, surface
@@ -236,18 +220,12 @@ export async function runTurn(
           ? err.message
           : String(err);
     const type = err instanceof ApiError ? err.type : "server_error";
-    appendEvent(sessionId, {
-      type: "session.error",
-      payload: { error: { type, message: msg } },
-      origin: "server",
-      processedAt: nowMs(),
-    });
-    appendEvent(sessionId, {
-      type: "session.status_idle",
-      payload: { stop_reason: "error" },
-      origin: "server",
-      processedAt: nowMs(),
-    });
+    // Close the open turn span before returning. Without this, the
+    // span.model_request_start emitted above would leave a dangling open
+    // span in the trace.
+    emit("span.model_request_end", { model: agent.model, model_usage: null, status: "error" });
+    emit("session.error", { error: { type, message: msg } });
+    emit("session.status_idle", { stop_reason: "error" });
     updateSessionStatus(sessionId, "idle", "error");
     return;
   }
@@ -346,18 +324,10 @@ export async function runTurn(
   } catch (err) {
     runtime.inFlightRuns.delete(sessionId);
     const msg = err instanceof Error ? err.message : String(err);
-    appendEvent(sessionId, {
-      type: "session.error",
-      payload: { error: { type: "server_error", message: `exec failed: ${msg}` } },
-      origin: "server",
-      processedAt: nowMs(),
-    });
-    appendEvent(sessionId, {
-      type: "session.status_idle",
-      payload: { stop_reason: "error" },
-      origin: "server",
-      processedAt: nowMs(),
-    });
+    // Close the open turn span before returning — see buildTurn catch above.
+    emit("span.model_request_end", { model: agent.model, model_usage: null, status: "error" });
+    emit("session.error", { error: { type: "server_error", message: `exec failed: ${msg}` } });
+    emit("session.status_idle", { stop_reason: "error" });
     updateSessionStatus(sessionId, "idle", "error");
     return;
   }
@@ -404,7 +374,7 @@ export async function runTurn(
         for (const t of translated) batch.push(t);
       });
       if (batch.length > 0) {
-        const batchInputs = batch.map((t) => {
+        const batchInputs: AppendInput[] = batch.map((t) => {
           if (t.type.endsWith("tool_use") || t.type.endsWith("mcp_tool_use") || t.type.endsWith("custom_tool_use")) {
             toolCallsInTurn++;
           }
@@ -413,6 +383,9 @@ export async function runTurn(
             payload: t.payload,
             origin: "server" as const,
             processedAt: nowMs(),
+            traceId: trace.trace_id,
+            spanId: trace.span_id,
+            parentSpanId: trace.parent_span_id,
           };
         });
         appendEventsBatch(sessionId, batchInputs);
@@ -425,11 +398,11 @@ export async function runTurn(
     // If the process exited with non-zero and produced no output, surface an error
     if ((exitResult as { code?: number })?.code !== 0 && buffer.trim() === "" && toolCallsInTurn === 0) {
       const code = (exitResult as { code?: number })?.code ?? "unknown";
-      appendEvent(sessionId, {
-        type: "session.error",
-        payload: { error: { type: "backend_error", message: `Backend CLI exited with code ${code} and no output. Check that the engine is installed and the API key is valid.` } },
-        origin: "server",
-        processedAt: nowMs(),
+      emit("session.error", {
+        error: {
+          type: "backend_error",
+          message: `Backend CLI exited with code ${code} and no output. Check that the engine is installed and the API key is valid.`,
+        },
       });
     }
   } catch (err) {
@@ -437,18 +410,11 @@ export async function runTurn(
       aborted = true;
     } else {
       const msg = err instanceof Error ? err.message : String(err);
-      appendEvent(sessionId, {
-        type: "session.error",
-        payload: { error: { type: "server_error", message: msg } },
-        origin: "server",
-        processedAt: nowMs(),
-      });
-      appendEvent(sessionId, {
-        type: "session.status_idle",
-        payload: { stop_reason: "error" },
-        origin: "server",
-        processedAt: nowMs(),
-      });
+      // Close the open turn span before returning — this path is reached
+      // when the NDJSON stream itself fails (translator throw, read error).
+      emit("span.model_request_end", { model: agent.model, model_usage: null, status: "error" });
+      emit("session.error", { error: { type: "server_error", message: msg } });
+      emit("session.status_idle", { stop_reason: "error" });
       updateSessionStatus(sessionId, "idle", "error");
       runtime.inFlightRuns.delete(sessionId);
       return;
@@ -459,12 +425,15 @@ export async function runTurn(
   }
 
   if (aborted) {
-    appendEvent(sessionId, {
-      type: "session.status_idle",
-      payload: { stop_reason: "interrupted" },
-      origin: "server",
-      processedAt: nowMs(),
+    // Close the open turn span on the interrupt path so the trace tree
+    // doesn't hang forever waiting for an end boundary.
+    const partial = translator.getTurnResult();
+    emit("span.model_request_end", {
+      model: agent.model,
+      model_usage: partial?.usage ?? null,
+      status: "interrupted",
     });
+    emit("session.status_idle", { stop_reason: "interrupted" });
     updateSessionStatus(sessionId, "idle", "interrupted");
     setIdleSince(sessionId, nowMs());
     scheduleDrain(sessionId);
@@ -495,22 +464,16 @@ export async function runTurn(
   // spawn_agent, intercept and delegate to the thread orchestrator. The result
   // is written back as a tool result and the turn is re-run automatically.
   if (stopReason === "custom_tool_call") {
-    const serverToolResult = await handleServerSideTool(sessionId, agent);
+    const serverToolResult = await handleServerSideTool(sessionId, agent, trace);
     if (serverToolResult) {
       // spawn_agent was handled — the thread orchestrator already wrote the
       // result back. Re-run the turn with the tool result to continue.
-      appendEvent(sessionId, {
-        type: "span.model_request_end",
-        payload: { model: agent.model, model_usage: result?.usage ?? null },
-        origin: "server",
-        processedAt: now,
-      });
-      appendEvent(sessionId, {
-        type: "session.status_idle",
-        payload: { stop_reason: "custom_tool_call" },
-        origin: "server",
-        processedAt: now,
-      });
+      emit(
+        "span.model_request_end",
+        { model: agent.model, model_usage: result?.usage ?? null, status: "ok" },
+        { at: now },
+      );
+      emit("session.status_idle", { stop_reason: "custom_tool_call" }, { at: now });
       updateSessionStatus(sessionId, "idle", "custom_tool_call");
 
       // Write the spawn result as response.json into the container
@@ -535,33 +498,25 @@ export async function runTurn(
         ).catch(() => {});
       }
 
-      // Re-run turn with tool result re-entry
+      // Re-run turn with tool result re-entry. Pass `trace` as the parent
+      // so the recursion's span is nested under this turn — the whole
+      // custom-tool loop renders as a single trace tree.
       await runTurn(sessionId, [{
         kind: "tool_result",
         eventId: `server_tool_${nowMs()}`,
         custom_tool_use_id: serverToolResult.toolUseId,
         content: [{ type: "text", text: serverToolResult.text }],
-      }], _depth + 1);
+      }], _depth + 1, trace);
       return;
     }
   }
 
-  appendEvent(sessionId, {
-    type: "span.model_request_end",
-    payload: {
-      model: agent.model,
-      model_usage: result?.usage ?? null,
-    },
-    origin: "server",
-    processedAt: now,
-  });
-
-  appendEvent(sessionId, {
-    type: "session.status_idle",
-    payload: { stop_reason: stopReason },
-    origin: "server",
-    processedAt: now,
-  });
+  emit(
+    "span.model_request_end",
+    { model: agent.model, model_usage: result?.usage ?? null, status: "ok" },
+    { at: now },
+  );
+  emit("session.status_idle", { stop_reason: stopReason }, { at: now });
   updateSessionStatus(sessionId, "idle", stopReason);
   console.log(`[driver] ${sessionId} turn complete: stop_reason=${stopReason}`);
   setIdleSince(sessionId, now);
@@ -597,12 +552,7 @@ export async function runTurn(
           }
         }
 
-        appendEvent(sessionId, {
-          type: "span.outcome_evaluation_start",
-          payload: { iteration },
-          origin: "server",
-          processedAt: nowMs(),
-        });
+        emit("span.outcome_evaluation_start", { iteration });
 
         const evaluation = await runGraderEvaluation(
           criteria.rubric,
@@ -629,24 +579,21 @@ export async function runTurn(
           ? "max_iterations_reached"
           : evaluation.result;
 
-        appendEvent(sessionId, {
-          type: "span.outcome_evaluation_end",
-          payload: {
-            result: finalResult,
-            iteration,
-            feedback: evaluation.feedback,
-          },
-          origin: "server",
-          processedAt: nowMs(),
+        emit("span.outcome_evaluation_end", {
+          result: finalResult,
+          iteration,
+          feedback: evaluation.feedback,
         });
 
-        // Re-run if needs_revision and under the iteration cap
+        // Re-run if needs_revision and under the iteration cap. Pass
+        // `trace` so the grader-feedback recursion nests under this turn
+        // and the full evaluator loop renders as one trace tree.
         if (evaluation.result === "needs_revision" && iteration + 1 < maxIter) {
           await runTurn(sessionId, [{
             kind: "text",
             eventId: `grader_feedback_${nowMs()}`,
             text: `[Grader feedback — iteration ${iteration + 1}/${maxIter}]\n\n${evaluation.feedback}`,
-          }], _depth + 1);
+          }], _depth + 1, trace);
           return; // recursive runTurn handles the rest
         }
       } catch (err) {
@@ -674,6 +621,7 @@ export interface ServerToolResult {
 async function handleServerSideTool(
   sessionId: string,
   agent: Agent,
+  parentTrace: TraceContext,
 ): Promise<ServerToolResult | null> {
   // Look at recent events to find the last custom_tool_use
   const recentEvents = listEvents(sessionId, { limit: 20, order: "desc" });
@@ -708,6 +656,7 @@ async function handleServerSideTool(
               input.agent_id,
               input.prompt,
               depth,
+              parentTrace,
             );
             return { toolUseId, text };
           } catch (err) {

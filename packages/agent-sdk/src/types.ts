@@ -328,6 +328,12 @@ export interface EventRow {
   received_at: number;
   origin: EventOrigin;
   idempotency_key: string | null;
+  /** OTel-style trace id — shared across all events of one top-level run. */
+  trace_id: string | null;
+  /** Span the event belongs to (either a boundary or inside the open span). */
+  span_id: string | null;
+  /** Parent span of `span_id`. Only meaningful on span.*_start events. */
+  parent_span_id: string | null;
 }
 
 export interface ManagedEvent {
@@ -336,6 +342,9 @@ export interface ManagedEvent {
   session_id: string;
   type: string;
   processed_at: string | null;
+  trace_id?: string | null;
+  span_id?: string | null;
+  parent_span_id?: string | null;
   [key: string]: unknown;
 }
 
