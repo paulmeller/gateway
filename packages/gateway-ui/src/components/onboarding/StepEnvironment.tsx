@@ -7,6 +7,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { LOCAL_PROVIDERS, CLOUD_PROVIDERS } from "@/lib/constants";
 import { useEnvironments } from "@/hooks/use-environments";
 import { useProviderStatus, type ProviderStatus } from "@/hooks/use-providers";
+import { toast } from "sonner";
 
 const PROVIDER_DOMAINS: Record<string, string> = {
   docker: "docker.com",
@@ -57,6 +58,10 @@ export function StepEnvironment({ onNext }: Props) {
 
   function handleCreate() {
     if (!name.trim() || !provider) return;
+    if (envs?.some(e => e.name.toLowerCase() === name.trim().toLowerCase())) {
+      toast.error(`Environment "${name.trim()}" already exists — use a different name or select existing`);
+      return;
+    }
     onNext({ mode: "create", data: { name: name.trim(), provider } });
   }
 

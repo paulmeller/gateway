@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MODELS, ENGINES } from "@/lib/constants";
 import { useAgents } from "@/hooks/use-agents";
+import { toast } from "sonner";
 
 type AgentResult =
   | { mode: "create"; data: { name: string; engine: string; model: string } }
@@ -32,6 +33,10 @@ export function StepAgent({ onNext }: Props) {
 
   function handleCreate() {
     if (!name.trim()) return;
+    if (agents?.some(a => a.name.toLowerCase() === name.trim().toLowerCase())) {
+      toast.error(`Agent "${name.trim()}" already exists — use a different name or select existing`);
+      return;
+    }
     onNext({ mode: "create", data: { name: name.trim(), engine, model } });
   }
 
