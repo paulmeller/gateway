@@ -20,17 +20,25 @@ export NODE_COMPILE_CACHE=/tmp/v8-cache
 mkdir -p /tmp/v8-cache
 # Install claude CLI if not present
 if ! command -v claude >/dev/null 2>&1; then npm install -g @anthropic-ai/claude-code 2>/dev/null; fi
-# Read env vars from stdin until blank line
+# Read env vars from stdin until blank line, save remaining stdin to temp file
+PROMPT_FILE=$(mktemp)
 while IFS= read -r line; do [ -z "$line" ] && break; export "$line"; done
-# Run as non-root if possible (claude requires non-root)
+cat > "$PROMPT_FILE"
+# Run as non-root if possible (claude requires non-root for bypassPermissions)
 if [ "$(id -u)" = "0" ]; then
   if ! id agent >/dev/null 2>&1; then
     useradd -m -s /bin/sh agent 2>/dev/null || adduser -D -s /bin/sh agent 2>/dev/null
   fi
   chown -R agent /tmp/ 2>/dev/null
-  exec su -s /bin/sh -c "NODE_COMPILE_CACHE=/tmp/v8-cache PATH=$PATH HOME=/home/agent claude $*" agent
+  chown -R agent /home/agent 2>/dev/null
+  # Export env vars to a file for the agent user
+  ENV_FILE=$(mktemp)
+  env | grep -E '^(ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN|NODE_COMPILE_CACHE|PATH)=' > "$ENV_FILE"
+  chown agent "$ENV_FILE" "$PROMPT_FILE"
+  exec su -s /bin/sh agent -c ". $ENV_FILE && HOME=/home/agent claude $* < $PROMPT_FILE; rm -f $ENV_FILE $PROMPT_FILE"
 fi
-exec claude "$@"
+exec claude "$@" < "$PROMPT_FILE"
+rm -f "$PROMPT_FILE"
 `;
 
 export async function installClaudeWrapper(spriteName: string, provider: ContainerProvider): Promise<void> {
