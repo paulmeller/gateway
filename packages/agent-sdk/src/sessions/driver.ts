@@ -30,7 +30,7 @@ import { getSession, setBackendSessionId, updateSessionStatus, updateSessionMuta
 import { getAgent } from "../db/agents";
 import { getEnvironment } from "../db/environments";
 import { markUserEventProcessed, listEvents } from "../db/events";
-import { acquireForFirstTurn } from "../sprite/lifecycle";
+import { acquireForFirstTurn, installSkills } from "../sprite/lifecycle";
 import * as pool from "../sprite/pool";
 import { resolveBackend } from "../backends/registry";
 import { resolveContainerProvider } from "../providers/registry";
@@ -147,6 +147,19 @@ export async function runTurn(
   try {
     spriteName = await acquireForFirstTurn(sessionId);
     console.log(`[driver] ${sessionId} container ready: ${spriteName}`);
+
+    // Re-inject skills if agent has been updated with new skills since container creation
+    const latestAgent = getAgent(session.agent.id);
+    if (latestAgent && latestAgent.skills && latestAgent.skills.length > 0) {
+      const currentSkillNames = new Set(agent.skills?.map(s => s.name) ?? []);
+      const newSkills = latestAgent.skills.filter(s => !currentSkillNames.has(s.name));
+      if (newSkills.length > 0) {
+        console.log(`[driver] ${sessionId} injecting ${newSkills.length} new skill(s)...`);
+        const sp = await resolveContainerProvider(environment.config?.provider);
+        await installSkills(spriteName, sp, newSkills, agent.engine);
+        console.log(`[driver] ${sessionId} skills injected`);
+      }
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     appendEvent(sessionId, {
