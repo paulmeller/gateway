@@ -1,7 +1,7 @@
 {
   "license": "Apache-2.0",
   "name": "@agentstep/agent-sdk",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "private": false,
   "type": "module",
   "main": "src/index.ts",
