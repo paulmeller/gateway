@@ -50,6 +50,11 @@ import {
   handlePutSetting,
   handleGetProviderStatus,
   handleGetSkillsCatalog,
+  handleSearchSkills,
+  handleGetSkillsStats,
+  handleGetSkillsSources,
+  handleGetSkillsIndex,
+  handleGetSkillsFeed,
 } from "@agentstep/agent-sdk/handlers";
 
 const app = new Hono();
@@ -127,8 +132,13 @@ app.put("/v1/settings", (c) => handlePutSetting(c.req.raw));
 // ── Providers ─────────────────────────────────────────────────────────────
 app.get("/v1/providers/status", (c) => handleGetProviderStatus(c.req.raw));
 
-// ── Skills Catalog ────────────────────────────────────────────────────
+// ── Skills ────────────────────────────────────────────────────────────
 app.get("/v1/skills/catalog", (c) => handleGetSkillsCatalog(c.req.raw));
+app.get("/v1/skills/stats", (c) => handleGetSkillsStats(c.req.raw));
+app.get("/v1/skills/sources", (c) => handleGetSkillsSources(c.req.raw));
+app.get("/v1/skills/index", (c) => handleGetSkillsIndex(c.req.raw));
+app.get("/v1/skills/feed", (c) => handleGetSkillsFeed(c.req.raw));
+app.get("/v1/skills", (c) => handleSearchSkills(c.req.raw));
 
 // ── Batch ────────────────────────────────────────────────────────────────
 app.post("/v1/batch", (c) => handleBatch(c.req.raw));

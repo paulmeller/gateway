@@ -44,21 +44,6 @@ function checkCloudProvider(name: string): AvailabilityResult {
   };
 }
 
-export async function handleGetSkillsCatalog(request: Request): Promise<Response> {
-  return routeWrap(request, async ({ request: req }) => {
-    const url = new URL(req.url);
-    const leaderboard = url.searchParams.get("leaderboard") || "trending";
-    const limit = url.searchParams.get("limit") || "12";
-    const upstream = `https://www.agentstep.com/v1/skills/top?leaderboard=${encodeURIComponent(leaderboard)}&limit=${encodeURIComponent(limit)}`;
-    const res = await fetch(upstream);
-    if (!res.ok) {
-      return jsonOk({ skills: [], total: 0 });
-    }
-    const data = await res.json();
-    return jsonOk(data);
-  });
-}
-
 export async function handleGetProviderStatus(request: Request): Promise<Response> {
   return routeWrap(request, async () => {
     const results: Record<string, AvailabilityResult> = {};

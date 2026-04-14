@@ -11,4 +11,5 @@ export { handleGetOpenApiSpec } from "./openapi";
 export { handleGetDocs } from "./docs";
 export { handleGetUI } from "./ui";
 export { handlePutSetting } from "./settings";
-export { handleGetProviderStatus, handleGetSkillsCatalog } from "./providers";
+export { handleGetProviderStatus } from "./providers";
+export { handleGetSkillsCatalog, handleSearchSkills, handleGetSkillsStats, handleGetSkillsSources, handleGetSkillsIndex, handleGetSkillsFeed } from "./skills";
