@@ -155,7 +155,8 @@ export async function runTurn(
       const newSkills = latestAgent.skills.filter(s => !currentSkillNames.has(s.name));
       if (newSkills.length > 0) {
         console.log(`[driver] ${sessionId} injecting ${newSkills.length} new skill(s)...`);
-        const sp = await resolveContainerProvider(environment.config?.provider);
+        const envRow = getEnvironment(session.environment_id);
+        const sp = await resolveContainerProvider(envRow?.config?.provider);
         await installSkills(spriteName, sp, newSkills, agent.engine);
         console.log(`[driver] ${sessionId} skills injected`);
       }
