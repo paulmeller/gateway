@@ -73,6 +73,16 @@ export interface BatchBackend {
   execute(operations: Array<{ method: string; path: string; body?: unknown }>): Promise<{ results: Array<{ status: number; body: unknown }> }>;
 }
 
+export interface SkillsBackend {
+  search(opts: { q?: string; sort?: string; limit?: number; offset?: number; source?: string }): Promise<any>;
+  stats(): Promise<any>;
+  sources(opts?: { limit?: number }): Promise<any>;
+}
+
+export interface ProvidersBackend {
+  status(): Promise<Record<string, { available: boolean; message?: string }>>;
+}
+
 export interface Backend {
   init(): Promise<void>;
   agents: AgentBackend;
@@ -82,4 +92,6 @@ export interface Backend {
   vaults: VaultBackend;
   memory: MemoryBackend;
   batch: BatchBackend;
+  skills: SkillsBackend;
+  providers: ProvidersBackend;
 }

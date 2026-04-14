@@ -75,4 +75,87 @@ export function registerAgentCommands(parent: Command): void {
       const res = await b.agents.delete(id);
       console.log(`Deleted agent ${res.id}`);
     });
+
+  // --- Skills subcommands ---
+
+  agents.command("skills <id>")
+    .description("List installed skills on an agent")
+    .action(async (id) => {
+      const b = await initBackend();
+      const agent = await b.agents.get(id);
+      const skills = agent.skills ?? [];
+      if (skills.length === 0) {
+        console.log("No skills installed.");
+        return;
+      }
+      formatOutput(getFormat(), skills, [
+        { header: "NAME", field: (s) => s.name },
+        { header: "SOURCE", field: (s) => s.source },
+        { header: "INSTALLED", field: (s) => s.installed_at ?? "" },
+      ]);
+    });
+
+  agents.command("add-skill <id> <source>")
+    .description("Install a skill from GitHub (owner/repo or owner/repo@skill-name)")
+    .action(async (id, source) => {
+      const b = await initBackend();
+      const agent = await b.agents.get(id);
+      const existing = agent.skills ?? [];
+
+      // Fetch SKILL.md from GitHub
+      const skill = await fetchSkillFromGitHub(source);
+      if (existing.some((s: any) => s.name === skill.name)) {
+        console.error(`Skill "${skill.name}" is already installed.`);
+        process.exit(1);
+      }
+
+      await b.agents.update(id, { skills: [...existing, skill] });
+      console.log(`Installed skill "${skill.name}" from ${source}`);
+    });
+
+  agents.command("remove-skill <id> <skill-name>")
+    .description("Remove an installed skill by name")
+    .action(async (id, skillName) => {
+      const b = await initBackend();
+      const agent = await b.agents.get(id);
+      const existing = agent.skills ?? [];
+      const filtered = existing.filter((s: any) => s.name !== skillName);
+      if (filtered.length === existing.length) {
+        console.error(`Skill "${skillName}" not found.`);
+        process.exit(1);
+      }
+      await b.agents.update(id, { skills: filtered });
+      console.log(`Removed skill "${skillName}"`);
+    });
+}
+
+async function fetchSkillFromGitHub(source: string): Promise<{ name: string; source: string; content: string; installed_at: string }> {
+  const atIdx = source.indexOf("@");
+  let owner: string, repo: string, skillName: string | undefined;
+  if (atIdx !== -1) {
+    [owner, repo] = source.slice(0, atIdx).split("/");
+    skillName = source.slice(atIdx + 1);
+  } else {
+    [owner, repo] = source.split("/");
+  }
+  if (!owner || !repo) throw new Error("Invalid format. Use owner/repo or owner/repo@skill-name");
+
+  const urls = skillName
+    ? [`https://raw.githubusercontent.com/${owner}/${repo}/main/skills/${skillName}/SKILL.md`,
+       `https://raw.githubusercontent.com/${owner}/${repo}/main/${skillName}/SKILL.md`]
+    : [`https://raw.githubusercontent.com/${owner}/${repo}/main/SKILL.md`,
+       `https://raw.githubusercontent.com/${owner}/${repo}/main/skills/SKILL.md`];
+
+  for (const url of urls) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        const content = await res.text();
+        const match = content.match(/^#\s+(.+)$/m);
+        const name = skillName || (match ? match[1].trim().toLowerCase().replace(/\s+/g, "-") : repo);
+        return { name, source, content, installed_at: new Date().toISOString() };
+      }
+    } catch { continue; }
+  }
+  throw new Error("Could not find SKILL.md in repository.");
 }

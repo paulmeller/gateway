@@ -507,4 +507,36 @@ export class LocalBackend implements Backend {
       );
     },
   };
+
+  skills = {
+    async search(opts: { q?: string; sort?: string; limit?: number; offset?: number; source?: string }) {
+      const { handleSearchSkills } = await import("@agentstep/agent-sdk/handlers");
+      const params = new URLSearchParams();
+      if (opts.q) params.set("q", opts.q);
+      if (opts.sort) params.set("sort", opts.sort);
+      if (opts.limit) params.set("limit", String(opts.limit));
+      if (opts.offset) params.set("offset", String(opts.offset));
+      if (opts.source) params.set("source", opts.source);
+      return callHandler(handleSearchSkills, "GET", url(`/v1/skills?${params}`));
+    },
+    async stats() {
+      const { handleGetSkillsStats } = await import("@agentstep/agent-sdk/handlers");
+      return callHandler(handleGetSkillsStats, "GET", url("/v1/skills/stats"));
+    },
+    async sources(opts?: { limit?: number }) {
+      const { handleGetSkillsSources } = await import("@agentstep/agent-sdk/handlers");
+      const params = opts?.limit ? `?limit=${opts.limit}` : "";
+      return callHandler(handleGetSkillsSources, "GET", url(`/v1/skills/sources${params}`));
+    },
+  };
+
+  providers = {
+    async status() {
+      const { handleGetProviderStatus } = await import("@agentstep/agent-sdk/handlers");
+      const res = await callHandler<{ data: Record<string, { available: boolean; message?: string }> }>(
+        handleGetProviderStatus, "GET", url("/v1/providers/status"),
+      );
+      return res.data;
+    },
+  };
 }

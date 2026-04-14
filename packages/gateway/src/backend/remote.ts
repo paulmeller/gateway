@@ -239,4 +239,26 @@ export class RemoteBackend implements Backend {
   batch = {
     execute: (operations: any[]) => this.request("POST", "/v1/batch", { operations }),
   };
+
+  skills = {
+    search: (opts: { q?: string; sort?: string; limit?: number; offset?: number; source?: string }) => {
+      const params = new URLSearchParams();
+      if (opts.q) params.set("q", opts.q);
+      if (opts.sort) params.set("sort", opts.sort);
+      if (opts.limit) params.set("limit", String(opts.limit));
+      if (opts.offset) params.set("offset", String(opts.offset));
+      if (opts.source) params.set("source", opts.source);
+      return this.request("GET", `/v1/skills?${params}`);
+    },
+    stats: () => this.request("GET", "/v1/skills/stats"),
+    sources: (opts?: { limit?: number }) =>
+      this.request("GET", `/v1/skills/sources${opts?.limit ? `?limit=${opts.limit}` : ""}`),
+  };
+
+  providers = {
+    status: async () => {
+      const res = await this.request("GET", "/v1/providers/status");
+      return res.data;
+    },
+  };
 }

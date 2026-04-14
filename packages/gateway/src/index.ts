@@ -15,6 +15,8 @@ import { registerQuickstartCommand } from "./commands/quickstart.js";
 import { registerServeCommand } from "./commands/serve.js";
 import { registerConfigCommands } from "./commands/config.js";
 import { registerVersionCommand } from "./commands/version.js";
+import { registerSkillsCommands } from "./commands/skills.js";
+import { registerProviderCommands } from "./commands/providers.js";
 import { ensureTelemetryConsent, trackCommand } from "./telemetry/index.js";
 
 const program = new Command("gateway")
@@ -100,6 +102,8 @@ registerBatchCommand(program);
 registerChatCommand(program);
 registerQuickstartCommand(program);
 registerServeCommand(program);
+registerSkillsCommands(program);
+registerProviderCommands(program);
 registerConfigCommands(program);
 registerVersionCommand(program);
 
