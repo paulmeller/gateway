@@ -2531,3 +2531,556 @@ describe("Environment Creation — Cloud Provider Skip", () => {
     expect(res2.status).toBe(409);
   });
 });
+
+// ── OpenAPI ─────────────────────────────────────────────────────────────────
+
+describe("OpenAPI Spec", () => {
+  beforeEach(() => freshDbEnv());
+
+  it("GET /v1/openapi.json returns valid spec", async () => {
+    await bootDb();
+    const { handleGetOpenApiSpec } = await import("../src/handlers/openapi");
+    const res = await handleGetOpenApiSpec(req("/v1/openapi.json"));
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.openapi).toBeDefined();
+    expect(body.paths).toBeDefined();
+    expect(body.info).toBeDefined();
+  });
+
+  it("spec includes all expected paths", async () => {
+    await bootDb();
+    const { handleGetOpenApiSpec } = await import("../src/handlers/openapi");
+    const res = await handleGetOpenApiSpec(req("/v1/openapi.json"));
+    const body = await res.json() as { paths: Record<string, unknown> };
+    const paths = Object.keys(body.paths);
+    expect(paths).toContain("/v1/agents");
+    expect(paths).toContain("/v1/environments");
+    expect(paths).toContain("/v1/sessions");
+    expect(paths).toContain("/v1/vaults");
+  });
+});
+
+// ── SSE Stream ──────────────────────────────────────────────────────────────
+
+describe("Session Stream", () => {
+  beforeEach(() => freshDbEnv());
+
+  it("returns SSE response for valid session", async () => {
+    await bootDb();
+    const agent = await createTestAgent();
+    const env = await createTestEnv();
+    const { handleCreateSession } = await import("../src/handlers/sessions");
+    const sessRes = await handleCreateSession(req("/v1/sessions", {
+      body: { agent: agent.id, environment_id: env.id },
+    }));
+    const session = await sessRes.json() as Record<string, unknown>;
+
+    const { handleSessionStream } = await import("../src/handlers/stream");
+    const controller = new AbortController();
+    const streamReq = new Request(`http://localhost/v1/sessions/${session.id}/stream`, {
+      headers: { "x-api-key": "test-api-key-12345" },
+      signal: controller.signal,
+    });
+    const res = await handleSessionStream(streamReq, session.id as string);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("text/event-stream");
+    controller.abort();
+  });
+
+  it("returns 404 for missing session", async () => {
+    await bootDb();
+    const { handleSessionStream } = await import("../src/handlers/stream");
+    const res = await handleSessionStream(
+      req("/v1/sessions/sess_nonexistent/stream"),
+      "sess_nonexistent",
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 401 without auth", async () => {
+    await bootDb();
+    const { handleSessionStream } = await import("../src/handlers/stream");
+    const res = await handleSessionStream(
+      req("/v1/sessions/sess_x/stream", { apiKey: "" }),
+      "sess_x",
+    );
+    expect(res.status).toBe(401);
+  });
+});
+
+// ── Additional Environment Tests ────────────────────────────────────────────
+
+describe("Environments — Additional Coverage", () => {
+  beforeEach(() => freshDbEnv());
+
+  it("list environments with limit and order", async () => {
+    await bootDb();
+    const { handleCreateEnvironment, handleListEnvironments } = await import("../src/handlers/environments");
+    for (let i = 0; i < 3; i++) {
+      await handleCreateEnvironment(req("/v1/environments", {
+        body: { name: `env-${i}-${Date.now()}`, config: { type: "cloud", provider: "e2b", packages: {} } },
+      }));
+    }
+    const res = await handleListEnvironments(req("/v1/environments?limit=2&order=desc"));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: any[] };
+    expect(body.data.length).toBeLessThanOrEqual(2);
+  });
+
+  it("get environment by id", async () => {
+    await bootDb();
+    const { handleCreateEnvironment, handleGetEnvironment } = await import("../src/handlers/environments");
+    const createRes = await handleCreateEnvironment(req("/v1/environments", {
+      body: { name: `env-get-${Date.now()}`, config: { type: "cloud", provider: "e2b", packages: {} } },
+    }));
+    const env = await createRes.json() as Record<string, unknown>;
+    const getRes = await handleGetEnvironment(req(`/v1/environments/${env.id}`), env.id as string);
+    expect(getRes.status).toBe(200);
+    const fetched = await getRes.json() as Record<string, unknown>;
+    expect(fetched.id).toBe(env.id);
+    expect(fetched.name).toBeDefined();
+  });
+
+  it("get nonexistent environment returns 404", async () => {
+    await bootDb();
+    const { handleGetEnvironment } = await import("../src/handlers/environments");
+    const res = await handleGetEnvironment(req("/v1/environments/env_nonexistent"), "env_nonexistent");
+    expect(res.status).toBe(404);
+  });
+
+  it("delete environment", async () => {
+    await bootDb();
+    const { handleCreateEnvironment, handleDeleteEnvironment, handleGetEnvironment } = await import("../src/handlers/environments");
+    const createRes = await handleCreateEnvironment(req("/v1/environments", {
+      body: { name: `env-del-${Date.now()}`, config: { type: "cloud", provider: "e2b", packages: {} } },
+    }));
+    const env = await createRes.json() as Record<string, unknown>;
+
+    const delRes = await handleDeleteEnvironment(req(`/v1/environments/${env.id}`, { method: "DELETE" }), env.id as string);
+    expect(delRes.status).toBe(200);
+
+    const getRes = await handleGetEnvironment(req(`/v1/environments/${env.id}`), env.id as string);
+    expect(getRes.status).toBe(404);
+  });
+
+  it("archive environment", async () => {
+    await bootDb();
+    const { handleCreateEnvironment, handleArchiveEnvironment } = await import("../src/handlers/environments");
+    const createRes = await handleCreateEnvironment(req("/v1/environments", {
+      body: { name: `env-arch-${Date.now()}`, config: { type: "cloud", provider: "e2b", packages: {} } },
+    }));
+    const env = await createRes.json() as Record<string, unknown>;
+
+    const archRes = await handleArchiveEnvironment(
+      req(`/v1/environments/${env.id}/archive`, { method: "POST" }),
+      env.id as string,
+    );
+    expect(archRes.status).toBe(200);
+    const archived = await archRes.json() as Record<string, unknown>;
+    expect(archived.archived_at).not.toBeNull();
+  });
+
+  it("invalid config returns 400", async () => {
+    await bootDb();
+    const { handleCreateEnvironment } = await import("../src/handlers/environments");
+    const res = await handleCreateEnvironment(req("/v1/environments", {
+      body: { name: "bad", config: { type: "invalid" } },
+    }));
+    expect(res.status).toBe(400);
+  });
+});
+
+// ── Additional Session Tests ────────────────────────────────────────────────
+
+describe("Sessions — Additional Coverage", () => {
+  beforeEach(() => freshDbEnv());
+
+  it("get session returns full object", async () => {
+    await bootDb();
+    const agent = await createTestAgent();
+    const env = await createTestEnv();
+    const { handleCreateSession, handleGetSession } = await import("../src/handlers/sessions");
+    const createRes = await handleCreateSession(req("/v1/sessions", {
+      body: { agent: agent.id, environment_id: env.id },
+    }));
+    const session = await createRes.json() as Record<string, unknown>;
+
+    const getRes = await handleGetSession(req(`/v1/sessions/${session.id}`), session.id as string);
+    expect(getRes.status).toBe(200);
+    const fetched = await getRes.json() as Record<string, unknown>;
+    expect(fetched.id).toBe(session.id);
+    expect(fetched.status).toBe("idle");
+    expect(fetched.agent).toBeDefined();
+    expect(fetched.environment_id).toBe(env.id);
+    expect(fetched.stats).toBeDefined();
+    expect(fetched.usage).toBeDefined();
+  });
+
+  it("get nonexistent session returns 404", async () => {
+    await bootDb();
+    const { handleGetSession } = await import("../src/handlers/sessions");
+    const res = await handleGetSession(req("/v1/sessions/sess_nonexistent"), "sess_nonexistent");
+    expect(res.status).toBe(404);
+  });
+
+  it("delete session", async () => {
+    await bootDb();
+    const agent = await createTestAgent();
+    const env = await createTestEnv();
+    const { handleCreateSession, handleDeleteSession, handleGetSession } = await import("../src/handlers/sessions");
+    const createRes = await handleCreateSession(req("/v1/sessions", {
+      body: { agent: agent.id, environment_id: env.id },
+    }));
+    const session = await createRes.json() as Record<string, unknown>;
+
+    const delRes = await handleDeleteSession(req(`/v1/sessions/${session.id}`, { method: "DELETE" }), session.id as string);
+    expect(delRes.status).toBe(200);
+    const delBody = await delRes.json() as Record<string, unknown>;
+    expect(delBody.id).toBe(session.id);
+  });
+
+  it("archive session", async () => {
+    await bootDb();
+    const agent = await createTestAgent();
+    const env = await createTestEnv();
+    const { handleCreateSession, handleArchiveSession } = await import("../src/handlers/sessions");
+    const createRes = await handleCreateSession(req("/v1/sessions", {
+      body: { agent: agent.id, environment_id: env.id },
+    }));
+    const session = await createRes.json() as Record<string, unknown>;
+
+    const archRes = await handleArchiveSession(
+      req(`/v1/sessions/${session.id}/archive`, { method: "POST" }),
+      session.id as string,
+    );
+    expect(archRes.status).toBe(200);
+    const archived = await archRes.json() as Record<string, unknown>;
+    expect(archived.archived_at).not.toBeNull();
+  });
+
+  it("update session metadata", async () => {
+    await bootDb();
+    const agent = await createTestAgent();
+    const env = await createTestEnv();
+    const { handleCreateSession, handleUpdateSession } = await import("../src/handlers/sessions");
+    const createRes = await handleCreateSession(req("/v1/sessions", {
+      body: { agent: agent.id, environment_id: env.id },
+    }));
+    const session = await createRes.json() as Record<string, unknown>;
+
+    const updateRes = await handleUpdateSession(
+      req(`/v1/sessions/${session.id}`, { body: { title: "Test Title", metadata: { key: "value" } } }),
+      session.id as string,
+    );
+    expect(updateRes.status).toBe(200);
+    const updated = await updateRes.json() as Record<string, unknown>;
+    expect(updated.title).toBe("Test Title");
+  });
+
+  it("list sessions with filters", async () => {
+    await bootDb();
+    const agent = await createTestAgent();
+    const env = await createTestEnv();
+    const { handleCreateSession, handleListSessions } = await import("../src/handlers/sessions");
+    await handleCreateSession(req("/v1/sessions", {
+      body: { agent: agent.id, environment_id: env.id },
+    }));
+
+    const res = await handleListSessions(req(`/v1/sessions?agent_id=${agent.id}&limit=5`));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: any[] };
+    expect(body.data.length).toBeGreaterThanOrEqual(1);
+    expect(body.data[0].agent.id).toBe(agent.id);
+  });
+
+  it("create session with invalid agent returns 404", async () => {
+    await bootDb();
+    const env = await createTestEnv();
+    const { handleCreateSession } = await import("../src/handlers/sessions");
+    const res = await handleCreateSession(req("/v1/sessions", {
+      body: { agent: "agent_nonexistent", environment_id: env.id },
+    }));
+    expect(res.status).toBe(404);
+  });
+});
+
+// ── Additional Event Tests ──────────────────────────────────────────────────
+
+describe("Events — Additional Coverage", () => {
+  beforeEach(() => freshDbEnv());
+
+  it("send multiple events in batch", async () => {
+    await bootDb();
+    const agent = await createTestAgent();
+    const env = await createTestEnv();
+    const { handleCreateSession } = await import("../src/handlers/sessions");
+    const sessRes = await handleCreateSession(req("/v1/sessions", {
+      body: { agent: agent.id, environment_id: env.id },
+    }));
+    const session = await sessRes.json() as Record<string, unknown>;
+
+    const { handlePostEvents, handleListEvents } = await import("../src/handlers/events");
+    await handlePostEvents(
+      req(`/v1/sessions/${session.id}/events`, {
+        body: {
+          events: [
+            { type: "user.message", content: [{ type: "text", text: "hello" }] },
+            { type: "user.message", content: [{ type: "text", text: "world" }] },
+          ],
+        },
+      }),
+      session.id as string,
+    );
+
+    const listRes = await handleListEvents(req(`/v1/sessions/${session.id}/events?limit=10`), session.id as string);
+    expect(listRes.status).toBe(200);
+    const body = await listRes.json() as { data: any[] };
+    // Should have at least the 2 user messages
+    const userMsgs = body.data.filter((e: any) => e.type === "user.message");
+    expect(userMsgs.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("list events with order asc", async () => {
+    await bootDb();
+    const agent = await createTestAgent();
+    const env = await createTestEnv();
+    const { handleCreateSession } = await import("../src/handlers/sessions");
+    const sessRes = await handleCreateSession(req("/v1/sessions", {
+      body: { agent: agent.id, environment_id: env.id },
+    }));
+    const session = await sessRes.json() as Record<string, unknown>;
+
+    const { handlePostEvents, handleListEvents } = await import("../src/handlers/events");
+    await handlePostEvents(
+      req(`/v1/sessions/${session.id}/events`, {
+        body: { events: [{ type: "user.message", content: [{ type: "text", text: "msg1" }] }] },
+      }),
+      session.id as string,
+    );
+
+    const res = await handleListEvents(req(`/v1/sessions/${session.id}/events?order=asc`), session.id as string);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: any[] };
+    if (body.data.length >= 2) {
+      expect(body.data[0].seq).toBeLessThan(body.data[1].seq);
+    }
+  });
+
+  it("events for nonexistent session returns 404", async () => {
+    await bootDb();
+    const { handleListEvents } = await import("../src/handlers/events");
+    const res = await handleListEvents(req("/v1/sessions/sess_nonexistent/events"), "sess_nonexistent");
+    expect(res.status).toBe(404);
+  });
+});
+
+// ── Additional Agent Tests ──────────────────────────────────────────────────
+
+describe("Agents — Additional Coverage", () => {
+  beforeEach(() => freshDbEnv());
+
+  it("create agent with system prompt", async () => {
+    await bootDb();
+    const { handleCreateAgent, handleGetAgent } = await import("../src/handlers/agents");
+    const res = await handleCreateAgent(req("/v1/agents", {
+      body: { name: "SystemAgent", model: "claude-sonnet-4-6", system: "You are a helpful assistant." },
+    }));
+    expect(res.status).toBe(201);
+    const agent = await res.json() as Record<string, unknown>;
+    expect(agent.system).toBe("You are a helpful assistant.");
+
+    const getRes = await handleGetAgent(req(`/v1/agents/${agent.id}`), agent.id as string);
+    const fetched = await getRes.json() as Record<string, unknown>;
+    expect(fetched.system).toBe("You are a helpful assistant.");
+  });
+
+  it("create agent with confirmation mode", async () => {
+    await bootDb();
+    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const res = await handleCreateAgent(req("/v1/agents", {
+      body: { name: "ConfirmAgent", model: "claude-sonnet-4-6", confirmation_mode: true },
+    }));
+    expect(res.status).toBe(201);
+    const agent = await res.json() as Record<string, unknown>;
+    expect(agent.confirmation_mode).toBe(true);
+  });
+
+  it("update agent name and model", async () => {
+    await bootDb();
+    const agent = await createTestAgent();
+    const { handleUpdateAgent } = await import("../src/handlers/agents");
+    const res = await handleUpdateAgent(
+      req(`/v1/agents/${agent.id}`, { body: { name: "NewName", model: "claude-opus-4-6" } }),
+      agent.id as string,
+    );
+    expect(res.status).toBe(200);
+    const updated = await res.json() as Record<string, unknown>;
+    expect(updated.name).toBe("NewName");
+    expect(updated.model).toBe("claude-opus-4-6");
+    expect(updated.version).toBe(2);
+  });
+
+  it("update creates new version", async () => {
+    await bootDb();
+    const agent = await createTestAgent();
+    const { handleUpdateAgent, handleGetAgent } = await import("../src/handlers/agents");
+    await handleUpdateAgent(
+      req(`/v1/agents/${agent.id}`, { body: { name: "V2" } }),
+      agent.id as string,
+    );
+    await handleUpdateAgent(
+      req(`/v1/agents/${agent.id}`, { body: { name: "V3" } }),
+      agent.id as string,
+    );
+    const res = await handleGetAgent(req(`/v1/agents/${agent.id}`), agent.id as string);
+    const fetched = await res.json() as Record<string, unknown>;
+    expect(fetched.version).toBe(3);
+    expect(fetched.name).toBe("V3");
+  });
+
+  it("get specific version", async () => {
+    await bootDb();
+    const agent = await createTestAgent({ name: "VersionTest" });
+    const { handleUpdateAgent, handleGetAgent } = await import("../src/handlers/agents");
+    await handleUpdateAgent(
+      req(`/v1/agents/${agent.id}`, { body: { name: "Updated" } }),
+      agent.id as string,
+    );
+    // Get latest — should be version 2
+    const latestRes = await handleGetAgent(req(`/v1/agents/${agent.id}`), agent.id as string);
+    const latest = await latestRes.json() as Record<string, unknown>;
+    expect(latest.version).toBe(2);
+    expect(latest.name).toBe("Updated");
+  });
+
+  it("create agent with empty name returns 400", async () => {
+    await bootDb();
+    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const res = await handleCreateAgent(req("/v1/agents", {
+      body: { name: "", model: "claude-sonnet-4-6" },
+    }));
+    expect(res.status).toBe(400);
+  });
+
+  it("list agents with order asc", async () => {
+    await bootDb();
+    await createTestAgent({ name: "A-first" });
+    await createTestAgent({ name: "B-second" });
+    const { handleListAgents } = await import("../src/handlers/agents");
+    const res = await handleListAgents(req("/v1/agents?order=asc&limit=10"));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: any[] };
+    expect(body.data.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ── Settings ────────────────────────────────────────────────────────────────
+
+describe("Settings — Additional Coverage", () => {
+  beforeEach(() => freshDbEnv());
+
+  it("PUT /v1/settings stores a value", async () => {
+    await bootDb();
+    const { handlePutSetting } = await import("../src/handlers/settings");
+    // Settings handler reads key+value from body
+    const res = await handlePutSetting(req("/v1/settings", {
+      method: "PUT",
+      body: { key: "anthropic_api_key", value: "sk-test-123" },
+    }));
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.ok).toBe(true);
+  });
+
+  it("settings require auth", async () => {
+    await bootDb();
+    const { handlePutSetting } = await import("../src/handlers/settings");
+    const res = await handlePutSetting(req("/v1/settings", {
+      method: "PUT",
+      body: { key: "test", value: "test" },
+      apiKey: "",
+    }));
+    expect(res.status).toBe(401);
+  });
+});
+
+// ── Vault Entry CRUD ────────────────────────────────────────────────────────
+
+describe("Vault Entries — Additional Coverage", () => {
+  beforeEach(() => freshDbEnv());
+
+  it("set and get vault entry", async () => {
+    await bootDb();
+    const agent = await createTestAgent();
+    const { handleCreateVault, handlePutEntry, handleGetEntry } = await import("../src/handlers/vaults");
+    const vaultRes = await handleCreateVault(req("/v1/vaults", {
+      body: { name: "test-vault", agent_id: agent.id },
+    }));
+    const vault = await vaultRes.json() as Record<string, unknown>;
+
+    await handlePutEntry(
+      req(`/v1/vaults/${vault.id}/entries/MY_KEY`, { method: "PUT", body: { value: "secret123" } }),
+      vault.id as string,
+      "MY_KEY",
+    );
+
+    const getRes = await handleGetEntry(
+      req(`/v1/vaults/${vault.id}/entries/MY_KEY`),
+      vault.id as string,
+      "MY_KEY",
+    );
+    expect(getRes.status).toBe(200);
+    const entry = await getRes.json() as Record<string, unknown>;
+    expect(entry.key).toBe("MY_KEY");
+    expect(entry.value).toBe("secret123");
+  });
+
+  it("delete vault entry", async () => {
+    await bootDb();
+    const agent = await createTestAgent();
+    const { handleCreateVault, handlePutEntry, handleDeleteEntry, handleGetEntry } = await import("../src/handlers/vaults");
+    const vaultRes = await handleCreateVault(req("/v1/vaults", {
+      body: { name: "del-vault", agent_id: agent.id },
+    }));
+    const vault = await vaultRes.json() as Record<string, unknown>;
+
+    await handlePutEntry(
+      req(`/v1/vaults/${vault.id}/entries/DEL_KEY`, { method: "PUT", body: { value: "todelete" } }),
+      vault.id as string,
+      "DEL_KEY",
+    );
+
+    const delRes = await handleDeleteEntry(
+      req(`/v1/vaults/${vault.id}/entries/DEL_KEY`, { method: "DELETE" }),
+      vault.id as string,
+      "DEL_KEY",
+    );
+    expect(delRes.status).toBe(200);
+
+    const getRes = await handleGetEntry(
+      req(`/v1/vaults/${vault.id}/entries/DEL_KEY`),
+      vault.id as string,
+      "DEL_KEY",
+    );
+    expect(getRes.status).toBe(404);
+  });
+
+  it("list vault entries", async () => {
+    await bootDb();
+    const agent = await createTestAgent();
+    const { handleCreateVault, handlePutEntry, handleListEntries } = await import("../src/handlers/vaults");
+    const vaultRes = await handleCreateVault(req("/v1/vaults", {
+      body: { name: "list-vault", agent_id: agent.id },
+    }));
+    const vault = await vaultRes.json() as Record<string, unknown>;
+
+    await handlePutEntry(req(`/v1/vaults/${vault.id}/entries/K1`, { method: "PUT", body: { value: "v1" } }), vault.id as string, "K1");
+    await handlePutEntry(req(`/v1/vaults/${vault.id}/entries/K2`, { method: "PUT", body: { value: "v2" } }), vault.id as string, "K2");
+
+    const listRes = await handleListEntries(req(`/v1/vaults/${vault.id}/entries`), vault.id as string);
+    expect(listRes.status).toBe(200);
+    const body = await listRes.json() as { data: any[] };
+    expect(body.data.length).toBe(2);
+  });
+});
