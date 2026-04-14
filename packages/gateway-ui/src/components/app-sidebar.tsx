@@ -4,7 +4,6 @@ import { Settings, Plus, Eye, EyeOff, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SessionList } from "@/components/sessions/SessionList";
-import { NewSessionForm } from "@/components/sessions/NewSessionForm";
 import { useAppStore } from "@/stores/app-store";
 import {
   Sidebar,
@@ -20,9 +19,8 @@ import {
 } from "@/components/ui/sidebar";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { apiKey, setApiKey, setSettingsOpen } = useAppStore();
+  const { apiKey, setApiKey, setSettingsOpen, setActiveSessionId } = useAppStore();
   const [showKey, setShowKey] = useState(false);
-  const [showNewSession, setShowNewSession] = useState(false);
 
   return (
     <Sidebar {...props}>
@@ -50,16 +48,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               variant="ghost"
               size="icon"
               className="size-5"
-              onClick={() => setShowNewSession(!showNewSession)}
+              onClick={() => setActiveSessionId(null)}
             >
               <Plus className="size-3.5" />
             </Button>
           </SidebarGroupLabel>
-          {showNewSession && (
-            <div className="px-2 pb-2">
-              <NewSessionForm onCreated={() => setShowNewSession(false)} />
-            </div>
-          )}
           <SessionList />
         </SidebarGroup>
       </SidebarContent>

@@ -64,7 +64,7 @@ export function StepAgent({ onNext }: Props) {
       {mode === "select" && hasExisting && (
         <div className="flex flex-col gap-3">
           <Select value={selectedId} onValueChange={setSelectedId}>
-            <SelectTrigger className="h-10 w-full"><SelectValue placeholder="Select an agent" /></SelectTrigger>
+            <SelectTrigger className="h-10 w-full text-foreground"><SelectValue placeholder="Select an agent" /></SelectTrigger>
             <SelectContent>
               {agents!.map((a) => (
                 <SelectItem key={a.id} value={a.id}>
@@ -82,13 +82,13 @@ export function StepAgent({ onNext }: Props) {
       {mode === "create" && (
         <div className="flex flex-col gap-3">
           <Input placeholder="Agent name" value={name} onChange={(e) => setName(e.target.value)}
-            className="h-10 w-full" />
+            className="h-10 w-full text-foreground" />
           <Select value={engine} onValueChange={(v) => { setEngine(v); setModel(MODELS[v][0]); }}>
-            <SelectTrigger className="h-10 w-full"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-10 w-full text-foreground"><SelectValue /></SelectTrigger>
             <SelectContent>{ENGINES.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}</SelectContent>
           </Select>
           <Select value={model} onValueChange={setModel}>
-            <SelectTrigger className="h-10 w-full"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-10 w-full text-foreground"><SelectValue /></SelectTrigger>
             <SelectContent>{(MODELS[engine] ?? []).map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
           </Select>
           <Button className="w-full h-10 bg-cta-gradient text-sm font-medium text-black hover:opacity-90" onClick={handleCreate} disabled={!name.trim()}>

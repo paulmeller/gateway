@@ -63,7 +63,7 @@ export function StepEnvironment({ onNext }: Props) {
       {mode === "select" && hasExisting && (
         <div className="flex flex-col gap-3">
           <Select value={selectedId} onValueChange={setSelectedId}>
-            <SelectTrigger className="h-10 w-full"><SelectValue placeholder="Select an environment" /></SelectTrigger>
+            <SelectTrigger className="h-10 w-full text-foreground"><SelectValue placeholder="Select an environment" /></SelectTrigger>
             <SelectContent>
               {readyEnvs.map((e) => (
                 <SelectItem key={e.id} value={e.id}>
@@ -81,9 +81,9 @@ export function StepEnvironment({ onNext }: Props) {
       {mode === "create" && (
         <div className="flex flex-col gap-3">
           <Input placeholder="Environment name" value={name} onChange={(e) => setName(e.target.value)}
-            className="h-10 w-full" />
+            className="h-10 w-full text-foreground" />
           <Select value={provider} onValueChange={setProvider}>
-            <SelectTrigger className="h-10 w-full"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-10 w-full text-foreground"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectGroup>
                 <SelectLabel>Local</SelectLabel>
