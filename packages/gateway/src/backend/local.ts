@@ -59,7 +59,8 @@ async function resolveApiKey(): Promise<string> {
     process.env.SEED_API_KEY = key;
     localApiKey = key;
     return localApiKey;
-  } catch {
+  } catch (err) {
+    console.error("[resolveApiKey] fallback key creation failed:", err);
     // fall through
   }
 
