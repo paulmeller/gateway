@@ -15,6 +15,44 @@ export async function runChatLoop(
   const verbose = opts.verbose;
   const startSeq = opts.startSeq ?? 0;
 
+  // Show session info header
+  try {
+    const session = await backend.sessions.get(sessionId);
+    const agentList = await backend.agents.list({ limit: 50 });
+    const agentId = typeof session.agent === "string" ? session.agent : session.agent?.id;
+    const agentObj = agentList.data.find((a: any) => a.id === agentId);
+
+    let agentLine = "";
+    if (agentObj) {
+      const backendName = agentObj.backend ?? agentObj.engine ?? "";
+      const model = agentObj.model ?? "";
+      const agentDisplay = backendName && model ? `${agentObj.name} (${backendName} / ${model})` : agentObj.name;
+      agentLine = `Agent: ${agentDisplay}`;
+    }
+
+    let envLine = "";
+    const envId = session.environment_id ?? session.environment?.id;
+    if (envId) {
+      try {
+        const envObj = await backend.environments.get(envId);
+        const provider = envObj.config?.provider ?? envObj.provider ?? "";
+        envLine = provider ? `Environment: ${envObj.name} (${provider})` : `Environment: ${envObj.name}`;
+      } catch {
+        envLine = `Environment: ${envId}`;
+      }
+    }
+
+    const sessionLine = `Session: ${sessionId}`;
+
+    if (agentLine) console.log(agentLine);
+    if (envLine) console.log(envLine);
+    console.log(sessionLine);
+    console.log("─".repeat(60));
+  } catch {
+    // Fall back gracefully if session info fetch fails
+    console.log("─".repeat(60));
+  }
+
   // Fetch and render history if starting from 0
   let lastSeq = startSeq;
   if (startSeq === 0) {
@@ -30,25 +68,48 @@ export async function runChatLoop(
   let interruptSent = false;
   let pendingConfirmation: any = null;
 
+  // Multi-line input state
+  let multiLineMode = false;
+  let multiLineBuffer = "";
+
   const spinner = ora({ text: "Agent is thinking...", spinner: "dots" });
+  let thinkingStart = 0;
+  let thinkingInterval: ReturnType<typeof setInterval> | null = null;
+
+  function startSpinner() {
+    thinkingStart = Date.now();
+    spinner.start();
+    thinkingInterval = setInterval(() => {
+      const elapsed = ((Date.now() - thinkingStart) / 1000).toFixed(0);
+      spinner.text = `Agent is thinking... (${elapsed}s)`;
+    }, 1000);
+  }
+
+  function stopSpinner() {
+    if (thinkingInterval) {
+      clearInterval(thinkingInterval);
+      thinkingInterval = null;
+    }
+    spinner.stop();
+  }
 
   if (!isRunning) {
     rl.prompt();
   } else {
-    spinner.start();
+    startSpinner();
   }
 
   // Ctrl+C handling
   rl.on("SIGINT", async () => {
     if (isRunning && !interruptSent) {
       interruptSent = true;
-      spinner.stop();
+      stopSpinner();
       console.log("\n[interrupted — press Ctrl+C again to exit]");
       try {
         await backend.events.send(sessionId, [{ type: "user.interrupt" }]);
       } catch {}
     } else {
-      spinner.stop();
+      stopSpinner();
       console.log();
       process.exit(0);
     }
@@ -75,6 +136,40 @@ export async function runChatLoop(
       return;
     }
 
+    // Multi-line mode toggle
+    if (trimmed === '"""') {
+      if (!multiLineMode) {
+        multiLineMode = true;
+        multiLineBuffer = "";
+        console.log(chalk.dim('  (multi-line mode — type """ on its own line to send)'));
+      } else {
+        // End multi-line mode and send accumulated buffer
+        multiLineMode = false;
+        const text = multiLineBuffer.trimEnd();
+        multiLineBuffer = "";
+        if (!text) {
+          if (!isRunning) rl.prompt();
+          return;
+        }
+        try {
+          await backend.events.send(sessionId, [{
+            type: "user.message",
+            content: [{ type: "text", text }],
+          }]);
+        } catch (err: any) {
+          console.error(chalk.red(`Error: ${err.message}`));
+          rl.prompt();
+        }
+      }
+      return;
+    }
+
+    // Accumulate in multi-line mode
+    if (multiLineMode) {
+      multiLineBuffer += line + "\n";
+      return;
+    }
+
     if (!trimmed) {
       if (!isRunning) rl.prompt();
       return;
@@ -92,7 +187,7 @@ export async function runChatLoop(
   });
 
   rl.on("close", () => {
-    spinner.stop();
+    stopSpinner();
     console.log();
     process.exit(0);
   });
@@ -103,32 +198,32 @@ export async function runChatLoop(
       const evtType = evt.type;
 
       if (["agent.message", "session.status_idle", "session.error", "session.status_terminated"].includes(evtType)) {
-        spinner.stop();
+        stopSpinner();
       }
 
       const needsConfirm = renderEvent(evt, verbose);
       if (needsConfirm) {
-        spinner.stop();
+        stopSpinner();
         pendingConfirmation = evt;
       }
 
       if (evtType === "session.status_running") {
         isRunning = true;
         interruptSent = false;
-        spinner.start();
+        startSpinner();
       } else if (evtType === "session.status_idle") {
         isRunning = false;
         interruptSent = false;
-        spinner.stop();
+        stopSpinner();
         rl.prompt();
       } else if (evtType === "session.status_terminated") {
-        spinner.stop();
+        stopSpinner();
         rl.close();
         return;
       }
     }
   } catch (err: any) {
-    spinner.stop();
+    stopSpinner();
     console.error(chalk.red(`Stream error: ${err.message}`));
   }
 

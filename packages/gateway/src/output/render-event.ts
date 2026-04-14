@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import { renderMarkdown } from "./render-markdown.js";
 
 /**
  * Renders a managed-agents event to the terminal.
@@ -16,32 +17,49 @@ export function renderEvent(evt: any, verbose: boolean): boolean {
 
     case "agent.message": {
       const text = extractText(evt);
-      if (text) console.log(`${chalk.green("Agent:")} ${text}`);
+      if (text) {
+        console.log(chalk.green("Agent:"));
+        console.log(renderMarkdown(text));
+      }
       break;
     }
 
     case "agent.thinking": {
       if (!verbose) break;
       const text = evt.thinking ?? "";
-      if (text) console.log(chalk.dim(`  [thinking] ${truncate(text, 200)}`));
+      if (text) console.log(chalk.dim.italic(`  [thinking] ${truncate(text, 200)}`));
       break;
     }
 
     case "agent.tool_use": {
-      console.log(chalk.yellow(`  [tool] ${evt.name}`));
-      if (verbose && evt.input) console.log(chalk.dim(`    input: ${truncate(JSON.stringify(evt.input), 200)}`));
+      const inputStr = evt.input ? JSON.stringify(evt.input, null, 2) : "";
+      const nameLabel = chalk.bold.yellow(evt.name);
+      const topBorder = chalk.dim("  ┌ ") + nameLabel + chalk.dim(" " + "─".repeat(Math.max(0, 37 - (evt.name?.length ?? 0))));
+      console.log(topBorder);
+      if (inputStr) {
+        for (const line of inputStr.split("\n")) {
+          console.log(chalk.dim("  │ ") + line);
+        }
+      }
+      console.log(chalk.dim("  └" + "─".repeat(39)));
       break;
     }
 
     case "agent.custom_tool_use": {
-      console.log(chalk.yellow(`  [custom tool] ${evt.name}`));
-      console.log(chalk.red("    ⚠ custom tool results not supported in CLI chat"));
+      const nameLabel = chalk.bold.yellow(evt.name);
+      const topBorder = chalk.dim("  ┌ ") + nameLabel + chalk.dim(" " + "─".repeat(Math.max(0, 37 - (evt.name?.length ?? 0))));
+      console.log(topBorder);
+      console.log(chalk.dim("  │ ") + chalk.red("⚠ custom tool results not supported in CLI chat"));
+      console.log(chalk.dim("  └" + "─".repeat(39)));
       break;
     }
 
     case "agent.mcp_tool_use": {
       const label = evt.server_name ? `${evt.server_name}/${evt.name}` : evt.name;
-      console.log(chalk.yellow(`  [mcp] ${label}`));
+      const nameLabel = chalk.bold.yellow(label);
+      const topBorder = chalk.dim("  ┌ ") + nameLabel + chalk.dim(" " + "─".repeat(Math.max(0, 37 - (label?.length ?? 0))));
+      console.log(topBorder);
+      console.log(chalk.dim("  └" + "─".repeat(39)));
       break;
     }
 
@@ -52,7 +70,7 @@ export function renderEvent(evt: any, verbose: boolean): boolean {
       if (!text) break;
       const lines = text.split("\n");
       const shown = lines.length > 20 ? [...lines.slice(0, 20), `... (${lines.length - 20} more lines)`] : lines;
-      for (const line of shown) console.log(chalk.dim(`    ${line}`));
+      for (const line of shown) console.log(chalk.dim(`  │ ${line}`));
       break;
     }
 
@@ -63,8 +81,12 @@ export function renderEvent(evt: any, verbose: boolean): boolean {
     }
 
     case "session.status_running":
+      // Handled by caller (spinner)
+      break;
+
     case "session.status_idle":
-      // Handled by caller (spinner / prompt)
+      // Handled by caller (prompt)
+      console.log(chalk.dim("─".repeat(60)));
       break;
 
     case "session.status_terminated": {
@@ -97,9 +119,19 @@ export function renderEvent(evt: any, verbose: boolean): boolean {
       if (verbose) console.log(chalk.dim(`  ▸ ${evt.name} done`));
       break;
 
+    case "span.model_request_end": {
+      const usage = evt.usage;
+      if (usage) {
+        const inTok = (usage.input_tokens ?? 0).toLocaleString();
+        const outTok = (usage.output_tokens ?? 0).toLocaleString();
+        const cost = usage.cost_usd != null ? ` · $${Number(usage.cost_usd).toFixed(4)}` : "";
+        console.log(chalk.dim(`  ↳ ${inTok} in · ${outTok} out${cost}`));
+      }
+      break;
+    }
+
     // Silent events
     case "span.model_request_start":
-    case "span.model_request_end":
     case "span.environment_setup_start":
     case "span.environment_setup_end":
     case "user.tool_confirmation":
