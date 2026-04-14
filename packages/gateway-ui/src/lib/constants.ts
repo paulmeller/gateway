@@ -23,7 +23,7 @@ export const PROVIDER_TOKENS: Record<string, { key: string; label: string; place
 };
 
 export const ENGINE_KEYS: Record<string, { key: string; label: string }> = {
-  claude: { key: "ANTHROPIC_API_KEY", label: "Anthropic API Key" },
+  claude: { key: "ANTHROPIC_API_KEY", label: "Anthropic API Key or OAuth Token" },
   codex: { key: "OPENAI_API_KEY", label: "OpenAI API Key" },
   gemini: { key: "GEMINI_API_KEY", label: "Gemini API Key" },
   factory: { key: "ANTHROPIC_API_KEY", label: "Anthropic API Key" },

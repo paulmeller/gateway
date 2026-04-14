@@ -116,7 +116,15 @@ export function OnboardingWizard() {
         // User picked an existing vault from the picker
         vaultIds = [selectedVaultId];
       } else {
-        const secretEntries = Object.entries(secrets).filter(([, v]) => v.trim());
+        // Auto-detect sk-ant-oat tokens and store as CLAUDE_CODE_OAUTH_TOKEN
+        const secretEntries = Object.entries(secrets)
+          .filter(([, v]) => v.trim())
+          .map(([key, value]) => {
+            if (key === "ANTHROPIC_API_KEY" && value.trim().startsWith("sk-ant-oat")) {
+              return ["CLAUDE_CODE_OAUTH_TOKEN", value] as [string, string];
+            }
+            return [key, value] as [string, string];
+          });
         if (secretEntries.length > 0) {
           // Find or create a vault for this agent
           let vaultId: string;

@@ -75,7 +75,7 @@ export function buildClaudeAuthEnv(): Record<string, string> {
   const cfg = getConfig();
   const env: Record<string, string> = {};
 
-  const token = cfg.anthropicApiKey || cfg.claudeToken;
+  const token = cfg.claudeToken || cfg.anthropicApiKey;
   if (token) {
     if (token.startsWith("sk-ant-oat")) {
       env.CLAUDE_CODE_OAUTH_TOKEN = token;
