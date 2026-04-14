@@ -23,6 +23,7 @@
     "node": ">=18"
   },
   "dependencies": {
+    "@clack/prompts": "^1.2.0",
     "cbor-x": "^1.6.0",
     "libsql": "^0.5.29"
   },
@@ -37,8 +38,8 @@
     "dotenv": "^16.4.7",
     "esbuild": "^0.25.12",
     "ora": "^8.2.0",
-    "yaml": "^2.7.1",
     "tsx": "^4.19.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "yaml": "^2.7.1"
   }
 }

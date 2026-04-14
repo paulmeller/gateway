@@ -1,4 +1,4 @@
-import { createInterface } from "node:readline";
+import * as p from "@clack/prompts";
 import { loadConfig, saveConfig } from "../config/file.js";
 
 function envDisabled(): boolean {
@@ -30,17 +30,20 @@ export async function ensureTelemetryConsent(): Promise<boolean> {
     return false;
   }
 
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  const answer = await new Promise<string>((resolve) => {
-    rl.question("Help improve AgentStep by sending anonymous usage data? (y/n) ", resolve);
+  const answer = await p.confirm({
+    message: "Help improve AgentStep Gateway by sending anonymous usage data?",
   });
-  rl.close();
+  if (p.isCancel(answer)) {
+    cfg.telemetry = false;
+    saveConfig(cfg);
+    return false;
+  }
 
-  cfg.telemetry = answer.trim().toLowerCase().startsWith("y");
+  cfg.telemetry = answer as boolean;
   saveConfig(cfg);
 
   if (cfg.telemetry) {
-    console.log("Thanks! You can disable anytime: gateway config set telemetry false\n");
+    p.log.info("Thanks! You can disable anytime: gateway config set telemetry false");
   }
 
   return cfg.telemetry;
