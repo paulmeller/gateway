@@ -13,7 +13,7 @@ test.describe("Home / Onboarding", () => {
   test("sidebar shows sessions section", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
-    await expect(page.locator("text=Sessions")).toBeVisible();
+    await expect(page.getByText("Sessions", { exact: true })).toBeVisible();
   });
 
   test("sidebar shows agentstep.com link", async ({ page }) => {
