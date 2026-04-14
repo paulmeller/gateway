@@ -25,8 +25,9 @@ const output = `// AUTO-GENERATED — do not edit. Run: npm run build:ui
 const HTML_TEMPLATE = \`${escaped}\`;
 const UI_VERSION = "${hash}";
 
-export async function handleGetUI(opts?: { apiKey?: string }): Promise<Response> {
+export async function handleGetUI(opts?: { apiKey?: string; version?: string }): Promise<Response> {
   let body = HTML_TEMPLATE;
+  const scripts: string[] = [];
   if (opts?.apiKey) {
     const safe = opts.apiKey
       .replace(/\\\\/g, "\\\\\\\\")
@@ -34,13 +35,15 @@ export async function handleGetUI(opts?: { apiKey?: string }): Promise<Response>
       .replace(/</g, "\\\\x3c")
       .replace(/>/g, "\\\\x3e")
       .replace(/\\n/g, "\\\\n");
-    body = body.replace(
-      "__INJECT__",
-      \`<script>window.__MA_API_KEY__="\${safe}";</script>\`,
-    );
-  } else {
-    body = body.replace("__INJECT__", "");
+    scripts.push(\`window.__MA_API_KEY__="\${safe}";\`);
   }
+  if (opts?.version) {
+    scripts.push(\`window.__MA_VERSION__="\${opts.version}";\`);
+  }
+  body = body.replace(
+    "__INJECT__",
+    scripts.length > 0 ? \`<script>\${scripts.join("")}</script>\` : "",
+  );
   return new Response(body, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",

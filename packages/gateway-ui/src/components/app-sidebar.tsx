@@ -76,7 +76,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               {showKey ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
             </Button>
           </div>
-          <div className="flex gap-1.5 text-xs">
+          <div className="flex items-center gap-1.5 text-xs">
             <a href="https://www.agentstep.com" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
               <ExternalLink className="size-3" /> agentstep.com
             </a>
@@ -84,6 +84,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <a href="https://www.agentstep.com/docs" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
               <BookOpen className="size-3" /> Docs
             </a>
+            {window.__MA_VERSION__ && (
+              <>
+                <span className="text-muted-foreground/30">·</span>
+                <span className="text-muted-foreground/50">v{window.__MA_VERSION__}</span>
+              </>
+            )}
           </div>
           <div className="flex gap-2">
             <Button

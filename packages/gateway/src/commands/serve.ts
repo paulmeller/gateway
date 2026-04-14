@@ -45,6 +45,7 @@ export function registerServeCommand(parent: Command): void {
         const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "../../package.json"), "utf-8"));
         version = pkg.version;
       } catch {}
+      process.env.GATEWAY_VERSION = version;
 
       console.log("");
       console.log(`  AgentStep Gateway v${version}`);
