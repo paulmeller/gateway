@@ -51,7 +51,7 @@ export function AgentsTab() {
             </TableHeader>
             <TableBody>
               {agents.map((a) => (
-                <TableRow key={a.id}>
+                <TableRow key={a.id} className="cursor-pointer" onClick={() => setEditAgent(a as Record<string, unknown>)}>
                   <TableCell className="font-mono text-xs text-muted-foreground">{a.id.slice(0, 16)}...</TableCell>
                   <TableCell className="font-medium text-foreground">{a.name}</TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{a.model}</TableCell>
@@ -67,10 +67,10 @@ export function AgentsTab() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setEditAgent(a as Record<string, unknown>)}>
+                        <DropdownMenuItem onSelect={() => setTimeout(() => setEditAgent(a as Record<string, unknown>), 0)}>
                           <Pencil className="mr-2 size-3.5" /> Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onClick={() => del.mutate(a.id)}>
+                        <DropdownMenuItem className="text-destructive" onSelect={() => del.mutate(a.id)}>
                           <Trash2 className="mr-2 size-3.5" /> Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>

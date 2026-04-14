@@ -120,7 +120,7 @@ export function OnboardingWizard() {
     <div className="flex flex-1 items-center justify-center p-8">
       {step === 0 && <StepAgent onNext={handleAgentNext} />}
       {step === 1 && <StepEnvironment onNext={handleEnvNext} />}
-      {step === 2 && <StepSecrets engine={agentData.engine} model={agentData.model} provider={envData.provider} onNext={handleSecretsNext} onSkip={() => setStep(3)} />}
+      {step === 2 && <StepSecrets engine={agentData.engine} model={agentData.model} provider={envData.provider} hasExistingVaults={existingVaultIds.length > 0} onNext={handleSecretsNext} onSkip={() => setStep(3)} />}
       {step === 3 && <StepReady agentName={agentData.name} envName={envData.name} hasSecrets={Object.values(secrets).some((v) => v.trim()) || existingVaultIds.length > 0} onStart={handleStart} loading={loading} isExistingAgent={isExistingAgent} isExistingEnv={isExistingEnv} />}
     </div>
   );

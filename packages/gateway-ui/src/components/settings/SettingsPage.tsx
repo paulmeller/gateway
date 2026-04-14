@@ -27,13 +27,11 @@ export function SettingsPage() {
               <TabsTrigger value="environments">Environments</TabsTrigger>
               <TabsTrigger value="vaults">Vaults</TabsTrigger>
               <TabsTrigger value="memory">Memory</TabsTrigger>
-              <TabsTrigger value="batch">Batch</TabsTrigger>
             </TabsList>
             <TabsContent value="agents" className="mt-6"><AgentsTab /></TabsContent>
             <TabsContent value="environments" className="mt-6"><EnvironmentsTab /></TabsContent>
             <TabsContent value="vaults" className="mt-6"><VaultsTab /></TabsContent>
             <TabsContent value="memory" className="mt-6"><MemoryStoresTab /></TabsContent>
-            <TabsContent value="batch" className="mt-6"><BatchTab /></TabsContent>
           </Tabs>
         </div>
       </div>

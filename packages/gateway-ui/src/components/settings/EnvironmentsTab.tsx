@@ -70,7 +70,7 @@ export function EnvironmentsTab() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem className="text-destructive" onClick={() => del.mutate(e.id)}>
+                        <DropdownMenuItem className="text-destructive" onSelect={() => del.mutate(e.id)}>
                           <Trash2 className="mr-2 size-3.5" /> Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>

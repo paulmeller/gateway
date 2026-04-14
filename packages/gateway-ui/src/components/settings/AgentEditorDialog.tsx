@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,14 +15,20 @@ export function AgentEditorDialog({ agent, open, onOpenChange }: Props) {
   const update = useUpdateAgent();
   const [json, setJson] = useState("");
 
-  function handleOpen(isOpen: boolean) {
-    if (isOpen && agent) {
-      const { id: _id, created_at: _ca, updated_at: _ua, ...rest } = agent;
-      void _id; void _ca; void _ua;
-      setJson(JSON.stringify(rest, null, 2));
+  useEffect(() => {
+    if (open && agent) {
+      // Strip read-only fields before showing in editor
+      const editable: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(agent)) {
+        if (!["id", "created_at", "updated_at", "version"].includes(k)) {
+          editable[k] = v;
+        }
+      }
+      setJson(JSON.stringify(editable, null, 2));
+    } else if (!open) {
+      setJson("");
     }
-    onOpenChange(isOpen);
-  }
+  }, [open, agent]);
 
   async function handleSave() {
     if (!agent) return;
@@ -37,7 +43,7 @@ export function AgentEditorDialog({ agent, open, onOpenChange }: Props) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpen}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl border-border bg-card">
         <DialogHeader>
           <DialogTitle className="text-foreground">Edit {agent?.name}</DialogTitle>
