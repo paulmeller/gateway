@@ -2218,3 +2218,82 @@ describe("Edge Cases", () => {
     expect(res.status).toBe(404);
   });
 });
+
+// ---------------------------------------------------------------------------
+// SDK API Key Export
+// ---------------------------------------------------------------------------
+
+describe("SDK API Key Export", () => {
+  beforeEach(() => freshDbEnv());
+
+  it("createApiKey is callable from SDK exports", async () => {
+    await bootDb();
+    const { createApiKey } = await import("../src/index");
+    const { key, id } = createApiKey({ name: "test-export", permissions: ["*"] });
+    expect(key).toBeTruthy();
+    expect(id).toBeTruthy();
+    expect(key.startsWith("ck_")).toBe(true);
+  });
+
+  it("listApiKeys returns created keys", async () => {
+    await bootDb();
+    const { createApiKey, listApiKeys } = await import("../src/index");
+    createApiKey({ name: "key1", permissions: ["*"] });
+    createApiKey({ name: "key2", permissions: ["*"] });
+    const keys = listApiKeys();
+    // bootDb() seeds one key + we created two more
+    expect(keys.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("createApiKey generates unique ids and keys", async () => {
+    await bootDb();
+    const { createApiKey } = await import("../src/index");
+    const a = createApiKey({ name: "a", permissions: ["*"] });
+    const b = createApiKey({ name: "b", permissions: ["*"] });
+    expect(a.id).not.toBe(b.id);
+    expect(a.key).not.toBe(b.key);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Config Settings Roundtrip
+// ---------------------------------------------------------------------------
+
+describe("Config Settings Roundtrip", () => {
+  beforeEach(() => freshDbEnv());
+
+  it("writeSetting persists and getConfig reads it", async () => {
+    await bootDb();
+    const { writeSetting, getConfig, invalidateConfigCache } = await import("../src/config/index");
+    writeSetting("anthropic_api_key", "sk-test-123");
+    invalidateConfigCache();
+    const cfg = getConfig();
+    // env var takes precedence; only verify when env var is not set
+    if (!process.env.ANTHROPIC_API_KEY) {
+      expect(cfg.anthropicApiKey).toBe("sk-test-123");
+    }
+  });
+
+  it("writeSetting updates existing value", async () => {
+    await bootDb();
+    const { writeSetting, getConfig, invalidateConfigCache } = await import("../src/config/index");
+    writeSetting("openai_api_key", "old-key");
+    writeSetting("openai_api_key", "new-key");
+    invalidateConfigCache();
+    if (!process.env.OPENAI_API_KEY) {
+      expect(getConfig().openAiApiKey).toBe("new-key");
+    }
+  });
+
+  it("invalidateConfigCache forces reload on next getConfig call", async () => {
+    await bootDb();
+    const { writeSetting, getConfig, invalidateConfigCache } = await import("../src/config/index");
+    // Warm the cache
+    getConfig();
+    writeSetting("default_model", "gemini-2.5-flash");
+    invalidateConfigCache();
+    if (!process.env.DEFAULT_MODEL) {
+      expect(getConfig().defaultModel).toBe("gemini-2.5-flash");
+    }
+  });
+});

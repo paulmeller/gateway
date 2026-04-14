@@ -208,4 +208,14 @@ describe("buildGeminiArgs", () => {
     const promptIdx = args.indexOf("--prompt");
     expect(args[promptIdx + 1]).toBe("");
   });
+
+  it("does NOT include --max-turns (gemini CLI does not support it)", async () => {
+    const { buildGeminiArgs } = await import("../src/backends/gemini/args");
+    const args = buildGeminiArgs({
+      agent: { model: "gemini-2.5-flash" } as any,
+      backendSessionId: null,
+      prompt: "test",
+    });
+    expect(args).not.toContain("--max-turns");
+  });
 });
