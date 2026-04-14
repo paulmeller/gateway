@@ -1,7 +1,7 @@
 {
   "license": "Apache-2.0",
   "name": "@agentstep/agent-sdk",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "private": false,
   "type": "module",
   "main": "src/index.ts",
@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^7.3.4",
+    "@sentry/node": "^10.48.0",
     "libsql": "^0.5.29",
     "ulid": "^2.3.0",
     "ws": "^8.18.0",
