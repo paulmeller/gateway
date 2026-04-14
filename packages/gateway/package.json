@@ -1,6 +1,6 @@
 {
   "name": "@agentstep/gateway",
-  "version": "0.2.10",
+  "version": "0.2.11",
   "description": "AgentStep Gateway — CLI for managing AI agents across multiple LLM backends",
   "type": "module",
   "bin": {
