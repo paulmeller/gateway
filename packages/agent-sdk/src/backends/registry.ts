@@ -11,6 +11,7 @@ import { opencodeBackend } from "./opencode";
 import { codexBackend } from "./codex";
 import { geminiBackend } from "./gemini";
 import { factoryBackend } from "./factory";
+import { piBackend } from "./pi";
 
 const BACKENDS: Record<BackendName, Backend> = {
   claude: claudeBackend,
@@ -18,6 +19,7 @@ const BACKENDS: Record<BackendName, Backend> = {
   codex: codexBackend,
   gemini: geminiBackend,
   factory: factoryBackend,
+  pi: piBackend,
 };
 
 /**

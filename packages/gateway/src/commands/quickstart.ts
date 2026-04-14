@@ -7,7 +7,7 @@ import { runChatLoop } from "./chat-loop.js";
 const LOCAL_PROVIDERS = ["docker", "apple-container", "apple-firecracker", "podman", "mvm"];
 const CLOUD_PROVIDERS = ["sprites", "e2b", "vercel", "daytona", "fly", "modal"];
 
-const ENGINES = ["claude", "opencode", "codex", "gemini", "factory"] as const;
+const ENGINES = ["claude", "opencode", "codex", "gemini", "factory", "pi"] as const;
 type Engine = typeof ENGINES[number];
 
 const ENGINE_MODELS: Record<Engine, string[]> = {
@@ -16,12 +16,13 @@ const ENGINE_MODELS: Record<Engine, string[]> = {
   codex: ["gpt-4o", "gpt-4o-mini", "o3"],
   gemini: ["gemini-2.5-pro", "gemini-2.0-flash", "gemini-1.5-pro"],
   factory: ["factory-default"],
+  pi: ["anthropic/claude-sonnet-4-6", "openai/gpt-4o-mini", "google/gemini-2.5-flash"],
 };
 
 export function registerQuickstartCommand(parent: Command): void {
   parent.command("quickstart")
     .description("Create agent + environment + session and start chatting")
-    .option("--engine <engine>", "Agent harness: claude, opencode, codex, gemini, factory", "claude")
+    .option("--engine <engine>", "Agent harness: claude, opencode, codex, gemini, factory, pi", "claude")
     .option("--model <model>", "Model (defaults per engine)")
     .option("--provider <provider>", "Provider: sprites, docker, apple-container, podman, e2b, vercel, daytona, fly, modal, mvm", "sprites")
     .action(async (opts) => {
@@ -271,6 +272,7 @@ const BACKEND_KEYS: Record<string, { envVars: string[]; label: string }> = {
   opencode: { envVars: ["OPENAI_API_KEY"], label: "OPENAI_API_KEY" },
   gemini: { envVars: ["GEMINI_API_KEY"], label: "GEMINI_API_KEY" },
   factory: { envVars: ["FACTORY_API_KEY"], label: "FACTORY_API_KEY" },
+  pi: { envVars: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY"], label: "ANTHROPIC_API_KEY" },
 };
 
 async function hasServerKey(backend: string): Promise<boolean> {
