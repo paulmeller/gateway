@@ -16,6 +16,19 @@ export type ToolClass = "builtin" | "mcp" | "custom";
 export interface TranslatedEvent {
   type: string;
   payload: Record<string, unknown>;
+  /**
+   * Optional per-event span id override. If omitted, the driver tags the
+   * event with the current turn's root span id. Translators use this to
+   * emit nested spans for tool calls — `span.tool_call_start/end` with a
+   * freshly-minted span id whose parent is the turn span.
+   */
+  spanId?: string;
+  /**
+   * Optional parent span override. Only meaningful alongside `spanId` —
+   * e.g. `span.tool_call_start` sets `parentSpanId` to the turn's root
+   * span id so the tool span nests under the turn.
+   */
+  parentSpanId?: string;
 }
 
 export interface TurnUsage {
@@ -66,4 +79,13 @@ export interface TranslatorOptions {
    * `system.init`-equivalent events trigger status_running (first turn only).
    */
   isFirstTurn: boolean;
+
+  /**
+   * Observability: the turn's root span id. When provided, translators
+   * may mint child spans for tool calls with `parentSpanId = turnSpanId`
+   * so the full trace tree is recoverable. Optional for
+   * backward-compatibility with older callers; legacy translators that
+   * don't emit per-tool spans simply ignore it.
+   */
+  turnSpanId?: string;
 }

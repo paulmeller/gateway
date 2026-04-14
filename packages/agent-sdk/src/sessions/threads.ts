@@ -7,7 +7,7 @@
  *
  * Depth is capped at MAX_THREAD_DEPTH to prevent infinite recursion.
  */
-import { createSession, getSessionRow } from "../db/sessions";
+import { createSession, getSessionRow, bumpSessionStats } from "../db/sessions";
 import { getAgent } from "../db/agents";
 import { getSession } from "../db/sessions";
 import { listEvents } from "../db/events";
@@ -124,12 +124,46 @@ export async function handleSpawnAgent(
     }
   }
 
+  // Sub-agent cost rollup (the architect's #1 omission).
+  //
+  // Read the child's usage deltas and apply them to the parent session.
+  // Without this, multi-agent runs show zero cost on the parent row and
+  // users can't tell how much a single user turn actually cost when it
+  // fanned out across sub-agents. We roll up usage + tool-call count,
+  // but NOT turn_count (keep parent turns separate from child turns).
+  const finalChildRow = getSessionRow(childSession.id);
+  if (finalChildRow) {
+    bumpSessionStats(
+      parentSessionId,
+      { tool_calls_count: finalChildRow.tool_calls_count },
+      {
+        input_tokens: finalChildRow.usage_input_tokens,
+        output_tokens: finalChildRow.usage_output_tokens,
+        cache_read_input_tokens: finalChildRow.usage_cache_read_input_tokens,
+        cache_creation_input_tokens: finalChildRow.usage_cache_creation_input_tokens,
+        cost_usd: finalChildRow.usage_cost_usd,
+      },
+    );
+  }
+
   // Emit thread_completed on parent — same trace tagging as thread_started.
+  // Include the rolled-up child usage so dashboards can see the cost of
+  // each spawn at a glance without having to join sessions.
   appendEvent(parentSessionId, {
     type: "session.thread_completed",
     payload: {
       child_session_id: childSession.id,
       result: resultText || "(no response from sub-agent)",
+      child_usage: finalChildRow
+        ? {
+            input_tokens: finalChildRow.usage_input_tokens,
+            output_tokens: finalChildRow.usage_output_tokens,
+            cache_read_input_tokens: finalChildRow.usage_cache_read_input_tokens,
+            cache_creation_input_tokens: finalChildRow.usage_cache_creation_input_tokens,
+            cost_usd: finalChildRow.usage_cost_usd,
+            tool_calls_count: finalChildRow.tool_calls_count,
+          }
+        : null,
     },
     origin: "server",
     processedAt: nowMs(),

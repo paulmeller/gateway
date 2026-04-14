@@ -9,6 +9,22 @@
  *
  * Every append MUST be invoked from inside the corresponding session's
  * `SessionActor` (see `lib/sessions/actor.ts`) to preserve ordering.
+ *
+ * ## Post-commit hooks
+ *
+ * `onAfterCommit(fn)` registers a synchronous callback that fires with
+ * every inserted row AFTER the DB transaction. Used by the OTLP exporter
+ * to trigger trace flush when a root turn span closes, and by cost
+ * rollup/alerting in the future. Errors in hooks are swallowed — they
+ * never propagate back to the writer.
+ *
+ * ## PII redaction
+ *
+ * `installPayloadRedactor(fn)` lets callers replace the event payload
+ * before it's serialized and inserted. Consumed by `redactor.ts` which
+ * strips known secrets (vault values, config tokens, `redactEnvKeys`)
+ * from stdout/stderr blocks. Applied to every `AppendInput` inside this
+ * module so no writer can bypass it.
  */
 import { EventEmitter } from "node:events";
 import {
@@ -89,19 +105,81 @@ function fireWebhook(sessionId: string, row: EventRow): void {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Post-commit hooks (OTLP exporter, cost rollup, alerting — future)
+// ─────────────────────────────────────────────────────────────────────────
+
+type AfterCommitHook = (sessionId: string, row: EventRow) => void;
+
+type GlobalHooks = typeof globalThis & {
+  __caBusAfterCommit?: Set<AfterCommitHook>;
+  __caBusRedactor?: (input: AppendInput) => AppendInput;
+};
+
+function hooks(): Set<AfterCommitHook> {
+  const g = globalThis as GlobalHooks;
+  if (!g.__caBusAfterCommit) g.__caBusAfterCommit = new Set();
+  return g.__caBusAfterCommit;
+}
+
+/**
+ * Register a synchronous callback that runs once the event row has been
+ * committed to the DB and emitted on the live tail. Errors in the hook
+ * are swallowed to avoid breaking the writer.
+ */
+export function onAfterCommit(fn: AfterCommitHook): () => void {
+  hooks().add(fn);
+  return () => hooks().delete(fn);
+}
+
+function fireHooks(sessionId: string, row: EventRow): void {
+  for (const fn of hooks()) {
+    try {
+      fn(sessionId, row);
+    } catch (err) {
+      console.warn(`[bus] after-commit hook failed:`, err);
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// PII redaction
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * Replace the global payload redactor. Typically installed at boot from
+ * `observability/redactor.ts` based on config. The redactor is pure:
+ * given an `AppendInput`, it returns a new `AppendInput` with any
+ * sensitive substrings replaced.
+ */
+export function installPayloadRedactor(
+  fn: ((input: AppendInput) => AppendInput) | null,
+): void {
+  const g = globalThis as GlobalHooks;
+  g.__caBusRedactor = fn ?? undefined;
+}
+
+function redact(input: AppendInput): AppendInput {
+  const g = globalThis as GlobalHooks;
+  const fn = g.__caBusRedactor;
+  return fn ? fn(input) : input;
+}
+
 export function appendEvent(sessionId: string, input: AppendInput): EventRow {
-  const row = dbAppend(sessionId, input);
+  const row = dbAppend(sessionId, redact(input));
   getOrCreateEmitter(sessionId).emit("event", row);
   fireWebhook(sessionId, row);
+  fireHooks(sessionId, row);
   return row;
 }
 
 export function appendEventsBatch(sessionId: string, inputs: AppendInput[]): EventRow[] {
-  const rows = dbAppendBatch(sessionId, inputs);
+  const rows = dbAppendBatch(sessionId, inputs.map(redact));
   const em = getOrCreateEmitter(sessionId);
   for (const row of rows) {
     em.emit("event", row);
     fireWebhook(sessionId, row);
+    fireHooks(sessionId, row);
   }
   return rows;
 }

@@ -17,7 +17,7 @@ import path from "node:path";
 import { getDb } from "./db/client";
 import { createApiKey, listApiKeys } from "./db/api_keys";
 import { getConfig } from "./config";
-import { appendEvent } from "./sessions/bus";
+import { appendEvent, installPayloadRedactor } from "./sessions/bus";
 import { getLastUnprocessedUserMessage } from "./db/events";
 import { runSweep } from "./sessions/sweeper";
 import { getRuntime } from "./state";
@@ -31,6 +31,8 @@ import { getEnvironment } from "./db/environments";
 import { initSentry } from "./sentry";
 import { setSessionSprite } from "./db/sessions";
 import * as pool from "./containers/pool";
+import { installOtlpExporter } from "./observability/otlp";
+import { redactAppendInput } from "./observability/redactor";
 import type { SessionRow } from "./types";
 
 type GlobalInit = typeof globalThis & {
@@ -55,7 +57,14 @@ async function doInit(): Promise<void> {
   // 1b. Auto-seed a default API key if none exist
   seedDefaultApiKey();
 
-  // 1c. Shutdown handlers
+  // 1c. Observability: install the bus-level payload redactor and the
+  // OTLP auto-export hook. The redactor is always installed (no-op when
+  // there are no secrets to scrub); the OTLP exporter fires only when
+  // an endpoint is configured.
+  installPayloadRedactor(redactAppendInput);
+  installOtlpExporter();
+
+  // 1d. Shutdown handlers
   installShutdownHandlers();
 
   // 2. Stale-session recovery

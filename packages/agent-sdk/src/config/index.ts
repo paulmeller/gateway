@@ -22,6 +22,12 @@ export interface Config {
   maxSpritesPerEnv: number;
   sessionMaxAgeMs: number;
   sweeperIntervalMs: number;
+  /** OTLP/HTTP endpoint for trace export (OTEL_EXPORTER_OTLP_ENDPOINT). */
+  otlpEndpoint: string | undefined;
+  /** Optional auth header for OTLP export (e.g. "Bearer ..."). */
+  otlpAuthorization: string | undefined;
+  /** Comma-separated env-var names whose values must be redacted from payloads. */
+  redactEnvKeys: string[];
 }
 
 type GlobalCache = typeof globalThis & {
@@ -77,6 +83,24 @@ function loadConfig(): Config {
     maxSpritesPerEnv: num(process.env.MAX_SPRITES_PER_ENV, 8),
     sessionMaxAgeMs: num(process.env.SESSION_MAX_AGE_MS, 7 * 24 * 3600 * 1000),
     sweeperIntervalMs: num(process.env.SWEEPER_INTERVAL_MS, 60_000),
+    otlpEndpoint:
+      process.env.OTEL_EXPORTER_OTLP_ENDPOINT ||
+      process.env.OTLP_ENDPOINT ||
+      readSetting("otlp_endpoint") ||
+      undefined,
+    otlpAuthorization:
+      process.env.OTEL_EXPORTER_OTLP_HEADERS_AUTHORIZATION ||
+      process.env.OTLP_AUTHORIZATION ||
+      readSetting("otlp_authorization") ||
+      undefined,
+    redactEnvKeys: (
+      process.env.OBS_REDACT_KEYS ||
+      readSetting("obs_redact_keys") ||
+      ""
+    )
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
   };
 }
 

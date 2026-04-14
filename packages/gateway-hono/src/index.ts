@@ -55,6 +55,10 @@ import {
   handleGetSkillsSources,
   handleGetSkillsIndex,
   handleGetSkillsFeed,
+  handleGetTrace,
+  handleListTraces,
+  handleExportTrace,
+  handleGetMetrics,
 } from "@agentstep/agent-sdk/handlers";
 
 const app = new Hono();
@@ -142,5 +146,11 @@ app.get("/v1/skills", (c) => handleSearchSkills(c.req.raw));
 
 // ── Batch ────────────────────────────────────────────────────────────────
 app.post("/v1/batch", (c) => handleBatch(c.req.raw));
+
+// ── Observability: traces + metrics ──────────────────────────────────────
+app.get("/v1/traces", (c) => handleListTraces(c.req.raw));
+app.get("/v1/traces/:id", (c) => handleGetTrace(c.req.raw, c.req.param("id")));
+app.post("/v1/traces/:id/export", (c) => handleExportTrace(c.req.raw, c.req.param("id")));
+app.get("/v1/metrics", (c) => handleGetMetrics(c.req.raw));
 
 export default app;

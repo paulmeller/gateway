@@ -279,6 +279,10 @@ export async function runTurn(
   const translator = backend.createTranslator({
     customToolNames: tools.customToolNames,
     isFirstTurn: getSessionRow(sessionId)?.claude_session_id == null,
+    // Observability: allow the translator to mint per-tool child spans
+    // nested under the turn's root span. Translators that don't implement
+    // this simply ignore the option.
+    turnSpanId: trace.span_id,
   });
 
   // Tool bridge: if this is a custom tool result re-entry on claude backend,
@@ -378,14 +382,20 @@ export async function runTurn(
           if (t.type.endsWith("tool_use") || t.type.endsWith("mcp_tool_use") || t.type.endsWith("custom_tool_use")) {
             toolCallsInTurn++;
           }
+          // Translator-emitted per-tool spans override the turn's default
+          // span context: `span.tool_call_start` gets its own fresh span
+          // id whose parent is the turn span, `agent.tool_use` rides
+          // under that same tool span id, etc.
+          const spanId = t.spanId ?? trace.span_id;
+          const parentSpanId = t.parentSpanId ?? trace.parent_span_id;
           return {
             type: t.type,
             payload: t.payload,
             origin: "server" as const,
             processedAt: nowMs(),
             traceId: trace.trace_id,
-            spanId: trace.span_id,
-            parentSpanId: trace.parent_span_id,
+            spanId,
+            parentSpanId,
           };
         });
         appendEventsBatch(sessionId, batchInputs);
