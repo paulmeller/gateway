@@ -42,8 +42,18 @@ export function registerServeCommand(parent: Command): void {
       let version = "dev";
       try {
         const __dirname = path.dirname(fileURLToPath(import.meta.url));
-        const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "../../package.json"), "utf-8"));
-        version = pkg.version;
+        // Try multiple paths: bundled (dist/gateway.js → ../package.json) and source (src/commands/ → ../../package.json)
+        const candidates = [
+          path.join(__dirname, "../package.json"),
+          path.join(__dirname, "../../package.json"),
+          path.join(process.cwd(), "package.json"),
+        ];
+        for (const p of candidates) {
+          try {
+            const pkg = JSON.parse(fs.readFileSync(p, "utf-8"));
+            if (pkg.version && pkg.name?.includes("gateway")) { version = pkg.version; break; }
+          } catch {}
+        }
       } catch {}
       process.env.GATEWAY_VERSION = version;
 
