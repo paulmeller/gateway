@@ -1,10 +1,10 @@
 export const MODELS: Record<string, string[]> = {
   claude: ["claude-sonnet-4-6", "claude-opus-4-6", "claude-haiku-4-5"],
-  opencode: ["anthropic/claude-sonnet-4-6", "openai/gpt-4o-mini"],
-  codex: ["gpt-5.4-mini", "gpt-5.4"],
-  gemini: ["gemini-3.1-pro-preview", "gemini-3", "gemini-2.5-flash"],
-  factory: ["claude-sonnet-4-6", "gpt-5.4", "gemini-3.1-pro-preview"],
-  pi: ["anthropic/claude-sonnet-4-6", "openai/gpt-4o-mini", "google/gemini-2.5-flash"],
+  opencode: ["anthropic/claude-sonnet-4-6", "anthropic/claude-opus-4-6", "openai/gpt-5.4", "openai/gpt-5.4-mini"],
+  codex: ["gpt-5.4-mini", "gpt-5.4", "gpt-5.3-codex"],
+  gemini: ["gemini-3.1-pro-preview", "gemini-3.1-flash-preview", "gemini-2.5-pro", "gemini-2.5-flash"],
+  factory: ["claude-sonnet-4-6", "claude-opus-4-6", "gpt-5.4", "gemini-3.1-pro-preview"],
+  pi: ["anthropic/claude-sonnet-4-6", "anthropic/claude-opus-4-6", "openai/gpt-5.4", "google/gemini-2.5-flash"],
 };
 
 export const ENGINES = Object.keys(MODELS);

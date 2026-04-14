@@ -126,11 +126,11 @@ export function OnboardingWizard() {
             // Check if agent already has a "default" vault from a previous run
             try {
               const res = await api<{ data: Array<{ id: string; name: string }> }>(`/vaults?agent_id=${agentId}`);
-              const existing = res.data.find(v => v.name === "default");
+              const existing = res.data.find(v => v.name === "my-vault");
               if (existing) {
                 vaultId = existing.id;
               } else {
-                const vault = await createVault.mutateAsync({ name: "default", agent_id: agentId });
+                const vault = await createVault.mutateAsync({ name: "my-vault", agent_id: agentId });
                 vaultId = vault.id;
               }
             } catch {
