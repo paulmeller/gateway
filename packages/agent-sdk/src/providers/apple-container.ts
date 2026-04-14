@@ -65,37 +65,13 @@ export const appleProvider = createCliProvider({
         }, 3000);
         proc.on("close", () => clearTimeout(t));
       });
-      // Check if kernel is configured
-      const { spawn: spawn2 } = await import("node:child_process");
-      const kernelOk = await new Promise<boolean>((resolve) => {
-        const proc = spawn2("container", ["system", "info"], {
-          stdio: ["pipe", "pipe", "pipe"],
-        });
-        let stderr = "";
-        proc.stderr?.on("data", (buf: Buffer) => { stderr += buf.toString(); });
-        proc.on("close", (code) => {
-          if (code !== 0 || stderr.includes("kernel not configured")) {
-            resolve(false);
-          } else {
-            resolve(true);
-          }
-        });
-        proc.on("error", () => resolve(false));
-        setTimeout(() => { proc.kill("SIGKILL"); resolve(false); }, 3000);
-      });
-      if (!kernelOk) {
-        return {
-          available: false,
-          message: "Apple Containers kernel not configured. Run: container system kernel set",
-        };
-      }
       return { available: true };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("ENOENT")) {
         return {
           available: false,
-          message: "Apple Containers CLI not found. Run: brew install container (requires macOS 26+)",
+          message: "Apple Containers not installed. Run: brew install container (requires macOS 26+)",
         };
       }
       return {
