@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
 
-interface Props { agentName: string; envName: string; hasSecrets: boolean; onStart: () => void; loading: boolean; }
+interface Props { agentName: string; envName: string; hasSecrets: boolean; onStart: () => void; loading: boolean; isExistingAgent?: boolean; isExistingEnv?: boolean; }
 
-export function StepReady({ agentName, envName, hasSecrets, onStart, loading }: Props) {
+export function StepReady({ agentName, envName, hasSecrets, onStart, loading, isExistingAgent, isExistingEnv }: Props) {
   return (
     <div className="w-full max-w-md flex flex-col gap-6">
       <div>
@@ -13,12 +13,12 @@ export function StepReady({ agentName, envName, hasSecrets, onStart, loading }: 
       <div className="rounded-xl ring-1 ring-border bg-card p-4 flex flex-col gap-3">
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Agent</span>
-          <span className="font-medium text-foreground">{agentName}</span>
+          <span className="font-medium text-foreground">{agentName}{isExistingAgent && <span className="text-xs text-muted-foreground ml-1">(existing)</span>}</span>
         </div>
         <div className="border-t border-border" />
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Environment</span>
-          <span className="font-medium text-foreground">{envName}</span>
+          <span className="font-medium text-foreground">{envName}{isExistingEnv && <span className="text-xs text-muted-foreground ml-1">(existing)</span>}</span>
         </div>
         <div className="border-t border-border" />
         <div className="flex justify-between text-sm">
