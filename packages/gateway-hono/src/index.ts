@@ -59,6 +59,7 @@ import {
   handleListTraces,
   handleExportTrace,
   handleGetMetrics,
+  handleGetApiMetrics,
 } from "@agentstep/agent-sdk/handlers";
 
 const app = new Hono();
@@ -69,6 +70,7 @@ app.get("/", serveUI);
 app.get("/settings", serveUI);
 app.get("/settings/agents/:id", serveUI);
 app.get("/sessions/:id", serveUI);
+app.get("/dashboard", serveUI);
 
 // ── Health ────────────────────────────────────────────────────────────────
 app.get("/api/health", (c) => c.json({ status: "ok" }));
@@ -151,6 +153,9 @@ app.post("/v1/batch", (c) => handleBatch(c.req.raw));
 app.get("/v1/traces", (c) => handleListTraces(c.req.raw));
 app.get("/v1/traces/:id", (c) => handleGetTrace(c.req.raw, c.req.param("id")));
 app.post("/v1/traces/:id/export", (c) => handleExportTrace(c.req.raw, c.req.param("id")));
+// NOTE: /v1/metrics/api must be registered BEFORE /v1/metrics so the
+// exact-match doesn't shadow it. Hono matches in registration order.
+app.get("/v1/metrics/api", (c) => handleGetApiMetrics(c.req.raw));
 app.get("/v1/metrics", (c) => handleGetMetrics(c.req.raw));
 
 export default app;

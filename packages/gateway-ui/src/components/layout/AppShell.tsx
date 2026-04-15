@@ -27,7 +27,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       }
       if (e.key === "Escape") {
         const state = useAppStore.getState();
-        if (state.settingsOpen) {
+        if (state.dashboardOpen) {
+          state.setDashboardOpen(false);
+        } else if (state.settingsOpen) {
           state.setSettingsOpen(false);
         }
       }

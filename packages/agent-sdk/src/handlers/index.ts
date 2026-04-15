@@ -14,4 +14,4 @@ export { handlePutSetting } from "./settings";
 export { handleGetProviderStatus } from "./providers";
 export { handleGetSkillsCatalog, handleSearchSkills, handleGetSkillsStats, handleGetSkillsSources, handleGetSkillsIndex, handleGetSkillsFeed } from "./skills";
 export { handleGetTrace, handleListTraces, handleExportTrace } from "./traces";
-export { handleGetMetrics } from "./metrics";
+export { handleGetMetrics, handleGetApiMetrics } from "./metrics";

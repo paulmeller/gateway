@@ -27,6 +27,7 @@
 import { routeWrap, jsonOk } from "../http";
 import { getDb } from "../db/client";
 import { badRequest } from "../errors";
+import { snapshotApiMetrics } from "../observability/api-metrics";
 
 type GroupBy = "agent" | "environment" | "backend" | "hour" | "day" | "none";
 
@@ -249,5 +250,27 @@ export function handleGetMetrics(request: Request): Promise<Response> {
       tool_latency_p99_ms: pct(99),
       tool_call_sample_count: durations.length,
     });
+  });
+}
+
+/**
+ * API throughput / latency snapshot for the dashboard.
+ *
+ * Unlike `handleGetMetrics` which aggregates the DB, this handler reads
+ * the in-process ring buffer populated by `routeWrap`. Cheap, restart-
+ * resets, good for a live dashboard.
+ *
+ * Query params:
+ *   - `window_minutes`  — rolling window (1..60, default 60)
+ */
+export function handleGetApiMetrics(request: Request): Promise<Response> {
+  return routeWrap(request, async () => {
+    const url = new URL(request.url);
+    const wmRaw = Number(url.searchParams.get("window_minutes") ?? "60");
+    if (!Number.isFinite(wmRaw) || wmRaw <= 0) {
+      throw badRequest("window_minutes must be a positive integer");
+    }
+    const windowMinutes = Math.min(Math.max(Math.floor(wmRaw), 1), 60);
+    return jsonOk(snapshotApiMetrics({ windowMs: windowMinutes * 60_000 }));
   });
 }

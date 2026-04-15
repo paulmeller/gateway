@@ -6,6 +6,7 @@ import { SessionHeader } from "@/components/layout/SessionHeader";
 import { ChatThread } from "@/components/chat/ChatThread";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { SettingsPage } from "@/components/settings/SettingsPage";
+import { DashboardPage } from "@/components/dashboard/DashboardPage";
 import { CommandPalette } from "@/components/shared/CommandPalette";
 import { useAppStore } from "@/stores/app-store";
 
@@ -17,7 +18,9 @@ const queryClient = new QueryClient({
 
 function Main() {
   const settingsOpen = useAppStore((s) => s.settingsOpen);
+  const dashboardOpen = useAppStore((s) => s.dashboardOpen);
 
+  if (dashboardOpen) return <DashboardPage />;
   if (settingsOpen) return <SettingsPage />;
 
   return (

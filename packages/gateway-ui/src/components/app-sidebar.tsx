@@ -1,6 +1,16 @@
 import * as React from "react";
 import { useState } from "react";
-import { Settings, Plus, Eye, EyeOff, Sun, Moon, ExternalLink, BookOpen } from "lucide-react";
+import {
+  Settings,
+  Plus,
+  Eye,
+  EyeOff,
+  Sun,
+  Moon,
+  ExternalLink,
+  BookOpen,
+  BarChart3,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SessionList } from "@/components/sessions/SessionList";
@@ -19,7 +29,8 @@ import {
 } from "@/components/ui/sidebar";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { apiKey, setApiKey, setSettingsOpen, setActiveSessionId } = useAppStore();
+  const { apiKey, setApiKey, setSettingsOpen, setActiveSessionId, setDashboardOpen } =
+    useAppStore();
   const [showKey, setShowKey] = useState(false);
 
   return (
@@ -89,6 +100,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             )}
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 justify-start gap-2 text-xs"
+              onClick={() => setDashboardOpen(true)}
+            >
+              <BarChart3 className="size-3.5" />
+              Dashboard
+            </Button>
             <Button
               variant="outline"
               size="sm"
