@@ -11,12 +11,32 @@ import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import { OverviewPage } from "@/components/pages/OverviewPage";
 import { SessionsPage } from "@/components/pages/SessionsPage";
 import { SessionDetailPage } from "@/components/pages/SessionDetailPage";
+import { PlaygroundPage } from "@/components/pages/PlaygroundPage";
+import { SkillsPage } from "@/components/pages/SkillsPage";
+import { ApiKeysPage } from "@/components/pages/ApiKeysPage";
+import { DocsPage } from "@/components/pages/DocsPage";
 import { useAppStore } from "@/stores/app-store";
 import { useEffect } from "react";
 
 // ─── Root ────────────────────────────────────────────────────────────────────
 
 function RootLayout() {
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const meta = e.metaKey || e.ctrlKey;
+      if (meta && e.key === "d") {
+        e.preventDefault();
+        useAppStore.getState().toggleDebug();
+      }
+      if (meta && e.key === "k") {
+        e.preventDefault();
+        useAppStore.getState().setCommandOpen(true);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
       <ConsoleNav />
@@ -142,7 +162,7 @@ const filesRoute = createRoute({
 const skillsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/skills",
-  component: placeholder("Skills"),
+  component: SkillsPage,
 });
 
 const memoryRoute = createRoute({
@@ -172,13 +192,13 @@ const dashboardRoute = createRoute({
 const docsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/docs",
-  component: placeholder("API Docs"),
+  component: DocsPage,
 });
 
 const apiKeysRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/api-keys",
-  component: placeholder("API Keys"),
+  component: ApiKeysPage,
 });
 
 const quickstartRoute = createRoute({
