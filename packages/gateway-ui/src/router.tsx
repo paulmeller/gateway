@@ -180,7 +180,9 @@ const memoryRoute = createRoute({
 const playgroundRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/playground",
-  component: placeholder("Playground coming soon"),
+  component: function PlaygroundRoute() {
+    return <div className="h-full overflow-hidden"><PlaygroundPage /></div>;
+  },
 });
 
 const dashboardRoute = createRoute({
