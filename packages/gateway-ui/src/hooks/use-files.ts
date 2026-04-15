@@ -24,7 +24,7 @@ export function useUploadFile() {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
-      const apiKey = useAppStore.getState().apiKey || localStorage.getItem("ma-api-key") || window.__MA_API_KEY__ || "";
+      const apiKey = useAppStore.getState().apiKey;
       const res = await fetch("/v1/files", {
         method: "POST",
         headers: { "x-api-key": apiKey },
@@ -49,7 +49,7 @@ export function useDeleteFile() {
 }
 
 export async function downloadFile(id: string, filename: string) {
-  const apiKey = useAppStore.getState().apiKey || localStorage.getItem("ma-api-key") || window.__MA_API_KEY__ || "";
+  const apiKey = useAppStore.getState().apiKey;
   const res = await fetch(`/v1/files/${id}/content`, {
     headers: { "x-api-key": apiKey },
   });

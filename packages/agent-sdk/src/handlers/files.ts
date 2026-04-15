@@ -48,12 +48,19 @@ export function handleUploadFile(request: Request): Promise<Response> {
       throw badRequest(`File too large: ${data.length} bytes (max ${maxSize})`);
     }
 
+    // Parse optional scope from query params or form data
+    const url = new URL(req.url);
+    const scopeId = url.searchParams.get("scope_id");
+    const scopeType = url.searchParams.get("scope_type") || "session";
+    const scope = scopeId ? { type: scopeType as "session", id: scopeId } : undefined;
+
     // Store on disk
     const record = createFile({
       filename,
       size: data.length,
       content_type: fileContentType,
       storage_path: "", // placeholder — set after store
+      scope,
     });
     const storagePath = storeFile(record.id, filename, data);
 
@@ -69,7 +76,8 @@ export function handleListFiles(request: Request): Promise<Response> {
   return routeWrap(request, async ({ request: req }) => {
     const url = new URL(req.url);
     const limit = Number(url.searchParams.get("limit") || "100");
-    const files = listFiles({ limit });
+    const scope_id = url.searchParams.get("scope_id") || undefined;
+    const files = listFiles({ limit, scope_id });
     return jsonOk({ data: files });
   });
 }

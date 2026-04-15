@@ -29,7 +29,7 @@ export function FileUpload({ onFileAttached }: Props) {
       const formData = new FormData();
       formData.append("file", file);
       const baseUrl = "/v1/files";
-      const apiKey = localStorage.getItem("ma-api-key") || window.__MA_API_KEY__ || "";
+      const apiKey = useAppStore.getState().apiKey;
       const res = await fetch(baseUrl, {
         method: "POST",
         headers: { "x-api-key": apiKey },

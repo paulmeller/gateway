@@ -326,7 +326,18 @@ export function runMigrations(db: InstanceType<typeof Database>): void {
       size INTEGER NOT NULL,
       content_type TEXT NOT NULL,
       storage_path TEXT NOT NULL,
+      scope_type TEXT,
+      scope_id TEXT,
       created_at INTEGER NOT NULL
     )
   `);
+
+  // Add scope columns to existing files table (idempotent)
+  const filesCols = db.prepare("PRAGMA table_info(files)").all() as Array<{ name: string }>;
+  if (!filesCols.some(c => c.name === "scope_type")) {
+    db.exec("ALTER TABLE files ADD COLUMN scope_type TEXT");
+  }
+  if (!filesCols.some(c => c.name === "scope_id")) {
+    db.exec("ALTER TABLE files ADD COLUMN scope_id TEXT");
+  }
 }

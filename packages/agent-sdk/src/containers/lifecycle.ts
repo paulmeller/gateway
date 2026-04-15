@@ -260,7 +260,7 @@ export async function acquireForFirstTurn(sessionId: string): Promise<string> {
  *   - file: read from local disk storage
  *   - github_repository: cloned via git
  */
-async function provisionResources(
+export async function provisionResources(
   spriteName: string,
   resources: SessionResource[],
   provider: import("../providers/types").ContainerProvider,

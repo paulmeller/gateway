@@ -30,7 +30,7 @@ import { getSession, setBackendSessionId, updateSessionStatus, updateSessionMuta
 import { getAgent } from "../db/agents";
 import { getEnvironment } from "../db/environments";
 import { markUserEventProcessed, listEvents } from "../db/events";
-import { acquireForFirstTurn, installSkills } from "../containers/lifecycle";
+import { acquireForFirstTurn, installSkills, provisionResources } from "../containers/lifecycle";
 import * as pool from "../containers/pool";
 import { resolveBackend } from "../backends/registry";
 import { resolveContainerProvider } from "../providers/registry";
@@ -173,6 +173,14 @@ export async function runTurn(
         await installSkills(spriteName, sp, newSkills, agent.engine);
         console.log(`[driver] ${sessionId} skills injected`);
       }
+    }
+
+    // Re-provision resources (files/repos added after container creation)
+    const freshSession = getSession(sessionId);
+    if (freshSession?.resources && freshSession.resources.length > 0) {
+      const envRow = getEnvironment(session.environment_id);
+      const sp = await resolveContainerProvider(envRow?.config?.provider);
+      await provisionResources(spriteName, freshSession.resources, sp);
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
