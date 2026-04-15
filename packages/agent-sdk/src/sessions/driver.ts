@@ -38,6 +38,8 @@ import { BLOCKED_ENV_KEYS } from "../providers/resolve-secrets";
 import { listEntries as listVaultEntries } from "../db/vaults";
 import { parseNDJSONLines } from "../backends/shared/ndjson";
 import type { TranslatedEvent } from "../backends/shared/translator-types";
+import { classifyError, buildErrorPayload } from "./errors";
+import { shouldRetry, incrementRetry, resetRetry, retryDelay } from "./retry";
 import type { Agent } from "../types";
 import type { ContainerProvider } from "../providers/types";
 import { resolveToolset } from "./tools";
@@ -176,7 +178,7 @@ export async function runTurn(
     const msg = err instanceof Error ? err.message : String(err);
     appendEvent(sessionId, {
       type: "session.error",
-      payload: { error: { type: "server_error", message: `container creation failed: ${msg}` } },
+      payload: buildErrorPayload(classifyError(`container creation failed: ${msg}`), "terminal"),
       origin: "server",
       processedAt: nowMs(),
     });
@@ -427,7 +429,10 @@ export async function runTurn(
       const code = (exitResult as { code?: number })?.code ?? "unknown";
       appendEvent(sessionId, {
         type: "session.error",
-        payload: { error: { type: "backend_error", message: `Backend CLI exited with code ${code} and no output. Check that the engine is installed and the API key is valid.` } },
+        payload: buildErrorPayload(
+          classifyError(`Backend CLI exited with code ${code} and no output. Check that the engine is installed and the API key is valid.`),
+          "terminal",
+        ),
         origin: "server",
         processedAt: nowMs(),
       });
@@ -437,9 +442,34 @@ export async function runTurn(
       aborted = true;
     } else {
       const msg = err instanceof Error ? err.message : String(err);
+      const classified = classifyError(msg);
+      const retry = shouldRetry(sessionId, classified);
+
+      if (retry) {
+        // Auto-retry: emit rescheduled, wait, then re-run
+        incrementRetry(sessionId);
+        appendEvent(sessionId, {
+          type: "session.error",
+          payload: buildErrorPayload(classified, "retrying"),
+          origin: "server",
+          processedAt: nowMs(),
+        });
+        appendEvent(sessionId, {
+          type: "session.status_rescheduled",
+          payload: { retry_attempt: retry.attempt, retry_delay_ms: retry.delayMs },
+          origin: "server",
+          processedAt: nowMs(),
+        });
+        await retryDelay(retry.delayMs);
+        // Re-run the turn (recursive call with original inputs + incremented depth)
+        return runTurn(sessionId, inputs, _depth + 1);
+      }
+
+      // Not retryable or exhausted
+      const retryStatus = classified.retryable ? "exhausted" : "terminal";
       appendEvent(sessionId, {
         type: "session.error",
-        payload: { error: { type: "server_error", message: msg } },
+        payload: buildErrorPayload(classified, retryStatus),
         origin: "server",
         processedAt: nowMs(),
       });
@@ -563,6 +593,7 @@ export async function runTurn(
     processedAt: now,
   });
   updateSessionStatus(sessionId, "idle", stopReason);
+  resetRetry(sessionId); // Clear retry counter on successful completion
   console.log(`[driver] ${sessionId} turn complete: stop_reason=${stopReason}`);
   setIdleSince(sessionId, now);
 
