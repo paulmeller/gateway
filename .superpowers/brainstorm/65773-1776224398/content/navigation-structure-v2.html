@@ -1,0 +1,125 @@
+<style>
+  body, .option, .content, h2, h3, p { color: #e0e0e0 !important; }
+  .mockup { background: #0a0a0a !important; border-color: #333 !important; }
+</style>
+
+<h2>Navigation Structure</h2>
+<p class="subtitle">How should the main navigation be organized? Think Vercel/Stripe left nav.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Resource-First Left Nav</h3>
+      <p>Vertical sidebar with sections: Overview, Resources (Agents, Environments, Sessions, Vaults, Files, Skills), Tools (Playground, Dashboard, API Docs). Like Stripe's left nav.</p>
+      <div class="mockup" style="margin-top:12px;padding:16px">
+        <div style="display:flex;gap:24px;font-size:12px;color:#ccc">
+          <div style="width:180px;border-right:1px solid #333;padding-right:16px">
+            <div style="color:#a3e635;font-weight:600;margin-bottom:16px">● agentstep</div>
+            <div style="color:#666;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Overview</div>
+            <div style="padding:5px 8px;color:#ccc;border-radius:4px">Home</div>
+            <div style="padding:5px 8px;color:#ccc;border-radius:4px">API Keys</div>
+            <div style="color:#666;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin:12px 0 6px">Resources</div>
+            <div style="padding:5px 8px;color:#fff;background:#a3e63515;border-radius:4px">Agents</div>
+            <div style="padding:5px 8px;color:#ccc;border-radius:4px">Environments</div>
+            <div style="padding:5px 8px;color:#ccc;border-radius:4px">Sessions</div>
+            <div style="padding:5px 8px;color:#ccc;border-radius:4px">Vaults</div>
+            <div style="padding:5px 8px;color:#ccc;border-radius:4px">Files</div>
+            <div style="padding:5px 8px;color:#ccc;border-radius:4px">Skills</div>
+            <div style="color:#666;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin:12px 0 6px">Tools</div>
+            <div style="padding:5px 8px;color:#ccc;border-radius:4px">Playground</div>
+            <div style="padding:5px 8px;color:#ccc;border-radius:4px">Dashboard</div>
+            <div style="padding:5px 8px;color:#ccc;border-radius:4px">API Docs</div>
+          </div>
+          <div style="flex:1;color:#ccc">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+              <div>
+                <div style="color:#fff;font-size:16px;font-weight:600">Agents</div>
+                <div style="color:#666;font-size:11px;margin-top:2px">Create and manage autonomous agents.</div>
+              </div>
+              <div style="background:linear-gradient(135deg,#a3e635,#84cc16);color:#000;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:600">+ New agent</div>
+            </div>
+            <div style="background:#111;border:1px solid #222;border-radius:8px;overflow:hidden">
+              <div style="display:flex;padding:10px 16px;color:#666;font-size:11px;border-bottom:1px solid #222">
+                <span style="flex:2">Name</span><span style="flex:2">Model</span><span style="flex:1">Engine</span><span style="flex:1">Status</span><span style="flex:1">Created</span>
+              </div>
+              <div style="display:flex;padding:10px 16px;color:#ccc;font-size:12px;border-bottom:1px solid #1a1a1a">
+                <span style="flex:2;color:#fff;font-weight:500">Coder</span><span style="flex:2;font-family:monospace;color:#888;font-size:11px">claude-sonnet-4-6</span><span style="flex:1;color:#888">claude</span><span style="flex:1"><span style="color:#a3e635;background:#a3e63515;padding:2px 8px;border-radius:10px;font-size:10px">Active</span></span><span style="flex:1;color:#666">2h ago</span>
+              </div>
+              <div style="display:flex;padding:10px 16px;color:#ccc;font-size:12px">
+                <span style="flex:2;color:#fff;font-weight:500">Analyst</span><span style="flex:2;font-family:monospace;color:#888;font-size:11px">openai/gpt-5.4</span><span style="flex:1;color:#888">pi</span><span style="flex:1"><span style="color:#a3e635;background:#a3e63515;padding:2px 8px;border-radius:10px;font-size:10px">Active</span></span><span style="flex:1;color:#666">1d ago</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Top Tab Nav</h3>
+      <p>Horizontal tabs across the top. No sidebar. Each tab is a full page. Like Vercel's project-level tabs.</p>
+      <div class="mockup" style="margin-top:12px;padding:16px">
+        <div style="font-size:12px;color:#ccc">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+            <div style="color:#a3e635;font-weight:600">● agentstep</div>
+            <div style="display:flex;gap:4px">
+              <span style="color:#888;background:#1a1a1a;padding:4px 10px;border-radius:4px;font-size:11px">v0.2.12</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:20px;border-bottom:1px solid #333;padding-bottom:10px;margin-bottom:16px;font-size:13px">
+            <span style="color:#a3e635;border-bottom:2px solid #a3e635;padding-bottom:10px;font-weight:500">Agents</span>
+            <span style="color:#888">Environments</span>
+            <span style="color:#888">Sessions</span>
+            <span style="color:#888">Vaults</span>
+            <span style="color:#888">Files</span>
+            <span style="color:#888">Skills</span>
+            <span style="color:#888">Playground</span>
+            <span style="color:#888">Dashboard</span>
+            <span style="color:#888">Docs</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div style="color:#fff;font-size:16px;font-weight:600">Agents</div>
+            <div style="background:linear-gradient(135deg,#a3e635,#84cc16);color:#000;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:600">+ New agent</div>
+          </div>
+          <div style="background:#111;border:1px solid #222;border-radius:8px;padding:10px 16px;color:#888;font-size:11px">
+            Agent table here...
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Compact Left Nav + Content Tabs</h3>
+      <p>Narrow icon sidebar for sections (Resources, Tools, Settings), content area uses tabs within each section. Like Supabase.</p>
+      <div class="mockup" style="margin-top:12px;padding:16px">
+        <div style="display:flex;gap:0;font-size:12px;color:#ccc">
+          <div style="width:48px;background:#0a0a0a;border-right:1px solid #222;display:flex;flex-direction:column;align-items:center;padding-top:12px;gap:8px">
+            <div style="color:#a3e635;font-size:16px">●</div>
+            <div style="width:32px;height:32px;background:#a3e63515;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#a3e635;font-size:14px">⬡</div>
+            <div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:#666;font-size:14px">▶</div>
+            <div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:#666;font-size:14px">📊</div>
+            <div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:#666;font-size:14px">📄</div>
+          </div>
+          <div style="flex:1;padding:16px">
+            <div style="display:flex;gap:16px;margin-bottom:16px;font-size:13px">
+              <span style="color:#a3e635;border-bottom:2px solid #a3e635;padding-bottom:4px">Agents</span>
+              <span style="color:#888">Environments</span>
+              <span style="color:#888">Sessions</span>
+              <span style="color:#888">Vaults</span>
+              <span style="color:#888">Files</span>
+            </div>
+            <div style="background:#111;border:1px solid #222;border-radius:8px;padding:10px 16px;color:#888;font-size:11px">
+              Agent table here...
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

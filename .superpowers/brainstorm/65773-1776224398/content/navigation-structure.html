@@ -1,0 +1,107 @@
+<h2>Navigation Structure</h2>
+<p class="subtitle">How should the main navigation be organized? Think Vercel/Stripe left nav.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Resource-First Nav</h3>
+      <p>Left sidebar is a vertical nav with sections: <strong>Overview, Agents, Environments, Sessions, Vaults, Files, Skills, Dashboard</strong>. Each section expands to show its list. Playground (chat) is one section, not the home page. Like Stripe's left nav.</p>
+      <div class="mockup" style="margin-top:12px;padding:12px">
+        <div style="display:flex;gap:20px;font-size:12px">
+          <div style="width:180px;border-right:1px solid #333;padding-right:16px">
+            <div style="color:#a3e635;font-weight:600;margin-bottom:12px">● agentstep</div>
+            <div style="color:#888;font-size:10px;text-transform:uppercase;margin-bottom:4px">Overview</div>
+            <div style="padding:4px 0;color:#fff">Home</div>
+            <div style="padding:4px 0;color:#fff">API Keys</div>
+            <div style="color:#888;font-size:10px;text-transform:uppercase;margin:8px 0 4px">Resources</div>
+            <div style="padding:4px 0;color:#a3e635">▸ Agents</div>
+            <div style="padding:4px 0;color:#fff">▸ Environments</div>
+            <div style="padding:4px 0;color:#fff">▸ Sessions</div>
+            <div style="padding:4px 0;color:#fff">▸ Vaults</div>
+            <div style="padding:4px 0;color:#fff">▸ Files</div>
+            <div style="padding:4px 0;color:#fff">▸ Skills</div>
+            <div style="color:#888;font-size:10px;text-transform:uppercase;margin:8px 0 4px">Tools</div>
+            <div style="padding:4px 0;color:#fff">Playground</div>
+            <div style="padding:4px 0;color:#fff">Dashboard</div>
+            <div style="padding:4px 0;color:#fff">API Docs</div>
+          </div>
+          <div style="flex:1">
+            <div style="color:#fff;font-size:14px;font-weight:600;margin-bottom:8px">Agents</div>
+            <div style="color:#888;font-size:11px;margin-bottom:12px">Create and manage autonomous agents.</div>
+            <div style="background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:8px 12px;font-size:11px">
+              <div style="display:flex;justify-content:space-between;color:#888;border-bottom:1px solid #333;padding-bottom:6px;margin-bottom:6px">
+                <span>Name</span><span>Model</span><span>Engine</span><span>Created</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;color:#fff;padding:4px 0">
+                <span>Coder</span><span style="color:#888">claude-sonnet-4-6</span><span style="color:#888">claude</span><span style="color:#888">2h ago</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Top Tab Nav + Sidebar Detail</h3>
+      <p>Horizontal tabs at top: <strong>Agents | Environments | Sessions | Vaults | Playground | Dashboard</strong>. Each tab has its own content area. When you click into an agent, a sidebar or detail panel shows config. Like Vercel's project tabs.</p>
+      <div class="mockup" style="margin-top:12px;padding:12px">
+        <div style="font-size:12px">
+          <div style="display:flex;gap:16px;border-bottom:1px solid #333;padding-bottom:8px;margin-bottom:12px">
+            <span style="color:#a3e635;border-bottom:2px solid #a3e635;padding-bottom:8px">Agents</span>
+            <span style="color:#888">Environments</span>
+            <span style="color:#888">Sessions</span>
+            <span style="color:#888">Vaults</span>
+            <span style="color:#888">Files</span>
+            <span style="color:#888">Playground</span>
+            <span style="color:#888">Dashboard</span>
+          </div>
+          <div style="color:#fff;font-size:14px;font-weight:600;margin-bottom:12px">Agents</div>
+          <div style="background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:8px 12px;font-size:11px">
+            <div style="display:flex;justify-content:space-between;color:#888;border-bottom:1px solid #333;padding-bottom:6px;margin-bottom:6px">
+              <span>Name</span><span>Model</span><span>Status</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;color:#fff;padding:4px 0">
+              <span>Coder</span><span style="color:#888">claude-sonnet-4-6</span><span style="color:#a3e635">Active</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Hybrid: Left Nav Sections + Content Tabs</h3>
+      <p>Left nav has high-level sections (Resources, Tools, Settings). Main area uses tabs for sub-navigation within each section. Like Supabase — nav for project areas, tabs for detail views.</p>
+      <div class="mockup" style="margin-top:12px;padding:12px">
+        <div style="display:flex;gap:20px;font-size:12px">
+          <div style="width:140px;border-right:1px solid #333;padding-right:12px">
+            <div style="color:#a3e635;font-weight:600;margin-bottom:12px">● agentstep</div>
+            <div style="padding:4px 0;color:#fff;background:#a3e63510;border-radius:4px;padding-left:8px">Resources</div>
+            <div style="padding:4px 0 4px 8px;color:#fff">Playground</div>
+            <div style="padding:4px 0 4px 8px;color:#fff">Dashboard</div>
+            <div style="padding:4px 0 4px 8px;color:#fff">API Docs</div>
+          </div>
+          <div style="flex:1">
+            <div style="display:flex;gap:12px;margin-bottom:12px">
+              <span style="color:#a3e635;border-bottom:2px solid #a3e635;padding-bottom:4px">Agents</span>
+              <span style="color:#888">Environments</span>
+              <span style="color:#888">Sessions</span>
+              <span style="color:#888">Vaults</span>
+              <span style="color:#888">Files</span>
+              <span style="color:#888">Skills</span>
+            </div>
+            <div style="background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:8px 12px;font-size:11px">
+              <div style="color:#fff;padding:4px 0">Agent list here...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,167 @@
+<style>
+  body, .option, .content, h2, h3, p { color: #e0e0e0 !important; }
+  .mockup { background: #0a0a0a !important; border-color: #333 !important; }
+</style>
+
+<h2>Playground Layout</h2>
+<p class="subtitle">The playground is a testing tool for API developers — not the home page anymore.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Chat Only (current, relocated)</h3>
+      <p>Same chat UI, just moved under Playground nav. Debug panel toggles open.</p>
+      <div class="mockup" style="margin-top:12px;padding:16px">
+        <div style="display:flex;gap:0;font-size:11px;color:#ccc;height:240px">
+          <div style="width:160px;border-right:1px solid #222;padding:12px;background:#050505">
+            <div style="color:#a3e635;font-weight:600;margin-bottom:12px;font-size:12px">● agentstep</div>
+            <div style="color:#666;font-size:9px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Tools</div>
+            <div style="padding:4px 8px;color:#fff;background:#a3e63515;border-radius:4px;font-size:11px">Playground</div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column">
+            <div style="padding:8px 16px;border-bottom:1px solid #222;display:flex;justify-content:space-between;align-items:center">
+              <div><span style="color:#fff;font-size:12px">Coder</span> <span style="color:#666;font-size:10px;font-family:monospace">claude-sonnet-4-6</span></div>
+              <span style="color:#666;font-size:10px;border:1px solid #333;padding:2px 8px;border-radius:4px">Debug</span>
+            </div>
+            <div style="flex:1;padding:16px;overflow:hidden">
+              <div style="display:flex;justify-content:flex-end;margin-bottom:8px"><div style="background:#222;border-radius:12px 12px 4px 12px;padding:8px 12px;max-width:60%;font-size:11px;color:#ccc">Analyze this CSV file</div></div>
+              <div style="display:flex;gap:6px;margin-bottom:8px"><div style="width:4px;height:4px;border-radius:50%;background:#a3e635;margin-top:6px"></div><div style="font-size:11px;color:#ccc">I'll read the file and analyze the data structure...</div></div>
+              <div style="background:#111;border:1px solid #222;border-radius:6px;padding:6px 10px;font-size:10px;color:#666;margin-left:10px">🔧 Read /uploads/data.csv</div>
+            </div>
+            <div style="border-top:1px solid #222;padding:8px 16px;display:flex;gap:8px;align-items:center">
+              <div style="color:#666;font-size:14px">📎</div>
+              <div style="flex:1;background:#111;border:1px solid #222;border-radius:8px;padding:8px 12px;font-size:11px;color:#666">Message...</div>
+              <div style="width:28px;height:28px;background:linear-gradient(135deg,#a3e635,#84cc16);border-radius:6px;display:flex;align-items:center;justify-content:center;color:#000;font-size:12px">↑</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Split: Chat + Event Inspector</h3>
+      <p>Chat on left, always-visible event stream on right. Developers see the raw API events alongside the conversation. Like a browser devtools split.</p>
+      <div class="mockup" style="margin-top:12px;padding:16px">
+        <div style="display:flex;gap:0;font-size:11px;color:#ccc;height:240px">
+          <div style="width:120px;border-right:1px solid #222;padding:12px;background:#050505">
+            <div style="color:#a3e635;font-weight:600;margin-bottom:12px;font-size:12px">● agentstep</div>
+            <div style="padding:4px 8px;color:#fff;background:#a3e63515;border-radius:4px">Playground</div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;border-right:1px solid #222">
+            <div style="padding:8px 12px;border-bottom:1px solid #222;font-size:12px;color:#fff">Chat</div>
+            <div style="flex:1;padding:12px;overflow:hidden">
+              <div style="display:flex;justify-content:flex-end;margin-bottom:8px"><div style="background:#222;border-radius:12px 12px 4px 12px;padding:6px 10px;font-size:10px;color:#ccc">Analyze this CSV</div></div>
+              <div style="display:flex;gap:6px"><div style="width:4px;height:4px;border-radius:50%;background:#a3e635;margin-top:5px"></div><div style="font-size:10px;color:#ccc">Reading the file now...</div></div>
+            </div>
+            <div style="border-top:1px solid #222;padding:6px 12px;display:flex;gap:6px">
+              <div style="flex:1;background:#111;border:1px solid #222;border-radius:6px;padding:6px 10px;font-size:10px;color:#666">Message...</div>
+              <div style="width:24px;height:24px;background:#a3e635;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#000;font-size:10px">↑</div>
+            </div>
+          </div>
+          <div style="width:260px;display:flex;flex-direction:column">
+            <div style="padding:8px 12px;border-bottom:1px solid #222;display:flex;justify-content:space-between">
+              <span style="font-size:12px;color:#fff">Events</span>
+              <span style="font-size:10px;color:#666">12 events</span>
+            </div>
+            <div style="flex:1;padding:8px;overflow:hidden;font-family:monospace;font-size:9px">
+              <div style="padding:4px 6px;border-left:2px solid #333;margin-bottom:4px">
+                <span style="color:#666">1</span> <span style="color:#a3e635;background:#a3e63520;padding:1px 4px;border-radius:2px">user.message</span> <span style="color:#888">Analyze this CSV</span>
+              </div>
+              <div style="padding:4px 6px;border-left:2px solid #333;margin-bottom:4px">
+                <span style="color:#666">2</span> <span style="color:#f59e0b;background:#f59e0b20;padding:1px 4px;border-radius:2px">session.status_running</span>
+              </div>
+              <div style="padding:4px 6px;border-left:2px solid #333;margin-bottom:4px">
+                <span style="color:#666">3</span> <span style="color:#8b5cf6;background:#8b5cf620;padding:1px 4px;border-radius:2px">agent.tool_use</span> <span style="color:#888">Read</span>
+              </div>
+              <div style="padding:4px 6px;border-left:2px solid #333;margin-bottom:4px">
+                <span style="color:#666">4</span> <span style="color:#8b5cf6;background:#8b5cf620;padding:1px 4px;border-radius:2px">agent.tool_result</span> <span style="color:#888">245 lines</span>
+              </div>
+              <div style="padding:4px 6px;border-left:2px solid #333;margin-bottom:4px">
+                <span style="color:#666">5</span> <span style="color:#06b6d4;background:#06b6d420;padding:1px 4px;border-radius:2px">agent.message</span> <span style="color:#888">The CSV contains...</span>
+              </div>
+              <div style="padding:4px 6px;border-left:2px solid #333;margin-bottom:4px">
+                <span style="color:#666">6</span> <span style="color:#f59e0b;background:#f59e0b20;padding:1px 4px;border-radius:2px">session.status_idle</span> <span style="color:#888">end_turn</span>
+              </div>
+              <div style="padding:4px 6px;border-left:2px solid #333;margin-bottom:4px">
+                <span style="color:#666">7</span> <span style="color:#666;background:#66666620;padding:1px 4px;border-radius:2px">span.model_request_end</span> <span style="color:#888">1.2k in · 89 out</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Three-Panel Workbench</h3>
+      <p>Agent config on left, chat in center, events + traces on right. Tweak agent settings and test in one view without navigating away. Like Anthropic's API workbench.</p>
+      <div class="mockup" style="margin-top:12px;padding:16px">
+        <div style="display:flex;gap:0;font-size:11px;color:#ccc;height:240px">
+          <div style="width:180px;border-right:1px solid #222;display:flex;flex-direction:column">
+            <div style="padding:8px 12px;border-bottom:1px solid #222;font-size:12px;color:#fff">Agent Config</div>
+            <div style="flex:1;padding:10px;overflow:hidden">
+              <div style="margin-bottom:10px">
+                <div style="color:#666;font-size:9px;text-transform:uppercase;margin-bottom:3px">Agent</div>
+                <div style="background:#111;border:1px solid #222;border-radius:4px;padding:5px 8px;font-size:10px;color:#fff">Coder ▾</div>
+              </div>
+              <div style="margin-bottom:10px">
+                <div style="color:#666;font-size:9px;text-transform:uppercase;margin-bottom:3px">Model</div>
+                <div style="background:#111;border:1px solid #222;border-radius:4px;padding:5px 8px;font-size:10px;color:#ccc;font-family:monospace">claude-sonnet-4-6</div>
+              </div>
+              <div style="margin-bottom:10px">
+                <div style="color:#666;font-size:9px;text-transform:uppercase;margin-bottom:3px">Environment</div>
+                <div style="background:#111;border:1px solid #222;border-radius:4px;padding:5px 8px;font-size:10px;color:#ccc">default ▾</div>
+              </div>
+              <div style="margin-bottom:10px">
+                <div style="color:#666;font-size:9px;text-transform:uppercase;margin-bottom:3px">System Prompt</div>
+                <div style="background:#111;border:1px solid #222;border-radius:4px;padding:5px 8px;font-size:10px;color:#666;height:40px">Optional...</div>
+              </div>
+              <div>
+                <div style="color:#666;font-size:9px;text-transform:uppercase;margin-bottom:3px">Resources</div>
+                <div style="background:#111;border:1px solid #222;border-radius:4px;padding:5px 8px;font-size:10px;color:#888">📎 data.csv</div>
+              </div>
+            </div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;border-right:1px solid #222">
+            <div style="padding:8px 12px;border-bottom:1px solid #222;font-size:12px;color:#fff">Chat</div>
+            <div style="flex:1;padding:10px;overflow:hidden">
+              <div style="display:flex;justify-content:flex-end;margin-bottom:6px"><div style="background:#222;border-radius:10px 10px 4px 10px;padding:6px 10px;font-size:10px;color:#ccc">Analyze this CSV</div></div>
+              <div style="display:flex;gap:5px"><div style="width:3px;height:3px;border-radius:50%;background:#a3e635;margin-top:5px"></div><div style="font-size:10px;color:#ccc">Reading the file...</div></div>
+            </div>
+            <div style="border-top:1px solid #222;padding:6px 10px;display:flex;gap:6px">
+              <div style="flex:1;background:#111;border:1px solid #222;border-radius:6px;padding:5px 8px;font-size:10px;color:#666">Message...</div>
+              <div style="width:22px;height:22px;background:#a3e635;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#000;font-size:10px">↑</div>
+            </div>
+          </div>
+          <div style="width:220px;display:flex;flex-direction:column">
+            <div style="padding:8px 12px;border-bottom:1px solid #222;display:flex;gap:8px">
+              <span style="font-size:11px;color:#fff;border-bottom:1px solid #a3e635;padding-bottom:4px">Events</span>
+              <span style="font-size:11px;color:#666">Traces</span>
+              <span style="font-size:11px;color:#666">Usage</span>
+            </div>
+            <div style="flex:1;padding:6px;overflow:hidden;font-family:monospace;font-size:9px">
+              <div style="padding:3px 5px;border-left:2px solid #333;margin-bottom:3px">
+                <span style="color:#a3e635;background:#a3e63520;padding:0px 3px;border-radius:2px;font-size:8px">user.message</span>
+              </div>
+              <div style="padding:3px 5px;border-left:2px solid #333;margin-bottom:3px">
+                <span style="color:#8b5cf6;background:#8b5cf620;padding:0px 3px;border-radius:2px;font-size:8px">agent.tool_use</span> <span style="color:#888">Read</span>
+              </div>
+              <div style="padding:3px 5px;border-left:2px solid #333;margin-bottom:3px">
+                <span style="color:#06b6d4;background:#06b6d420;padding:0px 3px;border-radius:2px;font-size:8px">agent.message</span>
+              </div>
+              <div style="padding:3px 5px;border-left:2px solid #333;margin-bottom:3px">
+                <span style="color:#f59e0b;background:#f59e0b20;padding:0px 3px;border-radius:2px;font-size:8px">status_idle</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
