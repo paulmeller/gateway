@@ -28,9 +28,8 @@ export function FileUpload({ onFileAttached }: Props) {
       // Upload file
       const formData = new FormData();
       formData.append("file", file);
-      const baseUrl = "/v1/files";
       const apiKey = useAppStore.getState().apiKey;
-      const res = await fetch(baseUrl, {
+      const res = await fetch(`/v1/files?scope_id=${sessionId}&scope_type=session`, {
         method: "POST",
         headers: { "x-api-key": apiKey },
         body: formData,
