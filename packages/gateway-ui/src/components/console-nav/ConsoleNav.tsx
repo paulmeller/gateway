@@ -86,7 +86,11 @@ function ThemeToggle() {
 
   return (
     <button
-      onClick={() => setDark((d) => !d)}
+      onClick={() => {
+        const isDark = document.documentElement.classList.toggle("dark");
+        localStorage.setItem("theme", isDark ? "dark" : "light");
+        setDark(isDark);
+      }}
       className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
       aria-label="Toggle theme"
     >
