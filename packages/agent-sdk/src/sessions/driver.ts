@@ -32,7 +32,7 @@ import { getSession, setBackendSessionId, updateSessionStatus, updateSessionMuta
 import { getAgent } from "../db/agents";
 import { getEnvironment } from "../db/environments";
 import { markUserEventProcessed, listEvents } from "../db/events";
-import { acquireForFirstTurn, installSkills } from "../containers/lifecycle";
+import { acquireForFirstTurn, installSkills, provisionResources } from "../containers/lifecycle";
 import * as pool from "../containers/pool";
 import { resolveBackend } from "../backends/registry";
 import { resolveContainerProvider } from "../providers/registry";
@@ -40,6 +40,8 @@ import { BLOCKED_ENV_KEYS } from "../providers/resolve-secrets";
 import { listEntries as listVaultEntries } from "../db/vaults";
 import { parseNDJSONLines } from "../backends/shared/ndjson";
 import type { TranslatedEvent } from "../backends/shared/translator-types";
+import { classifyError, buildErrorPayload } from "./errors";
+import { shouldRetry, incrementRetry, resetRetry, retryDelay } from "./retry";
 import type { Agent } from "../types";
 import type { ContainerProvider } from "../providers/types";
 import { resolveToolset } from "./tools";
@@ -172,6 +174,14 @@ export async function runTurn(
         await installSkills(spriteName, sp, newSkills, agent.engine);
         console.log(`[driver] ${sessionId} skills injected`);
       }
+    }
+
+    // Re-provision resources (files/repos added after container creation)
+    const freshSession = getSession(sessionId);
+    if (freshSession?.resources && freshSession.resources.length > 0) {
+      const envRow = getEnvironment(session.environment_id);
+      const sp = await resolveContainerProvider(envRow?.config?.provider);
+      await provisionResources(spriteName, freshSession.resources, sp);
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -420,10 +430,26 @@ export async function runTurn(
       aborted = true;
     } else {
       const msg = err instanceof Error ? err.message : String(err);
-      // Close the open turn span before returning — this path is reached
-      // when the NDJSON stream itself fails (translator throw, read error).
+      const classified = classifyError(msg);
+      const retry = shouldRetry(sessionId, classified);
+
+      if (retry) {
+        // Auto-retry: emit rescheduled event (with trace context), wait, then re-run
+        incrementRetry(sessionId);
+        emit("session.error", { error: { type: "server_error", message: msg, classified } });
+        emit("session.status_rescheduled", { retry_attempt: retry.attempt, retry_delay_ms: retry.delayMs });
+        runtime.inFlightRuns.delete(sessionId);
+        await retryDelay(retry.delayMs);
+        // Re-run the turn (recursive call with original inputs + incremented depth)
+        return runTurn(sessionId, inputs, _depth + 1, parentTrace);
+      }
+
+      // Not retryable or exhausted — close the open turn span before returning.
+      // This path is reached when the NDJSON stream itself fails (translator
+      // throw, read error, or exhausted retries).
       emit("span.model_request_end", { model: agent.model, model_usage: null, status: "error" });
-      emit("session.error", { error: { type: "server_error", message: msg } });
+      const retryStatus = classified.retryable ? "exhausted" : "terminal";
+      emit("session.error", { error: buildErrorPayload(classified, retryStatus) });
       emit("session.status_idle", { stop_reason: "error" });
       updateSessionStatus(sessionId, "idle", "error");
       runtime.inFlightRuns.delete(sessionId);
@@ -528,6 +554,7 @@ export async function runTurn(
   );
   emit("session.status_idle", { stop_reason: stopReason }, { at: now });
   updateSessionStatus(sessionId, "idle", stopReason);
+  resetRetry(sessionId); // Clear retry counter on successful completion
   console.log(`[driver] ${sessionId} turn complete: stop_reason=${stopReason}`);
   setIdleSince(sessionId, now);
 

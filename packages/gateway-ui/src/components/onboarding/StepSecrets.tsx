@@ -139,10 +139,7 @@ export function StepSecrets({ engine, model, provider, hasExistingVaults, onNext
               </div>
             ))}
           </div>
-          <div className="flex gap-3">
-            <Button variant="ghost" className="flex-1 h-10 text-sm text-muted-foreground hover:text-foreground ring-1 ring-border" onClick={onSkip}>Skip</Button>
-            <Button className="flex-1 h-10 bg-cta-gradient text-sm font-medium text-black hover:opacity-90" onClick={() => onNext(values)}>Save & Continue</Button>
-          </div>
+          <Button className="w-full h-10 bg-cta-gradient text-sm font-medium text-black hover:opacity-90" onClick={() => onNext(values)}>Save & Continue</Button>
         </>
       )}
     </div>

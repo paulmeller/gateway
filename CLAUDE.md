@@ -68,7 +68,7 @@ The turn driver (`packages/agent-sdk/src/sessions/driver.ts`) orchestrates every
 
 **Event bus** (`sessions/bus.ts`): Append-only log. DB is authoritative; EventEmitter provides live tail.
 
-**Backend interface** (`backends/types.ts`): `buildTurn()`, `createTranslator()`, `prepareOnSprite()`, `validateAgentCreation()`. Five implementations: claude, opencode, codex, gemini, factory.
+**Backend interface** (`backends/types.ts`): `buildTurn()`, `createTranslator()`, `prepareOnSprite()`, `validateAgentCreation()`. Six implementations: claude, opencode, codex, gemini, factory, pi.
 
 **Provider interface** (`providers/types.ts`): `create()`, `delete()`, `exec()`, `startExec()`. Eleven implementations: sprites (default), docker, apple-container, apple-firecracker, podman, e2b, vercel, daytona, fly, modal, mvm. Lazy dynamic imports in `providers/registry.ts`.
 

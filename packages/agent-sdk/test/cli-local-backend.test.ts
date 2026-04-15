@@ -243,7 +243,7 @@ describe("Quickstart Flow", () => {
       "MY_SECRET",
     );
     expect(entry.key).toBe("MY_SECRET");
-    expect(entry.value).toBe("supersecret");
+    expect(entry.ok).toBe(true);
 
     // 5. Create session with vault
     const { handleCreateSession } = await import("../src/handlers/sessions");
@@ -972,7 +972,7 @@ describe("Vault CLI Operations", () => {
       "MY_TOKEN",
     );
     expect(result.key).toBe("MY_TOKEN");
-    expect(result.value).toBe("tok_abc123");
+    expect(result.ok).toBe(true);
   });
 
   it("vault entries get retrieves value", async () => {

@@ -22,5 +22,8 @@
     "e2b": "^2.19.0",
     "marked": "^18.0.0",
     "modal": "^0.7.4"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.4"
   }
 }

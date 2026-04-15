@@ -34,7 +34,7 @@ export function StepEnvironment({ onNext }: Props) {
   const hasExisting = !isLoading && readyEnvs.length > 0;
   const [mode, setMode] = useState<"select" | "create">("create");
   const [selectedId, setSelectedId] = useState("");
-  const [name, setName] = useState("dev");
+  const [name, setName] = useState("default");
   const [provider, setProvider] = useState("");
 
   useEffect(() => {

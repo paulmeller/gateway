@@ -14,6 +14,7 @@ import {
   handleCreateEnvironment,
   handleListEnvironments,
   handleGetEnvironment,
+  handleUpdateEnvironment,
   handleDeleteEnvironment,
   handleArchiveEnvironment,
   handleCreateSession,
@@ -48,6 +49,7 @@ import {
   handleGetDocs,
   handleGetUI,
   handlePutSetting,
+  handleGetSetting,
   handleGetProviderStatus,
   handleGetSkillsCatalog,
   handleSearchSkills,
@@ -60,6 +62,14 @@ import {
   handleExportTrace,
   handleGetMetrics,
   handleGetApiMetrics,
+  handleUploadFile,
+  handleListFiles,
+  handleGetFile,
+  handleGetFileContent,
+  handleDeleteFile,
+  handleAddResource,
+  handleListResources,
+  handleDeleteResource,
 } from "@agentstep/agent-sdk/handlers";
 
 const app = new Hono();
@@ -90,6 +100,7 @@ app.delete("/v1/agents/:id", (c) => handleDeleteAgent(c.req.raw, c.req.param("id
 app.post("/v1/environments", (c) => handleCreateEnvironment(c.req.raw));
 app.get("/v1/environments", (c) => handleListEnvironments(c.req.raw));
 app.get("/v1/environments/:id", (c) => handleGetEnvironment(c.req.raw, c.req.param("id")));
+app.post("/v1/environments/:id", (c) => handleUpdateEnvironment(c.req.raw, c.req.param("id")));
 app.delete("/v1/environments/:id", (c) => handleDeleteEnvironment(c.req.raw, c.req.param("id")));
 app.post("/v1/environments/:id/archive", (c) => handleArchiveEnvironment(c.req.raw, c.req.param("id")));
 
@@ -107,6 +118,18 @@ app.get("/v1/sessions/:id/events", (c) => handleListEvents(c.req.raw, c.req.para
 
 // ── Stream (SSE) ─────────────────────────────────────────────────────────
 app.get("/v1/sessions/:id/stream", (c) => handleSessionStream(c.req.raw, c.req.param("id")));
+
+// ── Session Resources ───────────────────────────────────────────────────
+app.post("/v1/sessions/:id/resources", (c) => handleAddResource(c.req.raw, c.req.param("id")));
+app.get("/v1/sessions/:id/resources", (c) => handleListResources(c.req.raw, c.req.param("id")));
+app.delete("/v1/sessions/:id/resources/:rid", (c) => handleDeleteResource(c.req.raw, c.req.param("id"), c.req.param("rid")));
+
+// ── Files ────────────────────────────────────────────────────────────────
+app.post("/v1/files", (c) => handleUploadFile(c.req.raw));
+app.get("/v1/files", (c) => handleListFiles(c.req.raw));
+app.get("/v1/files/:id", (c) => handleGetFile(c.req.raw, c.req.param("id")));
+app.get("/v1/files/:id/content", (c) => handleGetFileContent(c.req.raw, c.req.param("id")));
+app.delete("/v1/files/:id", (c) => handleDeleteFile(c.req.raw, c.req.param("id")));
 
 // ── Threads ──────────────────────────────────────────────────────────────
 app.get("/v1/sessions/:id/threads", (c) => handleListThreads(c.req.raw, c.req.param("id")));
@@ -134,6 +157,7 @@ app.delete("/v1/memory_stores/:id/memories/:memId", (c) => handleDeleteMemory(c.
 
 // ── Settings ─────────────────────────────────────────────────────────────
 app.put("/v1/settings", (c) => handlePutSetting(c.req.raw));
+app.get("/v1/settings/:key", (c) => handleGetSetting(c.req.raw, c.req.param("key")));
 
 // ── Providers ─────────────────────────────────────────────────────────────
 app.get("/v1/providers/status", (c) => handleGetProviderStatus(c.req.raw));

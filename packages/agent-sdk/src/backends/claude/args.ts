@@ -57,6 +57,10 @@ export function buildClaudeArgs(input: BuildArgsInput): string[] {
     argv.push("--disallowed-tools", tools.disallowedTools.join(","));
   }
 
+  if (input.agent.model_config?.speed === "fast") {
+    argv.push("--fast");
+  }
+
   if (input.agent.mcp_servers && Object.keys(input.agent.mcp_servers).length > 0) {
     argv.push(
       "--mcp-config",
@@ -75,7 +79,7 @@ export function buildClaudeAuthEnv(): Record<string, string> {
   const cfg = getConfig();
   const env: Record<string, string> = {};
 
-  const token = cfg.anthropicApiKey || cfg.claudeToken;
+  const token = cfg.claudeToken || cfg.anthropicApiKey;
   if (token) {
     if (token.startsWith("sk-ant-oat")) {
       env.CLAUDE_CODE_OAUTH_TOKEN = token;

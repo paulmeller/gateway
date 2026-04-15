@@ -17,7 +17,7 @@ export function StepAgent({ onNext }: Props) {
   const hasExisting = !isLoading && agents && agents.length > 0;
   const [mode, setMode] = useState<"select" | "create">("create");
   const [selectedId, setSelectedId] = useState("");
-  const [name, setName] = useState("Coder");
+  const [name, setName] = useState("my-agent");
   const [engine, setEngine] = useState("claude");
   const [model, setModel] = useState(MODELS.claude[0]);
 

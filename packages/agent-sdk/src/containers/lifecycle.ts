@@ -248,22 +248,39 @@ export async function acquireForFirstTurn(sessionId: string): Promise<string> {
 }
 
 /**
- * Download/write resources into /tmp/resources/ in the container.
- * URIs are fetched via global fetch; text resources are written directly.
+ * Download/write resources into the container.
+ *
+ * Mount paths:
+ *   - If mount_path specified: /uploads/{mount_path}
+ *   - Otherwise: /tmp/resources/resource_{i}
+ *
+ * Resource types:
+ *   - uri: fetched via HTTP
+ *   - text: written directly
+ *   - file: read from local disk storage
+ *   - github_repository: cloned via git
  */
-async function provisionResources(
+export async function provisionResources(
   spriteName: string,
   resources: SessionResource[],
   provider: import("../providers/types").ContainerProvider,
 ): Promise<void> {
-  await provider.exec(spriteName, ["mkdir", "-p", "/tmp/resources"]);
+  await provider.exec(spriteName, ["bash", "-c", "mkdir -p /tmp/resources /uploads"]);
+  const MAX_RESOURCE_BYTES = 50 * 1024 * 1024; // 50 MB
 
   for (let i = 0; i < resources.length; i++) {
     const r = resources[i];
-    const filename = `/tmp/resources/resource_${i}`;
+    const mountTarget = r.mount_path
+      ? `/uploads/${r.mount_path}`
+      : `/tmp/resources/resource_${i}`;
+
+    // Ensure parent directory exists for mount_path
+    if (r.mount_path) {
+      const dir = mountTarget.substring(0, mountTarget.lastIndexOf("/"));
+      await provider.exec(spriteName, ["bash", "-c", `mkdir -p "${dir}"`]);
+    }
 
     if (r.type === "uri" && r.uri) {
-      const MAX_RESOURCE_BYTES = 50 * 1024 * 1024; // 50 MB
       try {
         const resp = await fetch(r.uri, { signal: AbortSignal.timeout(30000) });
         if (!resp.ok) {
@@ -272,23 +289,55 @@ async function provisionResources(
         }
         const contentLength = resp.headers.get("Content-Length");
         if (contentLength && parseInt(contentLength, 10) > MAX_RESOURCE_BYTES) {
-          console.warn(`[lifecycle] skipping resource ${r.uri}: Content-Length ${contentLength} exceeds 50 MB limit`);
+          console.warn(`[lifecycle] skipping resource ${r.uri}: too large`);
           continue;
         }
         const content = await resp.text();
         if (Buffer.byteLength(content, "utf8") > MAX_RESOURCE_BYTES) {
-          console.warn(`[lifecycle] skipping resource ${r.uri}: body size exceeds 50 MB limit`);
+          console.warn(`[lifecycle] skipping resource ${r.uri}: body too large`);
           continue;
         }
-        await provider.exec(spriteName, ["bash", "-c", `cat > ${filename}`], { stdin: content });
+        await provider.exec(spriteName, ["bash", "-c", `cat > "${mountTarget}"`], { stdin: content });
       } catch (err) {
         console.warn(`[lifecycle] failed to provision URI resource ${r.uri}:`, err);
       }
     } else if (r.type === "text" && r.content) {
       try {
-        await provider.exec(spriteName, ["bash", "-c", `cat > ${filename}`], { stdin: r.content });
+        await provider.exec(spriteName, ["bash", "-c", `cat > "${mountTarget}"`], { stdin: r.content });
       } catch (err) {
         console.warn(`[lifecycle] failed to provision text resource:`, err);
+      }
+    } else if (r.type === "file" && r.file_id) {
+      try {
+        const { getFile } = await import("../db/files");
+        const { readFile: readStoredFile } = await import("../files/storage");
+        const fileRow = getFile(r.file_id);
+        if (!fileRow) {
+          console.warn(`[lifecycle] file not found: ${r.file_id}`);
+          continue;
+        }
+        const data = readStoredFile(fileRow.storage_path);
+        if (data.length > MAX_RESOURCE_BYTES) {
+          console.warn(`[lifecycle] skipping file ${r.file_id}: too large`);
+          continue;
+        }
+        await provider.exec(spriteName, ["bash", "-c", `cat > "${mountTarget}"`], { stdin: data.toString("utf8") });
+      } catch (err) {
+        console.warn(`[lifecycle] failed to provision file resource ${r.file_id}:`, err);
+      }
+    } else if (r.type === "github_repository" && r.repository_url) {
+      try {
+        const repoDir = r.mount_path ? `/uploads/${r.mount_path}` : `/tmp/resources/repo_${i}`;
+        let gitCmd = `git clone --depth 1`;
+        if (r.branch) gitCmd += ` --branch "${r.branch}"`;
+        gitCmd += ` "${r.repository_url}" "${repoDir}"`;
+        if (r.commit) gitCmd += ` && cd "${repoDir}" && git checkout "${r.commit}"`;
+        const result = await provider.exec(spriteName, ["bash", "-c", gitCmd], { timeoutMs: 120_000 });
+        if (result.exit_code !== 0) {
+          console.warn(`[lifecycle] git clone failed for ${r.repository_url}: ${result.stderr.slice(0, 200)}`);
+        }
+      } catch (err) {
+        console.warn(`[lifecycle] failed to clone repo ${r.repository_url}:`, err);
       }
     }
   }

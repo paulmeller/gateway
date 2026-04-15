@@ -1,5 +1,5 @@
 export { handleCreateAgent, handleListAgents, handleGetAgent, handleUpdateAgent, handleDeleteAgent } from "./agents";
-export { handleCreateEnvironment, handleListEnvironments, handleGetEnvironment, handleDeleteEnvironment, handleArchiveEnvironment } from "./environments";
+export { handleCreateEnvironment, handleListEnvironments, handleGetEnvironment, handleUpdateEnvironment, handleDeleteEnvironment, handleArchiveEnvironment } from "./environments";
 export { handleCreateSession, handleListSessions, handleGetSession, handleUpdateSession, handleDeleteSession, handleArchiveSession } from "./sessions";
 export { handlePostEvents, handleListEvents } from "./events";
 export { handleSessionStream } from "./stream";
@@ -10,8 +10,10 @@ export { handleCreateMemoryStore, handleListMemoryStores, handleGetMemoryStore, 
 export { handleGetOpenApiSpec } from "./openapi";
 export { handleGetDocs } from "./docs";
 export { handleGetUI } from "./ui";
-export { handlePutSetting } from "./settings";
+export { handlePutSetting, handleGetSetting } from "./settings";
 export { handleGetProviderStatus } from "./providers";
 export { handleGetSkillsCatalog, handleSearchSkills, handleGetSkillsStats, handleGetSkillsSources, handleGetSkillsIndex, handleGetSkillsFeed } from "./skills";
 export { handleGetTrace, handleListTraces, handleExportTrace } from "./traces";
 export { handleGetMetrics, handleGetApiMetrics } from "./metrics";
+export { handleUploadFile, handleListFiles, handleGetFile, handleGetFileContent, handleDeleteFile } from "./files";
+export { handleAddResource, handleListResources, handleDeleteResource } from "./resources";

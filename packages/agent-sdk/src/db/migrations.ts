@@ -329,4 +329,46 @@ export function runMigrations(db: InstanceType<typeof Database>): void {
     `CREATE INDEX IF NOT EXISTS idx_events_trace
        ON events(trace_id) WHERE trace_id IS NOT NULL`,
   );
+
+  // Environment description and metadata
+  const envCols = db
+    .prepare(`PRAGMA table_info(environments)`)
+    .all() as Array<{ name: string }>;
+  if (!envCols.some((c) => c.name === "description")) {
+    db.exec(`ALTER TABLE environments ADD COLUMN description TEXT`);
+  }
+  if (!envCols.some((c) => c.name === "metadata_json")) {
+    db.exec(
+      `ALTER TABLE environments ADD COLUMN metadata_json TEXT NOT NULL DEFAULT '{}'`,
+    );
+  }
+
+  // model_config: per-agent model configuration (speed, etc.)
+  const avColsModelConfig = db.prepare("PRAGMA table_info(agent_versions)").all() as Array<{ name: string }>;
+  if (!avColsModelConfig.some(c => c.name === "model_config_json")) {
+    db.exec("ALTER TABLE agent_versions ADD COLUMN model_config_json TEXT NOT NULL DEFAULT '{}'");
+  }
+
+  // Files table for uploaded files
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS files (
+      id TEXT PRIMARY KEY,
+      filename TEXT NOT NULL,
+      size INTEGER NOT NULL,
+      content_type TEXT NOT NULL,
+      storage_path TEXT NOT NULL,
+      scope_type TEXT,
+      scope_id TEXT,
+      created_at INTEGER NOT NULL
+    )
+  `);
+
+  // Add scope columns to existing files table (idempotent)
+  const filesCols = db.prepare("PRAGMA table_info(files)").all() as Array<{ name: string }>;
+  if (!filesCols.some(c => c.name === "scope_type")) {
+    db.exec("ALTER TABLE files ADD COLUMN scope_type TEXT");
+  }
+  if (!filesCols.some(c => c.name === "scope_id")) {
+    db.exec("ALTER TABLE files ADD COLUMN scope_id TEXT");
+  }
 }

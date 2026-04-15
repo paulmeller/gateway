@@ -7,6 +7,7 @@ import {
   archiveEnvironment,
   deleteEnvironment,
   hasSessionsAttached,
+  updateEnvironment,
 } from "../db/environments";
 import { kickoffEnvironmentSetup } from "../containers/setup";
 import { resolveContainerProvider as resolveProvider } from "../providers/registry";
@@ -45,7 +46,16 @@ const ConfigSchema = z.object({
 const CreateSchema = z.object({
   name: z.string().min(1),
   config: ConfigSchema,
+  description: z.string().optional().nullable(),
+  metadata: z.record(z.string()).optional(),
   backend: z.enum(["anthropic"]).optional(),
+});
+
+const UpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().optional().nullable(),
+  metadata: z.record(z.string()).optional(),
+  config: ConfigSchema.optional(),
 });
 
 export function handleCreateEnvironment(request: Request): Promise<Response> {
@@ -91,6 +101,8 @@ export function handleCreateEnvironment(request: Request): Promise<Response> {
     const env = createEnvironment({
       name: parsed.data.name,
       config: parsed.data.config,
+      description: parsed.data.description ?? null,
+      metadata: parsed.data.metadata,
     });
 
     kickoffEnvironmentSetup(env.id);
@@ -160,5 +172,30 @@ export function handleArchiveEnvironment(request: Request, id: string): Promise<
     archiveEnvironment(id);
     const env = getEnvironment(id)!;
     return jsonOk(env);
+  });
+}
+
+export function handleUpdateEnvironment(request: Request, id: string): Promise<Response> {
+  return routeWrap(request, async () => {
+    if (isProxied(id)) {
+      return forwardToAnthropic(request, `/v1/environments/${id}`, {
+        body: await request.text(),
+      });
+    }
+    const existing = getEnvironment(id);
+    if (!existing) throw notFound(`environment ${id} not found`);
+
+    const rawBody = await request.text();
+    const body = rawBody ? JSON.parse(rawBody) : null;
+    const parsed = UpdateSchema.safeParse(body);
+    if (!parsed.success) throw badRequest(parsed.error.message);
+
+    const updated = updateEnvironment(id, {
+      name: parsed.data.name,
+      description: parsed.data.description,
+      metadata: parsed.data.metadata,
+      config: parsed.data.config,
+    });
+    return jsonOk(updated!);
   });
 }

@@ -10,7 +10,8 @@ import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 
 const MESSAGE_TYPES = new Set([
   "user.message", "agent.message", "agent.thinking",
-  "agent.tool_use", "agent.custom_tool_use", "agent.tool_result", "session.error",
+  "agent.tool_use", "agent.custom_tool_use", "agent.tool_result",
+  "agent.tool_confirmation_request", "session.error",
 ]);
 
 export function ChatThread() {

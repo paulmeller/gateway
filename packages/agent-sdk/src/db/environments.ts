@@ -7,7 +7,9 @@ function hydrate(row: EnvironmentRow): Environment {
   return {
     id: row.id,
     name: row.name,
+    description: row.description ?? null,
     config: JSON.parse(row.config_json) as EnvironmentConfig,
+    metadata: (row.metadata_json ? JSON.parse(row.metadata_json) : {}) as Record<string, string>,
     state: row.state,
     state_message: row.state_message,
     created_at: toIso(row.created_at),
@@ -18,17 +20,58 @@ function hydrate(row: EnvironmentRow): Environment {
 export function createEnvironment(input: {
   name: string;
   config: EnvironmentConfig;
+  description?: string | null;
+  metadata?: Record<string, string>;
 }): Environment {
   const db = getDb();
   const id = newId("env");
   const now = nowMs();
 
   db.prepare(
-    `INSERT INTO environments (id, name, config_json, state, created_at)
-     VALUES (?, ?, ?, 'preparing', ?)`,
-  ).run(id, input.name, JSON.stringify(input.config), now);
+    `INSERT INTO environments (id, name, description, config_json, metadata_json, state, created_at)
+     VALUES (?, ?, ?, ?, ?, 'preparing', ?)`,
+  ).run(
+    id,
+    input.name,
+    input.description ?? null,
+    JSON.stringify(input.config),
+    JSON.stringify(input.metadata ?? {}),
+    now,
+  );
 
   return getEnvironment(id)!;
+}
+
+export function updateEnvironment(
+  id: string,
+  updates: {
+    name?: string;
+    description?: string | null;
+    metadata?: Record<string, string>;
+    config?: EnvironmentConfig;
+  },
+): Environment | null {
+  const db = getDb();
+  const row = db
+    .prepare(`SELECT * FROM environments WHERE id = ?`)
+    .get(id) as EnvironmentRow | undefined;
+  if (!row) return null;
+
+  const newName = updates.name !== undefined ? updates.name : row.name;
+  const newDescription =
+    updates.description !== undefined ? updates.description : row.description;
+  const newConfigJson =
+    updates.config !== undefined ? JSON.stringify(updates.config) : row.config_json;
+  const newMetadataJson =
+    updates.metadata !== undefined
+      ? JSON.stringify(updates.metadata)
+      : row.metadata_json ?? "{}";
+
+  db.prepare(
+    `UPDATE environments SET name = ?, description = ?, config_json = ?, metadata_json = ? WHERE id = ?`,
+  ).run(newName, newDescription ?? null, newConfigJson, newMetadataJson, id);
+
+  return getEnvironment(id);
 }
 
 export function getEnvironment(id: string): Environment | null {

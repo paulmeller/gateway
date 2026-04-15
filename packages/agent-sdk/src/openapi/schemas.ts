@@ -118,6 +118,19 @@ export const AgentSkillSchema = registry.register(
 );
 
 // ---------------------------------------------------------------------------
+// ModelConfig
+// ---------------------------------------------------------------------------
+
+export const ModelConfigSchema = registry.register(
+  "ModelConfig",
+  z.object({
+    speed: z.enum(["standard", "fast"]).optional().openapi({
+      description: "Model speed. 'fast' enables fast mode on Claude. Only affects claude engine.",
+    }),
+  }),
+);
+
+// ---------------------------------------------------------------------------
 // Agent
 // ---------------------------------------------------------------------------
 
@@ -131,9 +144,9 @@ export const AgentSchema = registry.register(
     system: z.string().nullable(),
     tools: z.array(ToolConfigSchema),
     mcp_servers: z.record(McpServerConfigSchema),
-    engine: z.enum(["claude", "opencode", "codex", "anthropic", "gemini", "factory"]).openapi({
+    engine: z.enum(["claude", "opencode", "codex", "anthropic", "gemini", "factory", "pi"]).openapi({
       description:
-        "Which agent harness powers this agent. `claude` drives `claude -p`; `opencode` drives sst/opencode-ai's `opencode run`; `gemini` drives Google's `gemini -p`; `factory` drives Factory's `droid exec`. Immutable after agent creation.",
+        "Which agent harness powers this agent. `claude` drives `claude -p`; `opencode` drives sst/opencode-ai's `opencode run`; `gemini` drives Google's `gemini -p`; `factory` drives Factory's `droid exec`; `pi` drives the pi.dev coding agent (`pi --mode json`). Immutable after agent creation.",
     }),
     webhook_url: z.string().nullable().openapi({
       description: "URL to POST webhook notifications to. Best-effort delivery with 5s timeout.",
@@ -150,6 +163,9 @@ export const AgentSchema = registry.register(
     skills: z.array(AgentSkillSchema).openapi({
       description: "Skills injected into the container at session start. For Claude backend, written to .claude/skills/<name>/SKILL.md. For all backends, also written to .agents/skills/<name>/SKILL.md. Non-Claude backends also receive skills prepended to the system prompt.",
     }),
+    model_config: ModelConfigSchema.openapi({
+      description: "Model configuration options. 'fast' speed enables fast mode on Claude (claude engine only).",
+    }),
     created_at: IsoTimestamp,
     updated_at: IsoTimestamp,
   }),
@@ -164,9 +180,9 @@ export const CreateAgentRequestSchema = registry.register(
       system: z.string().nullish().openapi({ example: "You are a helpful assistant." }),
       tools: z.array(ToolConfigSchema).optional(),
       mcp_servers: z.record(McpServerConfigSchema).optional(),
-      engine: z.enum(["claude", "opencode", "codex", "anthropic", "gemini", "factory"]).optional().openapi({
+      engine: z.enum(["claude", "opencode", "codex", "anthropic", "gemini", "factory", "pi"]).optional().openapi({
         description:
-          "Agent harness. Defaults to `claude`. Opencode agents must set `model` to a `provider/model` string (e.g. `anthropic/claude-sonnet-4-6`) and must NOT declare `tools` — opencode manages its tool surface internally. Gemini agents require GEMINI_API_KEY. Factory agents require FACTORY_API_KEY.",
+          "Agent harness. Defaults to `claude`. Opencode agents must set `model` to a `provider/model` string (e.g. `anthropic/claude-sonnet-4-6`) and must NOT declare `tools` — opencode manages its tool surface internally. Gemini agents require GEMINI_API_KEY. Factory agents require FACTORY_API_KEY. Pi agents (pi.dev) require at least one of ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY.",
         example: "claude",
       }),
       webhook_url: z.string().url().optional().openapi({
@@ -183,6 +199,9 @@ export const CreateAgentRequestSchema = registry.register(
       }),
       skills: z.array(AgentSkillSchema).max(20).optional().openapi({
         description: "Skills to inject into the container at session start. Maximum 20 skills, 256KB per skill, 1MB total. For Claude: written to .claude/skills/<name>/SKILL.md. All backends: also written to .agents/skills/<name>/SKILL.md.",
+      }),
+      model_config: ModelConfigSchema.optional().openapi({
+        description: "Model configuration options. 'fast' speed enables fast mode on Claude (claude engine only).",
       }),
     })
     .openapi({
@@ -205,6 +224,9 @@ export const UpdateAgentRequestSchema = registry.register(
     mcp_servers: z.record(McpServerConfigSchema).optional(),
     skills: z.array(AgentSkillSchema).max(20).optional().openapi({
       description: "Updated skills list. Replaces the existing skills entirely.",
+    }),
+    model_config: ModelConfigSchema.optional().openapi({
+      description: "Model configuration options. 'fast' speed enables fast mode on Claude (claude engine only).",
     }),
   }),
 );
@@ -255,7 +277,13 @@ export const EnvironmentSchema = registry.register(
   z.object({
     id: UlidId,
     name: z.string(),
+    description: z.string().nullable().openapi({
+      description: "Optional human-readable description of the environment.",
+    }),
     config: EnvironmentConfigSchema,
+    metadata: z.record(z.string()).openapi({
+      description: "Key-value metadata attached to the environment. Values must be strings.",
+    }),
     state: z.enum(["preparing", "ready", "failed"]),
     state_message: z.string().nullable(),
     created_at: IsoTimestamp,
@@ -269,6 +297,12 @@ export const CreateEnvironmentRequestSchema = registry.register(
     .object({
       name: z.string().min(1).openapi({ example: "my-env" }),
       config: EnvironmentConfigSchema,
+      description: z.string().optional().nullable().openapi({
+        description: "Optional human-readable description of the environment.",
+      }),
+      metadata: z.record(z.string()).optional().openapi({
+        description: "Key-value metadata to attach to the environment. Values must be strings.",
+      }),
     })
     .openapi({
       example: {
@@ -276,6 +310,20 @@ export const CreateEnvironmentRequestSchema = registry.register(
         config: { type: "cloud", networking: { type: "unrestricted" } },
       },
     }),
+);
+
+export const UpdateEnvironmentRequestSchema = registry.register(
+  "UpdateEnvironmentRequest",
+  z.object({
+    name: z.string().min(1).optional().openapi({ example: "my-env-renamed" }),
+    description: z.string().optional().nullable().openapi({
+      description: "Update the description. Pass null to clear.",
+    }),
+    metadata: z.record(z.string()).optional().openapi({
+      description: "Replaces the metadata entirely. Values must be strings.",
+    }),
+    config: EnvironmentConfigSchema.optional(),
+  }),
 );
 
 // ---------------------------------------------------------------------------

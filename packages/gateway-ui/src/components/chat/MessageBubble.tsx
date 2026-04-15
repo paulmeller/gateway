@@ -5,6 +5,7 @@ import remarkGfm from "remark-gfm";
 import { Terminal, Brain, ChevronRight } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ToolCallCard } from "./ToolCallCard";
+import { ToolConfirmation } from "./ToolConfirmation";
 import type { SessionEvent } from "@/hooks/use-events";
 
 interface Props { event: SessionEvent; }
@@ -70,6 +71,13 @@ export function MessageBubble({ event }: Props) {
         </Accordion>
       </div>
     );
+  }
+
+  if (type === "agent.tool_confirmation_request") {
+    const toolName = (event.tool_name || "tool") as string;
+    const toolInput = event.tool_input;
+    const toolUseId = event.tool_use_id as string | undefined;
+    return <ToolConfirmation toolName={toolName} toolInput={toolInput} toolUseId={toolUseId} />;
   }
 
   if (type === "session.error") {
