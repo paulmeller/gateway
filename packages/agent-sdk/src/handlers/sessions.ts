@@ -28,9 +28,14 @@ const AgentRef = z.union([
 ]);
 
 const ResourceSchema = z.object({
-  type: z.enum(["uri", "text"]),
+  type: z.enum(["uri", "text", "file", "github_repository"]),
   uri: z.string().optional(),
   content: z.string().optional(),
+  file_id: z.string().optional(),
+  mount_path: z.string().optional(),
+  repository_url: z.string().optional(),
+  branch: z.string().optional(),
+  commit: z.string().optional(),
 });
 
 const CreateSchema = z.object({

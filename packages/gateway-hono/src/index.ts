@@ -49,6 +49,7 @@ import {
   handleGetDocs,
   handleGetUI,
   handlePutSetting,
+  handleGetSetting,
   handleGetProviderStatus,
   handleGetSkillsCatalog,
   handleSearchSkills,
@@ -150,6 +151,7 @@ app.delete("/v1/memory_stores/:id/memories/:memId", (c) => handleDeleteMemory(c.
 
 // ── Settings ─────────────────────────────────────────────────────────────
 app.put("/v1/settings", (c) => handlePutSetting(c.req.raw));
+app.get("/v1/settings/:key", (c) => handleGetSetting(c.req.raw, c.req.param("key")));
 
 // ── Providers ─────────────────────────────────────────────────────────────
 app.get("/v1/providers/status", (c) => handleGetProviderStatus(c.req.raw));

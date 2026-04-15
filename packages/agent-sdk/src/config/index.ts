@@ -31,7 +31,7 @@ const g = globalThis as GlobalCache;
 
 const CACHE_MS = 30_000;
 
-function readSetting(key: string): string | undefined {
+export function readSetting(key: string): string | undefined {
   try {
     const db = getDb();
     const row = db

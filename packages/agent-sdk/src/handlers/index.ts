@@ -10,7 +10,7 @@ export { handleCreateMemoryStore, handleListMemoryStores, handleGetMemoryStore, 
 export { handleGetOpenApiSpec } from "./openapi";
 export { handleGetDocs } from "./docs";
 export { handleGetUI } from "./ui";
-export { handlePutSetting } from "./settings";
+export { handlePutSetting, handleGetSetting } from "./settings";
 export { handleGetProviderStatus } from "./providers";
 export { handleGetSkillsCatalog, handleSearchSkills, handleGetSkillsStats, handleGetSkillsSources, handleGetSkillsIndex, handleGetSkillsFeed } from "./skills";
 export { handleUploadFile, handleListFiles, handleGetFile, handleGetFileContent, handleDeleteFile } from "./files";
