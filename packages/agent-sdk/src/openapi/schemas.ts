@@ -255,7 +255,13 @@ export const EnvironmentSchema = registry.register(
   z.object({
     id: UlidId,
     name: z.string(),
+    description: z.string().nullable().openapi({
+      description: "Optional human-readable description of the environment.",
+    }),
     config: EnvironmentConfigSchema,
+    metadata: z.record(z.string()).openapi({
+      description: "Key-value metadata attached to the environment. Values must be strings.",
+    }),
     state: z.enum(["preparing", "ready", "failed"]),
     state_message: z.string().nullable(),
     created_at: IsoTimestamp,
@@ -269,6 +275,12 @@ export const CreateEnvironmentRequestSchema = registry.register(
     .object({
       name: z.string().min(1).openapi({ example: "my-env" }),
       config: EnvironmentConfigSchema,
+      description: z.string().optional().nullable().openapi({
+        description: "Optional human-readable description of the environment.",
+      }),
+      metadata: z.record(z.string()).optional().openapi({
+        description: "Key-value metadata to attach to the environment. Values must be strings.",
+      }),
     })
     .openapi({
       example: {
@@ -276,6 +288,20 @@ export const CreateEnvironmentRequestSchema = registry.register(
         config: { type: "cloud", networking: { type: "unrestricted" } },
       },
     }),
+);
+
+export const UpdateEnvironmentRequestSchema = registry.register(
+  "UpdateEnvironmentRequest",
+  z.object({
+    name: z.string().min(1).optional().openapi({ example: "my-env-renamed" }),
+    description: z.string().optional().nullable().openapi({
+      description: "Update the description. Pass null to clear.",
+    }),
+    metadata: z.record(z.string()).optional().openapi({
+      description: "Replaces the metadata entirely. Values must be strings.",
+    }),
+    config: EnvironmentConfigSchema.optional(),
+  }),
 );
 
 // ---------------------------------------------------------------------------

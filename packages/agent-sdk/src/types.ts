@@ -83,7 +83,12 @@ export interface AgentVersionRow {
   confirmation_mode: number;
   callable_agents_json: string | null;
   skills_json: string;
+  model_config_json: string;
   created_at: number;
+}
+
+export interface ModelConfig {
+  speed?: "standard" | "fast";
 }
 
 export interface AgentSkill {
@@ -108,6 +113,7 @@ export interface Agent {
   confirmation_mode: boolean;
   callable_agents: Array<{ type: "agent"; id: string; version?: number }>;
   skills: AgentSkill[];
+  model_config: ModelConfig;
   created_at: string;
   updated_at: string;
 }
@@ -142,7 +148,9 @@ export interface EnvironmentConfig {
 export interface EnvironmentRow {
   id: string;
   name: string;
+  description: string | null;
   config_json: string;
+  metadata_json: string;
   state: EnvironmentState;
   state_message: string | null;
   template_sprite: string | null;
@@ -154,7 +162,9 @@ export interface EnvironmentRow {
 export interface Environment {
   id: string;
   name: string;
+  description: string | null;
   config: EnvironmentConfig;
+  metadata: Record<string, string>;
   state: EnvironmentState;
   state_message: string | null;
   created_at: string;

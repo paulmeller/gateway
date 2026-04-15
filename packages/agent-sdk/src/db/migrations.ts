@@ -298,4 +298,23 @@ export function runMigrations(db: InstanceType<typeof Database>): void {
   if (!avCols.some(c => c.name === "skills_json")) {
     db.exec("ALTER TABLE agent_versions ADD COLUMN skills_json TEXT NOT NULL DEFAULT '[]'");
   }
+
+  // Environment description and metadata
+  const envCols = db
+    .prepare(`PRAGMA table_info(environments)`)
+    .all() as Array<{ name: string }>;
+  if (!envCols.some((c) => c.name === "description")) {
+    db.exec(`ALTER TABLE environments ADD COLUMN description TEXT`);
+  }
+  if (!envCols.some((c) => c.name === "metadata_json")) {
+    db.exec(
+      `ALTER TABLE environments ADD COLUMN metadata_json TEXT NOT NULL DEFAULT '{}'`,
+    );
+  }
+
+  // model_config: per-agent model configuration (speed, etc.)
+  const avColsModelConfig = db.prepare("PRAGMA table_info(agent_versions)").all() as Array<{ name: string }>;
+  if (!avColsModelConfig.some(c => c.name === "model_config_json")) {
+    db.exec("ALTER TABLE agent_versions ADD COLUMN model_config_json TEXT NOT NULL DEFAULT '{}'");
+  }
 }

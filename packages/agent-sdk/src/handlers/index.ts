@@ -1,5 +1,5 @@
 export { handleCreateAgent, handleListAgents, handleGetAgent, handleUpdateAgent, handleDeleteAgent } from "./agents";
-export { handleCreateEnvironment, handleListEnvironments, handleGetEnvironment, handleDeleteEnvironment, handleArchiveEnvironment } from "./environments";
+export { handleCreateEnvironment, handleListEnvironments, handleGetEnvironment, handleUpdateEnvironment, handleDeleteEnvironment, handleArchiveEnvironment } from "./environments";
 export { handleCreateSession, handleListSessions, handleGetSession, handleUpdateSession, handleDeleteSession, handleArchiveSession } from "./sessions";
 export { handlePostEvents, handleListEvents } from "./events";
 export { handleSessionStream } from "./stream";

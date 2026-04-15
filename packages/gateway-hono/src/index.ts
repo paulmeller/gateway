@@ -14,6 +14,7 @@ import {
   handleCreateEnvironment,
   handleListEnvironments,
   handleGetEnvironment,
+  handleUpdateEnvironment,
   handleDeleteEnvironment,
   handleArchiveEnvironment,
   handleCreateSession,
@@ -84,6 +85,7 @@ app.delete("/v1/agents/:id", (c) => handleDeleteAgent(c.req.raw, c.req.param("id
 app.post("/v1/environments", (c) => handleCreateEnvironment(c.req.raw));
 app.get("/v1/environments", (c) => handleListEnvironments(c.req.raw));
 app.get("/v1/environments/:id", (c) => handleGetEnvironment(c.req.raw, c.req.param("id")));
+app.post("/v1/environments/:id", (c) => handleUpdateEnvironment(c.req.raw, c.req.param("id")));
 app.delete("/v1/environments/:id", (c) => handleDeleteEnvironment(c.req.raw, c.req.param("id")));
 app.post("/v1/environments/:id/archive", (c) => handleArchiveEnvironment(c.req.raw, c.req.param("id")));
 
