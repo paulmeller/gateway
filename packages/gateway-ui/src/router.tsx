@@ -18,9 +18,9 @@ import { useEffect } from "react";
 
 function RootLayout() {
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-background text-foreground">
       <ConsoleNav />
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto bg-background">
         <Outlet />
       </main>
     </div>

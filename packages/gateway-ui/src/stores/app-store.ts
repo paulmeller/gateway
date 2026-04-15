@@ -109,7 +109,7 @@ export const useAppStore = create<AppState>((set) => ({
       const sid = useAppStore.getState().activeSessionId;
       window.history.pushState(null, "", sid ? `/sessions/${sid}` : "/");
     }
-    set({ settingsOpen: open });
+    set({ settingsOpen: open, dashboardOpen: open ? false : useAppStore.getState().dashboardOpen });
   },
   sidebarOpen: true,
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
