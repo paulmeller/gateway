@@ -213,9 +213,14 @@ export interface SessionRow {
 }
 
 export interface SessionResource {
-  type: "uri" | "text";
+  type: "uri" | "text" | "file" | "github_repository";
   uri?: string;
   content?: string;
+  file_id?: string;
+  mount_path?: string;
+  repository_url?: string;
+  branch?: string;
+  commit?: string;
 }
 
 export interface Session {

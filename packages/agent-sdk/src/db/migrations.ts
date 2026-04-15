@@ -317,4 +317,16 @@ export function runMigrations(db: InstanceType<typeof Database>): void {
   if (!avColsModelConfig.some(c => c.name === "model_config_json")) {
     db.exec("ALTER TABLE agent_versions ADD COLUMN model_config_json TEXT NOT NULL DEFAULT '{}'");
   }
+
+  // Files table for uploaded files
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS files (
+      id TEXT PRIMARY KEY,
+      filename TEXT NOT NULL,
+      size INTEGER NOT NULL,
+      content_type TEXT NOT NULL,
+      storage_path TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    )
+  `);
 }

@@ -13,3 +13,5 @@ export { handleGetUI } from "./ui";
 export { handlePutSetting } from "./settings";
 export { handleGetProviderStatus } from "./providers";
 export { handleGetSkillsCatalog, handleSearchSkills, handleGetSkillsStats, handleGetSkillsSources, handleGetSkillsIndex, handleGetSkillsFeed } from "./skills";
+export { handleUploadFile, handleListFiles, handleGetFile, handleGetFileContent, handleDeleteFile } from "./files";
+export { handleAddResource, handleListResources, handleDeleteResource } from "./resources";

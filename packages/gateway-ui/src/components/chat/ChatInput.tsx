@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { ArrowUp, Square, AlertTriangle } from "lucide-react";
+import { FileUpload } from "./FileUpload";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAppStore } from "@/stores/app-store";
@@ -68,6 +69,7 @@ export function ChatInput() {
         </div>
       )}
       <div className="mx-auto flex max-w-3xl items-end gap-2">
+        <FileUpload />
         <Textarea
           ref={textareaRef}
           value={text}

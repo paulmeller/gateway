@@ -56,6 +56,14 @@ import {
   handleGetSkillsSources,
   handleGetSkillsIndex,
   handleGetSkillsFeed,
+  handleUploadFile,
+  handleListFiles,
+  handleGetFile,
+  handleGetFileContent,
+  handleDeleteFile,
+  handleAddResource,
+  handleListResources,
+  handleDeleteResource,
 } from "@agentstep/agent-sdk/handlers";
 
 const app = new Hono();
@@ -103,6 +111,18 @@ app.get("/v1/sessions/:id/events", (c) => handleListEvents(c.req.raw, c.req.para
 
 // ── Stream (SSE) ─────────────────────────────────────────────────────────
 app.get("/v1/sessions/:id/stream", (c) => handleSessionStream(c.req.raw, c.req.param("id")));
+
+// ── Session Resources ───────────────────────────────────────────────────
+app.post("/v1/sessions/:id/resources", (c) => handleAddResource(c.req.raw, c.req.param("id")));
+app.get("/v1/sessions/:id/resources", (c) => handleListResources(c.req.raw, c.req.param("id")));
+app.delete("/v1/sessions/:id/resources/:rid", (c) => handleDeleteResource(c.req.raw, c.req.param("id"), c.req.param("rid")));
+
+// ── Files ────────────────────────────────────────────────────────────────
+app.post("/v1/files", (c) => handleUploadFile(c.req.raw));
+app.get("/v1/files", (c) => handleListFiles(c.req.raw));
+app.get("/v1/files/:id", (c) => handleGetFile(c.req.raw, c.req.param("id")));
+app.get("/v1/files/:id/content", (c) => handleGetFileContent(c.req.raw, c.req.param("id")));
+app.delete("/v1/files/:id", (c) => handleDeleteFile(c.req.raw, c.req.param("id")));
 
 // ── Threads ──────────────────────────────────────────────────────────────
 app.get("/v1/sessions/:id/threads", (c) => handleListThreads(c.req.raw, c.req.param("id")));
