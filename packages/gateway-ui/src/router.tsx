@@ -8,6 +8,9 @@ import { ResourcesTab } from "@/components/settings/ResourcesTab";
 import { MemoryStoresTab } from "@/components/settings/MemoryStoresTab";
 import { DashboardPage } from "@/components/dashboard/DashboardPage";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
+import { OverviewPage } from "@/components/pages/OverviewPage";
+import { SessionsPage } from "@/components/pages/SessionsPage";
+import { SessionDetailPage } from "@/components/pages/SessionDetailPage";
 import { useAppStore } from "@/stores/app-store";
 import { useEffect } from "react";
 
@@ -53,7 +56,7 @@ function placeholder(title: string) {
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  component: placeholder("Home"),
+  component: OverviewPage,
 });
 
 const agentsRoute = createRoute({
@@ -100,20 +103,15 @@ const environmentsRoute = createRoute({
 const sessionsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sessions",
-  component: placeholder("Sessions"),
+  component: SessionsPage,
 });
 
-const sessionDetailRoute = createRoute({
+export const sessionDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sessions/$id",
-  component: function SessionDetailPage() {
+  component: function SessionDetailRoute() {
     const { id } = sessionDetailRoute.useParams();
-    return (
-      <Page>
-        <h1 className="text-2xl font-semibold">Session Detail</h1>
-        <p className="mt-2 font-mono text-sm text-muted-foreground">{id}</p>
-      </Page>
-    );
+    return <SessionDetailPage id={id} />;
   },
 });
 

@@ -74,13 +74,8 @@ import {
 
 const app = new Hono();
 
-// ── Built-in Web UI (SPA — serve index for all client routes) ────────────
+// ── Built-in Web UI helper ────────────────────────────────────────────────
 const serveUI = () => handleGetUI({ apiKey: process.env.SEED_API_KEY, version: process.env.GATEWAY_VERSION, sentryDsn: process.env.SENTRY_DSN });
-app.get("/", serveUI);
-app.get("/settings", serveUI);
-app.get("/settings/agents/:id", serveUI);
-app.get("/sessions/:id", serveUI);
-app.get("/dashboard", serveUI);
 
 // ── Health ────────────────────────────────────────────────────────────────
 app.get("/api/health", (c) => c.json({ status: "ok" }));
@@ -181,5 +176,14 @@ app.post("/v1/traces/:id/export", (c) => handleExportTrace(c.req.raw, c.req.para
 // exact-match doesn't shadow it. Hono matches in registration order.
 app.get("/v1/metrics/api", (c) => handleGetApiMetrics(c.req.raw));
 app.get("/v1/metrics", (c) => handleGetMetrics(c.req.raw));
+
+// ── SPA catch-all (must be last) ────────────────────────────────────────────
+app.get("*", (c) => {
+  const path = c.req.path;
+  if (path.startsWith("/v1/") || path.startsWith("/api/")) {
+    return c.json({ error: { type: "not_found_error", message: "Not found" } }, 404);
+  }
+  return serveUI();
+});
 
 export default app;
