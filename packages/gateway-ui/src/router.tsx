@@ -1,0 +1,220 @@
+import { createRouter, createRoute, createRootRoute, Outlet } from "@tanstack/react-router";
+import { ConsoleNav } from "@/components/console-nav/ConsoleNav";
+import { AgentsTab } from "@/components/settings/AgentsTab";
+import { AgentDetailPage } from "@/components/settings/AgentDetailPage";
+import { EnvironmentsTab } from "@/components/settings/EnvironmentsTab";
+import { VaultsTab } from "@/components/settings/VaultsTab";
+import { ResourcesTab } from "@/components/settings/ResourcesTab";
+import { MemoryStoresTab } from "@/components/settings/MemoryStoresTab";
+import { DashboardPage } from "@/components/dashboard/DashboardPage";
+import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
+import { useAppStore } from "@/stores/app-store";
+import { useEffect } from "react";
+
+// ─── Root ────────────────────────────────────────────────────────────────────
+
+function RootLayout() {
+  return (
+    <div className="flex h-screen overflow-hidden">
+      <ConsoleNav />
+      <main className="flex-1 overflow-y-auto">
+        <Outlet />
+      </main>
+    </div>
+  );
+}
+
+const rootRoute = createRootRoute({
+  component: RootLayout,
+});
+
+// ─── Wrapper helper ──────────────────────────────────────────────────────────
+
+function Page({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mx-auto max-w-5xl px-6 py-6">{children}</div>
+  );
+}
+
+// ─── Placeholder factory ─────────────────────────────────────────────────────
+
+function placeholder(title: string) {
+  return function PlaceholderPage() {
+    return (
+      <Page>
+        <h1 className="text-2xl font-semibold">{title}</h1>
+      </Page>
+    );
+  };
+}
+
+// ─── Routes ──────────────────────────────────────────────────────────────────
+
+const indexRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/",
+  component: placeholder("Home"),
+});
+
+const agentsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/agents",
+  component: function AgentsPage() {
+    return (
+      <Page>
+        <AgentsTab />
+      </Page>
+    );
+  },
+});
+
+const agentDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/agents/$id",
+  component: function AgentDetailRoute() {
+    const { id } = agentDetailRoute.useParams();
+
+    useEffect(() => {
+      useAppStore.getState().setSelectedAgentId(id);
+      return () => {
+        // don't clear on unmount — AgentDetailPage reads from store
+      };
+    }, [id]);
+
+    return <AgentDetailPage />;
+  },
+});
+
+const environmentsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/environments",
+  component: function EnvironmentsPage() {
+    return (
+      <Page>
+        <EnvironmentsTab />
+      </Page>
+    );
+  },
+});
+
+const sessionsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/sessions",
+  component: placeholder("Sessions"),
+});
+
+const sessionDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/sessions/$id",
+  component: function SessionDetailPage() {
+    const { id } = sessionDetailRoute.useParams();
+    return (
+      <Page>
+        <h1 className="text-2xl font-semibold">Session Detail</h1>
+        <p className="mt-2 font-mono text-sm text-muted-foreground">{id}</p>
+      </Page>
+    );
+  },
+});
+
+const secretsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/secrets",
+  component: function SecretsPage() {
+    return (
+      <Page>
+        <VaultsTab />
+      </Page>
+    );
+  },
+});
+
+const filesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/files",
+  component: function FilesPage() {
+    return (
+      <Page>
+        <ResourcesTab />
+      </Page>
+    );
+  },
+});
+
+const skillsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/skills",
+  component: placeholder("Skills"),
+});
+
+const memoryRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/memory",
+  component: function MemoryPage() {
+    return (
+      <Page>
+        <MemoryStoresTab />
+      </Page>
+    );
+  },
+});
+
+const playgroundRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/playground",
+  component: placeholder("Playground coming soon"),
+});
+
+const dashboardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/dashboard",
+  component: DashboardPage,
+});
+
+const docsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/docs",
+  component: placeholder("API Docs"),
+});
+
+const apiKeysRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/api-keys",
+  component: placeholder("API Keys"),
+});
+
+const quickstartRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/quickstart",
+  component: OnboardingWizard,
+});
+
+// ─── Route tree ───────────────────────────────────────────────────────────────
+
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  agentsRoute,
+  agentDetailRoute,
+  environmentsRoute,
+  sessionsRoute,
+  sessionDetailRoute,
+  secretsRoute,
+  filesRoute,
+  skillsRoute,
+  memoryRoute,
+  playgroundRoute,
+  dashboardRoute,
+  docsRoute,
+  apiKeysRoute,
+  quickstartRoute,
+]);
+
+// ─── Router ───────────────────────────────────────────────────────────────────
+
+export const router = createRouter({ routeTree });
+
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: typeof router;
+  }
+}
