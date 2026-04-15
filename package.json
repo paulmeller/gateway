@@ -1,0 +1,30 @@
+{
+  "name": "managed-agents",
+  "private": true,
+  "workspaces": [
+    "packages/agent-sdk",
+    "packages/gateway",
+    "packages/gateway-hono",
+    "packages/gateway-fastify",
+    "packages/gateway-next",
+    "packages/gateway-ui"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @agentstep/gateway-hono",
+    "dev:next": "npm run dev -w @agentstep/gateway-next",
+    "build": "npm run build -w @agentstep/gateway-next",
+    "test": "npm test -w @agentstep/agent-sdk",
+    "typecheck": "npm run typecheck -w @agentstep/agent-sdk",
+    "build:ui": "npm run build -w @agentstep/gateway-ui && npx tsx scripts/build-ui.ts"
+  },
+  "dependencies": {
+    "@vercel/sandbox": "^1.9.3",
+    "e2b": "^2.19.0",
+    "marked": "^18.0.0",
+    "modal": "^0.7.4"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.4"
+  },
+  "version": "0.3.2"
+}

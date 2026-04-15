@@ -1,0 +1,43 @@
+export const MODELS: Record<string, string[]> = {
+  claude: ["claude-sonnet-4-6", "claude-opus-4-6", "claude-haiku-4-5"],
+  opencode: ["anthropic/claude-sonnet-4-6", "anthropic/claude-opus-4-6", "openai/gpt-5.4", "openai/gpt-5.4-mini"],
+  codex: ["gpt-5.4-mini", "gpt-5.4", "gpt-5.3-codex"],
+  gemini: ["gemini-3.1-pro-preview", "gemini-3.1-flash-preview", "gemini-2.5-pro", "gemini-2.5-flash"],
+  factory: ["claude-sonnet-4-6", "claude-opus-4-6", "gpt-5.4", "gemini-3.1-pro-preview"],
+  pi: ["anthropic/claude-sonnet-4-6", "anthropic/claude-opus-4-6", "openai/gpt-5.4", "google/gemini-2.5-flash"],
+};
+
+export const ENGINES = Object.keys(MODELS);
+
+export const LOCAL_PROVIDERS = ["docker", "apple-container", "podman"] as const;
+export const CLOUD_PROVIDERS = ["sprites", "e2b", "vercel", "daytona", "fly", "modal"] as const;
+export const PROVIDERS = [...LOCAL_PROVIDERS, ...CLOUD_PROVIDERS] as const;
+
+export const PROVIDER_TOKENS: Record<string, { key: string; label: string; placeholder: string }> = {
+  sprites: { key: "SPRITE_TOKEN", label: "Sprites.dev Token", placeholder: "user/org/.../token" },
+  e2b: { key: "E2B_API_KEY", label: "E2B API Key", placeholder: "e2b_..." },
+  vercel: { key: "VERCEL_TOKEN", label: "Vercel Token", placeholder: "..." },
+  daytona: { key: "DAYTONA_API_KEY", label: "Daytona API Key", placeholder: "..." },
+  fly: { key: "FLY_API_TOKEN", label: "Fly.io API Token", placeholder: "fo1_..." },
+  modal: { key: "MODAL_TOKEN_ID", label: "Modal Token ID", placeholder: "..." },
+};
+
+export const ENGINE_KEYS: Record<string, { key: string; label: string }> = {
+  claude: { key: "ANTHROPIC_API_KEY", label: "Anthropic API Key or OAuth Token" },
+  codex: { key: "OPENAI_API_KEY", label: "OpenAI API Key" },
+  gemini: { key: "GEMINI_API_KEY", label: "Gemini API Key" },
+  factory: { key: "ANTHROPIC_API_KEY", label: "Anthropic API Key" },
+  pi: { key: "ANTHROPIC_API_KEY", label: "Anthropic API Key" },
+};
+
+/** OpenCode and pi support multiple providers — key depends on the model prefix */
+export function getEngineKey(engine: string, model: string): { key: string; label: string } | undefined {
+  if (engine === "opencode" || engine === "pi") {
+    if (model.startsWith("openai/")) return { key: "OPENAI_API_KEY", label: "OpenAI API Key" };
+    if (model.startsWith("google/") || model.startsWith("gemini/")) {
+      return { key: "GEMINI_API_KEY", label: "Gemini API Key" };
+    }
+    return { key: "ANTHROPIC_API_KEY", label: "Anthropic API Key" };
+  }
+  return ENGINE_KEYS[engine];
+}

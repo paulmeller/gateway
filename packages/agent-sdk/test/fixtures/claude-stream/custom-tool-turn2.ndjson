@@ -1,0 +1,3 @@
+{"type":"system","subtype":"init","session_id":"cc_sess_fixture_01","model":"claude-sonnet-4-6","tools":["get_weather"],"mcp_servers":[]}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Sydney is 18°C and sunny."}]}}
+{"type":"result","subtype":"success","session_id":"cc_sess_fixture_01","num_turns":2,"total_cost_usd":0.002,"usage":{"input_tokens":55,"output_tokens":18,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}
