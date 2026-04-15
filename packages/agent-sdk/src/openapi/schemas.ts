@@ -118,6 +118,19 @@ export const AgentSkillSchema = registry.register(
 );
 
 // ---------------------------------------------------------------------------
+// ModelConfig
+// ---------------------------------------------------------------------------
+
+export const ModelConfigSchema = registry.register(
+  "ModelConfig",
+  z.object({
+    speed: z.enum(["standard", "fast"]).optional().openapi({
+      description: "Model speed. 'fast' enables fast mode on Claude. Only affects claude engine.",
+    }),
+  }),
+);
+
+// ---------------------------------------------------------------------------
 // Agent
 // ---------------------------------------------------------------------------
 
@@ -149,6 +162,9 @@ export const AgentSchema = registry.register(
     }),
     skills: z.array(AgentSkillSchema).openapi({
       description: "Skills injected into the container at session start. For Claude backend, written to .claude/skills/<name>/SKILL.md. For all backends, also written to .agents/skills/<name>/SKILL.md. Non-Claude backends also receive skills prepended to the system prompt.",
+    }),
+    model_config: ModelConfigSchema.openapi({
+      description: "Model configuration options. 'fast' speed enables fast mode on Claude (claude engine only).",
     }),
     created_at: IsoTimestamp,
     updated_at: IsoTimestamp,
@@ -184,6 +200,9 @@ export const CreateAgentRequestSchema = registry.register(
       skills: z.array(AgentSkillSchema).max(20).optional().openapi({
         description: "Skills to inject into the container at session start. Maximum 20 skills, 256KB per skill, 1MB total. For Claude: written to .claude/skills/<name>/SKILL.md. All backends: also written to .agents/skills/<name>/SKILL.md.",
       }),
+      model_config: ModelConfigSchema.optional().openapi({
+        description: "Model configuration options. 'fast' speed enables fast mode on Claude (claude engine only).",
+      }),
     })
     .openapi({
       example: {
@@ -205,6 +224,9 @@ export const UpdateAgentRequestSchema = registry.register(
     mcp_servers: z.record(McpServerConfigSchema).optional(),
     skills: z.array(AgentSkillSchema).max(20).optional().openapi({
       description: "Updated skills list. Replaces the existing skills entirely.",
+    }),
+    model_config: ModelConfigSchema.optional().openapi({
+      description: "Model configuration options. 'fast' speed enables fast mode on Claude (claude engine only).",
     }),
   }),
 );

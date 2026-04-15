@@ -57,6 +57,10 @@ export function buildClaudeArgs(input: BuildArgsInput): string[] {
     argv.push("--disallowed-tools", tools.disallowedTools.join(","));
   }
 
+  if (input.agent.model_config?.speed === "fast") {
+    argv.push("--fast");
+  }
+
   if (input.agent.mcp_servers && Object.keys(input.agent.mcp_servers).length > 0) {
     argv.push(
       "--mcp-config",

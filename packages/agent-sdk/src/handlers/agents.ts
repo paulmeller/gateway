@@ -40,6 +40,10 @@ const McpServerSchema = z.record(
   }),
 );
 
+const ModelConfigSchema = z.object({
+  speed: z.enum(["standard", "fast"]).optional(),
+});
+
 const CreateSchema = z.object({
   name: z.string().min(1),
   model: z.string().min(1),
@@ -57,6 +61,7 @@ const CreateSchema = z.object({
     version: z.number().int().optional(),
   })).optional(),
   skills: z.array(SkillSchema).max(20).optional(),
+  model_config: ModelConfigSchema.optional(),
 }).refine(data => {
   if (!data.skills) return true;
   const total = data.skills.reduce((sum, s) => sum + s.content.length, 0);
@@ -78,6 +83,7 @@ const UpdateSchema = z.object({
     version: z.number().int().optional(),
   })).optional(),
   skills: z.array(SkillSchema).max(20).optional(),
+  model_config: ModelConfigSchema.optional(),
 }).refine(data => {
   if (!data.skills) return true;
   const total = data.skills.reduce((sum, s) => sum + s.content.length, 0);
@@ -142,6 +148,7 @@ export function handleCreateAgent(request: Request): Promise<Response> {
         ...s,
         installed_at: s.installed_at ?? nowIso,
       })),
+      model_config: parsed.data.model_config,
     });
     return jsonOk(agent, 201);
   });
@@ -207,6 +214,7 @@ export function handleUpdateAgent(request: Request, id: string): Promise<Respons
         ...s,
         installed_at: s.installed_at ?? nowIso,
       })),
+      model_config: parsed.data.model_config,
     });
     if (!updated) throw notFound(`agent ${id} not found`);
     return jsonOk(updated);
