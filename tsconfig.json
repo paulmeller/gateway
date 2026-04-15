@@ -1,0 +1,8 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/agent-sdk" },
+    { "path": "packages/gateway-next" },
+    { "path": "packages/gateway-hono" }
+  ]
+}

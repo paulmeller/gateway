@@ -1,0 +1,5 @@
+{"type":"thread.started","thread_id":"019d769f-b31a-7a60-b657-d81f76a47bbc"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_1","type":"command_execution","command":"echo hello","output":"hello\n"}}
+{"type":"item.completed","item":{"id":"item_2","type":"agent_message","text":"I ran the echo command and it returned hello."}}
+{"type":"turn.completed","usage":{"input_tokens":200,"cached_input_tokens":0,"output_tokens":30}}

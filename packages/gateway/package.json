@@ -1,0 +1,45 @@
+{
+  "name": "@agentstep/gateway",
+  "version": "0.3.1",
+  "description": "AgentStep Gateway — CLI for managing AI agents across multiple LLM backends",
+  "type": "module",
+  "bin": {
+    "gateway": "./dist/gateway.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node build.js",
+    "prepublishOnly": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agentstep/managed-agents.git",
+    "directory": "packages/gateway"
+  },
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.2.0",
+    "cbor-x": "^1.6.0",
+    "libsql": "^0.5.29"
+  },
+  "devDependencies": {
+    "@agentstep/agent-sdk": "*",
+    "@agentstep/gateway-hono": "*",
+    "@hono/node-server": "^1.14.0",
+    "@types/node": "^24.0.0",
+    "chalk": "^5.4.1",
+    "cli-table3": "^0.6.5",
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.7",
+    "esbuild": "^0.25.12",
+    "ora": "^8.2.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.3",
+    "yaml": "^2.7.1"
+  }
+}

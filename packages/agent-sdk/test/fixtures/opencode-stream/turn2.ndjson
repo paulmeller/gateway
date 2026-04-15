@@ -1,0 +1,3 @@
+{"type":"step_start","sessionID":"ses_fixture_01","part":{}}
+{"type":"text","sessionID":"ses_fixture_01","part":{"text":"You said hello."}}
+{"type":"step_finish","sessionID":"ses_fixture_01","part":{"reason":"stop","cost":0.00055,"tokens":{"input":56,"output":9}}}

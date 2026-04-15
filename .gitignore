@@ -1,0 +1,30 @@
+node_modules/
+.next/
+.turbo/
+*.tsbuildinfo
+*.DS_Store
+dist/
+
+# Env files (may contain API keys / secrets)
+.env
+.env.*
+!.env.example
+
+# Database and runtime data (generated at runtime)
+**/data/*.db*
+**/data/.api-key
+**/data/files/
+
+# Local Claude Code settings
+.claude/settings.local.json
+
+# Superpowers brainstorm artifacts (local dev tool state)
+.superpowers/
+
+# Superpowers plan/spec docs (local working docs, not project docs)
+docs/superpowers/
+
+# Test coverage and results
+coverage/
+test-results/
+**/test-results/
