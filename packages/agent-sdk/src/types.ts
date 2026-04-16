@@ -126,7 +126,7 @@ export type EnvironmentState = "preparing" | "ready" | "failed";
 
 export interface EnvironmentConfig {
   type: "cloud";
-  provider?: "sprites" | "docker" | "apple-container" | "apple-firecracker" | "podman" | "e2b" | "vercel" | "daytona" | "fly" | "modal" | "mvm";
+  provider?: "sprites" | "docker" | "apple-container" | "apple-firecracker" | "podman" | "e2b" | "vercel" | "daytona" | "fly" | "modal" | "mvm" | "anthropic";
   packages?: {
     apt?: string[];
     cargo?: string[];

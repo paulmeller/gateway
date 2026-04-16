@@ -10,10 +10,11 @@ export const MODELS: Record<string, string[]> = {
 export const ENGINES = Object.keys(MODELS);
 
 export const LOCAL_PROVIDERS = ["docker", "apple-container", "podman"] as const;
-export const CLOUD_PROVIDERS = ["sprites", "e2b", "vercel", "daytona", "fly", "modal"] as const;
+export const CLOUD_PROVIDERS = ["anthropic", "sprites", "e2b", "vercel", "daytona", "fly", "modal"] as const;
 export const PROVIDERS = [...LOCAL_PROVIDERS, ...CLOUD_PROVIDERS] as const;
 
 export const PROVIDER_TOKENS: Record<string, { key: string; label: string; placeholder: string }> = {
+  anthropic: { key: "ANTHROPIC_API_KEY", label: "Anthropic API Key", placeholder: "sk-ant-..." },
   sprites: { key: "SPRITE_TOKEN", label: "Sprites.dev Token", placeholder: "user/org/.../token" },
   e2b: { key: "E2B_API_KEY", label: "E2B API Key", placeholder: "e2b_..." },
   vercel: { key: "VERCEL_TOKEN", label: "Vercel Token", placeholder: "..." },

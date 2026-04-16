@@ -9,6 +9,7 @@ import { runTurn, writePermissionResponse } from "../sessions/driver";
 import { enqueueTurn } from "../queue";
 import { pushPendingUserInput, type TurnInput } from "../state";
 import { isProxied } from "../db/proxy";
+import { resolveRemoteSessionId } from "../db/sync";
 import { forwardToAnthropic } from "../proxy/forward";
 import { badRequest, notFound } from "../errors";
 import { getAgent } from "../db/agents";
@@ -58,7 +59,10 @@ const BatchSchema = z.object({
 
 export function handlePostEvents(request: Request, sessionId: string): Promise<Response> {
   return routeWrap(request, async () => {
-    if (isProxied(sessionId)) return forwardToAnthropic(request, `/v1/sessions/${sessionId}/events`);
+    if (isProxied(sessionId)) {
+      const remoteId = resolveRemoteSessionId(sessionId);
+      return forwardToAnthropic(request, `/v1/sessions/${remoteId}/events`);
+    }
     const session = getSession(sessionId);
     if (!session) throw notFound(`session ${sessionId} not found`);
 
@@ -216,7 +220,10 @@ export function handlePostEvents(request: Request, sessionId: string): Promise<R
 
 export function handleListEvents(request: Request, sessionId: string): Promise<Response> {
   return routeWrap(request, async () => {
-    if (isProxied(sessionId)) return forwardToAnthropic(request, `/v1/sessions/${sessionId}/events`);
+    if (isProxied(sessionId)) {
+      const remoteId = resolveRemoteSessionId(sessionId);
+      return forwardToAnthropic(request, `/v1/sessions/${remoteId}/events`);
+    }
     const session = getSession(sessionId);
     if (!session) throw notFound(`session ${sessionId} not found`);
 

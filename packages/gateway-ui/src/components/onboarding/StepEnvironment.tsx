@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { ModeToggle } from "./ModeToggle";
 
 const PROVIDER_DOMAINS: Record<string, string> = {
+  anthropic: "anthropic.com",
   docker: "docker.com",
   "apple-container": "apple.com",
   podman: "podman.io",

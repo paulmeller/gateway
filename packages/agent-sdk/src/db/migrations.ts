@@ -371,4 +371,16 @@ export function runMigrations(db: InstanceType<typeof Database>): void {
   if (!filesCols.some(c => c.name === "scope_id")) {
     db.exec("ALTER TABLE files ADD COLUMN scope_id TEXT");
   }
+
+  // Anthropic sync: maps local resource IDs to remote Anthropic IDs
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS anthropic_sync (
+      local_id TEXT NOT NULL,
+      resource_type TEXT NOT NULL CHECK(resource_type IN ('agent','environment','vault','session')),
+      remote_id TEXT NOT NULL,
+      synced_at INTEGER NOT NULL,
+      config_hash TEXT,
+      PRIMARY KEY (local_id, resource_type)
+    )
+  `);
 }

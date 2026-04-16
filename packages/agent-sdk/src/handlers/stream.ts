@@ -3,6 +3,7 @@ import { authenticate } from "../auth/middleware";
 import { subscribe } from "../sessions/bus";
 import { getSession } from "../db/sessions";
 import { isProxied } from "../db/proxy";
+import { resolveRemoteSessionId } from "../db/sync";
 import { forwardToAnthropic } from "../proxy/forward";
 import { toResponse, notFound } from "../errors";
 import type { ManagedEvent } from "../types";
@@ -13,7 +14,8 @@ export async function handleSessionStream(request: Request, sessionId: string): 
     await authenticate(request);
 
     if (isProxied(sessionId)) {
-      const res = await forwardToAnthropic(request, `/v1/sessions/${sessionId}/stream`);
+      const remoteId = resolveRemoteSessionId(sessionId);
+      const res = await forwardToAnthropic(request, `/v1/sessions/${remoteId}/stream`);
       const headers = new Headers(res.headers);
       headers.set("X-Accel-Buffering", "no");
       return new Response(res.body, { status: res.status, headers });
