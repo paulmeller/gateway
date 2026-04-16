@@ -1,0 +1,46 @@
+{
+  "license": "Apache-2.0",
+  "name": "@agentstep/agent-sdk",
+  "version": "0.3.5",
+  "private": false,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./queue": "./src/queue/index.ts",
+    "./config": "./src/config/index.ts",
+    "./backends/claude": "./src/backends/claude/index.ts",
+    "./backends/codex": "./src/backends/codex/index.ts",
+    "./backends/opencode": "./src/backends/opencode/index.ts",
+    "./handlers": "./src/handlers/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agentstep/gateway.git",
+    "directory": "packages/agent-sdk"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^7.3.4",
+    "@sentry/node": "^10.48.0",
+    "libsql": "^0.5.29",
+    "ulid": "^2.3.0",
+    "ws": "^8.18.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/ws": "^8.5.13",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.0"
+  }
+}
