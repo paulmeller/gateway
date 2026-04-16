@@ -13,12 +13,19 @@ export async function handleSessionStream(request: Request, sessionId: string): 
     await ensureInitialized();
     await authenticate(request);
 
+    // Sync-and-proxy sessions have a local record — serve from local event bus.
+    // Pure proxy sessions (no local record) forward to Anthropic.
     if (isProxied(sessionId)) {
-      const remoteId = resolveRemoteSessionId(sessionId);
-      const res = await forwardToAnthropic(request, `/v1/sessions/${remoteId}/stream`);
-      const headers = new Headers(res.headers);
-      headers.set("X-Accel-Buffering", "no");
-      return new Response(res.body, { status: res.status, headers });
+      const localSession = getSession(sessionId);
+      if (!localSession) {
+        // Pure proxy — forward to Anthropic
+        const remoteId = resolveRemoteSessionId(sessionId);
+        const res = await forwardToAnthropic(request, `/v1/sessions/${remoteId}/stream`);
+        const headers = new Headers(res.headers);
+        headers.set("X-Accel-Buffering", "no");
+        return new Response(res.body, { status: res.status, headers });
+      }
+      // Sync-and-proxy: fall through to local SSE below
     }
 
     const session = getSession(sessionId);

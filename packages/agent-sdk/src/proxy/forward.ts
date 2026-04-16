@@ -89,6 +89,8 @@ export async function forwardToAnthropic(
     "te",
     "trailer",
     "upgrade",
+    "content-encoding",  // Node fetch auto-decompresses; forwarding this causes ERR_CONTENT_DECODING_FAILED
+    "content-length",    // Length changes after decompression
   ]);
   const responseHeaders = new Headers();
   for (const [k, v] of res.headers) {

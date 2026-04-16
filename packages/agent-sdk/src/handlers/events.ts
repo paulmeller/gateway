@@ -11,8 +11,69 @@ import { pushPendingUserInput, type TurnInput } from "../state";
 import { isProxied } from "../db/proxy";
 import { resolveRemoteSessionId } from "../db/sync";
 import { forwardToAnthropic } from "../proxy/forward";
+import { getConfig } from "../config";
 import { badRequest, notFound } from "../errors";
 import { getAgent } from "../db/agents";
+
+/**
+ * Background-stream the remote Anthropic session and tee events into the
+ * local event bus. This powers the local SSE stream for the UI.
+ */
+async function teeRemoteStream(localSessionId: string, remoteSessionId: string): Promise<void> {
+  const cfg = getConfig();
+  if (!cfg.anthropicApiKey) return;
+
+  const res = await fetch(`https://api.anthropic.com/v1/sessions/${remoteSessionId}/stream`, {
+    headers: {
+      "x-api-key": cfg.anthropicApiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-beta": "agent-api-2026-03-01",
+      "accept": "text/event-stream",
+    },
+  });
+  if (!res.ok || !res.body) return;
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const seenIds = new Set<string>();
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // Parse SSE events from buffer
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+
+      let eventData = "";
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          eventData += line.slice(6);
+        } else if (line === "" && eventData) {
+          try {
+            const evt = JSON.parse(eventData);
+            // Dedupe — skip events already seen (stream may replay)
+            const evtId = evt.id ?? "";
+            if (evtId && seenIds.has(evtId)) { eventData = ""; continue; }
+            if (evtId) seenIds.add(evtId);
+            // Skip user events — already stored by the POST handler
+            if (evt.type === "user" || evt.type === "user.message") { eventData = ""; continue; }
+            appendEvent(localSessionId, {
+              type: evt.type ?? "unknown",
+              payload: evt,
+              origin: "server",
+              processedAt: Date.now(),
+            });
+          } catch { /* skip unparseable */ }
+          eventData = "";
+        }
+      }
+    }
+  } catch { /* stream ended */ }
+}
 import { nowMs } from "../util/clock";
 import type { EventRow } from "../types";
 
@@ -61,6 +122,34 @@ export function handlePostEvents(request: Request, sessionId: string): Promise<R
   return routeWrap(request, async () => {
     if (isProxied(sessionId)) {
       const remoteId = resolveRemoteSessionId(sessionId);
+      const localSession = getSession(sessionId);
+
+      // For sync-and-proxy sessions (local record exists), tee events into local bus
+      if (localSession) {
+        const rawBody = await request.text();
+        try {
+          const body = JSON.parse(rawBody);
+          if (body?.events) {
+            for (const evt of body.events) {
+              appendEvent(sessionId, {
+                type: evt.type === "user.message" ? "user.message" : evt.type,
+                payload: evt,
+                origin: "user",
+                processedAt: Date.now(),
+              });
+            }
+          }
+        } catch { /* best-effort */ }
+
+        // Forward to Anthropic, then tee the response stream events into local bus
+        const proxyRes = await forwardToAnthropic(request, `/v1/sessions/${remoteId}/events`, { body: rawBody });
+
+        // Background: stream remote session to capture agent responses
+        teeRemoteStream(sessionId, remoteId).catch(() => {});
+
+        return proxyRes;
+      }
+
       return forwardToAnthropic(request, `/v1/sessions/${remoteId}/events`);
     }
     const session = getSession(sessionId);
@@ -221,8 +310,13 @@ export function handlePostEvents(request: Request, sessionId: string): Promise<R
 export function handleListEvents(request: Request, sessionId: string): Promise<Response> {
   return routeWrap(request, async () => {
     if (isProxied(sessionId)) {
-      const remoteId = resolveRemoteSessionId(sessionId);
-      return forwardToAnthropic(request, `/v1/sessions/${remoteId}/events`);
+      // Sync-and-proxy sessions have local events — serve from local DB
+      const localSession = getSession(sessionId);
+      if (!localSession) {
+        const remoteId = resolveRemoteSessionId(sessionId);
+        return forwardToAnthropic(request, `/v1/sessions/${remoteId}/events`);
+      }
+      // Fall through to local handler
     }
     const session = getSession(sessionId);
     if (!session) throw notFound(`session ${sessionId} not found`);
