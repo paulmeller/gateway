@@ -29,7 +29,7 @@ import { getDb } from "../db/client";
 import { badRequest } from "../errors";
 import { snapshotApiMetrics } from "../observability/api-metrics";
 
-type GroupBy = "agent" | "environment" | "backend" | "hour" | "day" | "none";
+type GroupBy = "agent" | "environment" | "backend" | "hour" | "day" | "api_key" | "none";
 
 interface Totals {
   session_count: number;
@@ -65,7 +65,10 @@ function zeroTotals(): Totals {
 
 function parseGroupBy(raw: string | null): GroupBy {
   if (!raw) return "none";
-  if (raw === "agent" || raw === "environment" || raw === "backend" || raw === "hour" || raw === "day") {
+  if (
+    raw === "agent" || raw === "environment" || raw === "backend" ||
+    raw === "hour" || raw === "day" || raw === "api_key"
+  ) {
     return raw;
   }
   return "none";
@@ -79,6 +82,9 @@ function groupByExpr(g: GroupBy): string {
       return "s.environment_id";
     case "backend":
       return "av.backend";
+    case "api_key":
+      // Null (pre-0.4 sessions) collapses to "__unattributed__" bucket.
+      return "COALESCE(s.api_key_id, '__unattributed__')";
     case "hour":
       // SQLite strftime returns UTC bucket keys like '2026-04-14 15'
       return "strftime('%Y-%m-%dT%H:00', s.created_at/1000, 'unixepoch')";

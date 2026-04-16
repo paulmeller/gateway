@@ -264,6 +264,133 @@ describe("Scope enforcement — checkResourceScope helper", () => {
   });
 });
 
+describe("Per-key cost dashboard (PR2)", () => {
+  beforeEach(() => freshDbEnv());
+
+  it("sessions capture api_key_id from the authenticating context", async () => {
+    const { adminKey, adminId } = await bootDb();
+    const { createAgent } = await import("../src/db/agents");
+    const { handleCreateSession } = await import("../src/handlers/sessions");
+
+    const agent = createAgent({
+      name: "test",
+      model: "claude-sonnet-4-6",
+    });
+
+    // Create an environment directly in DB (bypasses provider setup)
+    const { getDb } = await import("../src/db/client");
+    const { newId } = await import("../src/util/ids");
+    const db = getDb();
+    const envId = newId("env");
+    db.prepare(
+      `INSERT INTO environments (id, name, config_json, state, created_at) VALUES (?, ?, ?, 'ready', ?)`,
+    ).run(envId, "env-test", JSON.stringify({ type: "cloud", provider: "docker" }), Date.now());
+
+    const res = await handleCreateSession(req("/v1/sessions", {
+      apiKey: adminKey,
+      body: { agent: agent.id, environment_id: envId },
+    }));
+    expect(res.status).toBe(201);
+    const session = await res.json() as { id: string };
+
+    const row = db.prepare("SELECT api_key_id FROM sessions WHERE id = ?").get(session.id) as { api_key_id: string | null };
+    expect(row.api_key_id).toBe(adminId);
+  });
+
+  it("GET /v1/metrics?group_by=api_key attributes session costs to the owning key", async () => {
+    const { adminKey, adminId } = await bootDb();
+    const { getDb } = await import("../src/db/client");
+    const { newId } = await import("../src/util/ids");
+    const { createAgent } = await import("../src/db/agents");
+    const { handleGetMetrics } = await import("../src/handlers/metrics");
+    const db = getDb();
+
+    const agent = createAgent({ name: "metrics-test", model: "claude-sonnet-4-6" });
+    const envId = newId("env");
+    db.prepare(
+      `INSERT INTO environments (id, name, config_json, state, created_at) VALUES (?, ?, ?, 'ready', ?)`,
+    ).run(envId, "env-metrics", JSON.stringify({ type: "cloud", provider: "docker" }), Date.now());
+
+    // Seed two sessions: one with api_key_id = adminId, one with null (legacy).
+    const now = Date.now();
+    const s1 = newId("sess");
+    const s2 = newId("sess");
+    db.prepare(
+      `INSERT INTO sessions (id, agent_id, agent_version, environment_id, status, metadata_json, usage_cost_usd, api_key_id, turn_count, created_at, updated_at)
+       VALUES (?, ?, 1, ?, 'idle', '{}', 1.23, ?, 2, ?, ?)`,
+    ).run(s1, agent.id, envId, adminId, now - 1000, now - 1000);
+    db.prepare(
+      `INSERT INTO sessions (id, agent_id, agent_version, environment_id, status, metadata_json, usage_cost_usd, api_key_id, turn_count, created_at, updated_at)
+       VALUES (?, ?, 1, ?, 'idle', '{}', 0.50, NULL, 1, ?, ?)`,
+    ).run(s2, agent.id, envId, now - 500, now - 500);
+
+    const res = await handleGetMetrics(req(`/v1/metrics?group_by=api_key&from=0&to=${now + 1}`, { apiKey: adminKey }));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { groups: Array<{ key: string; cost_usd: number; session_count: number }> };
+    const attributed = body.groups.find(g => g.key === adminId);
+    const unattributed = body.groups.find(g => g.key === "__unattributed__");
+    expect(attributed?.cost_usd).toBeCloseTo(1.23, 2);
+    expect(attributed?.session_count).toBe(1);
+    expect(unattributed?.cost_usd).toBeCloseTo(0.50, 2);
+    expect(unattributed?.session_count).toBe(1);
+  });
+
+  it("GET /v1/api-keys/:id/activity returns sessions + totals for the key", async () => {
+    const { adminKey, adminId } = await bootDb();
+    const { getDb } = await import("../src/db/client");
+    const { newId } = await import("../src/util/ids");
+    const { createAgent } = await import("../src/db/agents");
+    const { handleGetApiKeyActivity } = await import("../src/handlers/api_keys");
+    const db = getDb();
+    const now = Date.now();
+
+    const agent = createAgent({ name: "activity-test", model: "claude-sonnet-4-6" });
+    const envId = newId("env");
+    db.prepare(
+      `INSERT INTO environments (id, name, config_json, state, created_at) VALUES (?, ?, ?, 'ready', ?)`,
+    ).run(envId, "env-activity", JSON.stringify({ type: "cloud", provider: "docker" }), now);
+
+    // Two sessions for the admin key
+    for (let i = 0; i < 2; i++) {
+      const id = newId("sess");
+      db.prepare(
+        `INSERT INTO sessions (id, agent_id, agent_version, environment_id, status, metadata_json, usage_cost_usd, api_key_id, turn_count, created_at, updated_at)
+         VALUES (?, ?, 1, ?, 'idle', '{}', ?, ?, ?, ?, ?)`,
+      ).run(id, agent.id, envId, 0.10 * (i + 1), adminId, i + 1, now - (100 * (2 - i)), now);
+    }
+
+    const res = await handleGetApiKeyActivity(req(`/v1/api-keys/${adminId}/activity`, { apiKey: adminKey }), adminId);
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      sessions: Array<{ usage_cost_usd: number }>;
+      totals: { session_count: number; cost_usd: number; turn_count: number; error_count: number };
+    };
+    expect(body.sessions).toHaveLength(2);
+    expect(body.totals.session_count).toBe(2);
+    expect(body.totals.cost_usd).toBeCloseTo(0.30, 2);
+    expect(body.totals.turn_count).toBe(3);
+    expect(body.totals.error_count).toBe(0);
+  });
+
+  it("GET /v1/api-keys/:id/activity requires admin", async () => {
+    await bootDb();
+    const { createApiKey } = await import("../src/db/api_keys");
+    const { handleGetApiKeyActivity } = await import("../src/handlers/api_keys");
+
+    const { key: userKey, id: userId } = createApiKey({
+      name: "scoped",
+      permissions: { admin: false, scope: null },
+      rawKey: "ck_test_user_activity_1",
+    });
+
+    const res = await handleGetApiKeyActivity(
+      req(`/v1/api-keys/${userId}/activity`, { apiKey: userKey }),
+      userId,
+    );
+    expect(res.status).toBe(403);
+  });
+});
+
 describe("tenant_id passthrough (v0.5 reservation)", () => {
   beforeEach(() => freshDbEnv());
 

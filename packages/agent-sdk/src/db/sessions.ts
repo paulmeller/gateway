@@ -48,6 +48,8 @@ export function createSession(input: {
   vault_ids?: string[] | null;
   parent_session_id?: string | null;
   thread_depth?: number;
+  /** v0.4: the API key that authenticated this session creation, for cost attribution. */
+  api_key_id?: string | null;
 }): Session {
   const db = getDb();
   const id = newId("sess");
@@ -58,8 +60,8 @@ export function createSession(input: {
        id, agent_id, agent_version, environment_id, status,
        title, metadata_json, max_budget_usd, resources_json,
        vault_ids_json, parent_session_id, thread_depth,
-       created_at, updated_at
-     ) VALUES (?, ?, ?, ?, 'idle', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       api_key_id, created_at, updated_at
+     ) VALUES (?, ?, ?, ?, 'idle', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
     input.agent_id,
@@ -72,11 +74,34 @@ export function createSession(input: {
     input.vault_ids ? JSON.stringify(input.vault_ids) : null,
     input.parent_session_id ?? null,
     input.thread_depth ?? 0,
+    input.api_key_id ?? null,
     now,
     now,
   );
 
   return getSession(id)!;
+}
+
+/**
+ * List recent sessions owned by an API key. Used by the per-key activity
+ * endpoint on the admin dashboard. Ordered by created_at DESC.
+ */
+export function listSessionsByApiKey(
+  keyId: string,
+  opts: { limit?: number; offset?: number } = {},
+): Session[] {
+  const db = getDb();
+  const limit = Math.min(opts.limit ?? 50, 200);
+  const offset = opts.offset ?? 0;
+  const rows = db
+    .prepare(
+      `SELECT * FROM sessions
+        WHERE api_key_id = ?
+        ORDER BY created_at DESC
+        LIMIT ? OFFSET ?`,
+    )
+    .all(keyId, limit, offset) as SessionRow[];
+  return rows.map(hydrateSession);
 }
 
 export function getSession(id: string): Session | null {

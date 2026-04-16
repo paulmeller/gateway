@@ -207,6 +207,8 @@ export interface SessionRow {
   vault_ids_json: string | null;
   parent_session_id: string | null;
   thread_depth: number;
+  /** v0.4+: API key that authenticated the session creation. Null for pre-0.4 rows. */
+  api_key_id: string | null;
   created_at: number;
   updated_at: number;
   archived_at: number | null;

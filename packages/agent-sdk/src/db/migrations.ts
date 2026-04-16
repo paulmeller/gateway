@@ -399,4 +399,15 @@ export function runMigrations(db: InstanceType<typeof Database>): void {
   if (!apiKeyCols.some((c) => c.name === "tenant_id")) {
     db.exec(`ALTER TABLE api_keys ADD COLUMN tenant_id TEXT`);
   }
+
+  // Per-key cost attribution (v0.4 PR2). Sessions record which API key
+  // authenticated the POST /v1/sessions call. Legacy sessions remain NULL
+  // — metrics attribute them to the "__unattributed__" bucket.
+  const sessionColsApiKey = db
+    .prepare(`PRAGMA table_info(sessions)`)
+    .all() as Array<{ name: string }>;
+  if (!sessionColsApiKey.some((c) => c.name === "api_key_id")) {
+    db.exec(`ALTER TABLE sessions ADD COLUMN api_key_id TEXT`);
+  }
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_api_key_id ON sessions(api_key_id)`);
 }

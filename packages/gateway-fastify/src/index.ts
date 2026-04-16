@@ -55,6 +55,7 @@ import {
   handleGetApiKey,
   handlePatchApiKey,
   handleRevokeApiKey,
+  handleGetApiKeyActivity,
 } from "@agentstep/agent-sdk/handlers";
 
 /**
@@ -239,6 +240,11 @@ export function buildApp() {
   // ── Virtual keys (admin-only) ────────────────────────────────────────
   route(app, "post", "/v1/api-keys", handleCreateApiKey);
   route(app, "get", "/v1/api-keys", handleListApiKeys);
+  app.get("/v1/api-keys/:id/activity", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const response = await handleGetApiKeyActivity(toWebRequest(req), id);
+    await sendWebResponse(reply, response);
+  });
   app.get("/v1/api-keys/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
     const response = await handleGetApiKey(toWebRequest(req), id);

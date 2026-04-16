@@ -22,6 +22,8 @@ import {
   updateApiKeyPermissions,
   hydratePermissions,
 } from "../db/api_keys";
+import { listSessionsByApiKey } from "../db/sessions";
+import { getDb } from "../db/client";
 import type { KeyPermissions } from "../types";
 
 const ScopeSchema = z.object({
@@ -150,5 +152,54 @@ export function handleRevokeApiKey(request: Request, id: string): Promise<Respon
     const ok = revokeApiKey(id);
     if (!ok) throw notFound(`api key ${id} not found`);
     return jsonOk({ ok: true, id });
+  });
+}
+
+/**
+ * Per-key activity endpoint for the admin dashboard.
+ *
+ * Returns recent sessions (newest first, up to 50) plus aggregate totals
+ * (session count, total cost, error count) over *all* sessions the key
+ * has ever created. Admin-only.
+ */
+export function handleGetApiKeyActivity(
+  request: Request,
+  id: string,
+): Promise<Response> {
+  return routeWrap(request, async ({ auth }) => {
+    requireAdmin(auth);
+    const row = getApiKeyById(id);
+    if (!row) throw notFound(`api key ${id} not found`);
+
+    const sessions = listSessionsByApiKey(id, { limit: 50 });
+
+    // Totals across all sessions (not just the returned 50) for this key.
+    const db = getDb();
+    const totals = db
+      .prepare(
+        `SELECT COUNT(*)                         AS session_count,
+                COALESCE(SUM(usage_cost_usd), 0) AS cost_usd,
+                COALESCE(SUM(turn_count), 0)     AS turn_count
+           FROM sessions
+          WHERE api_key_id = ?`,
+      )
+      .get(id) as { session_count: number; cost_usd: number; turn_count: number };
+
+    // Error count via events table (consistent with handleGetMetrics).
+    const errorRow = db
+      .prepare(
+        `SELECT COUNT(*) AS error_count
+           FROM events e
+           JOIN sessions s ON s.id = e.session_id
+          WHERE s.api_key_id = ? AND e.type = 'session.error'`,
+      )
+      .get(id) as { error_count: number };
+
+    return jsonOk({
+      id,
+      name: row.name,
+      sessions,
+      totals: { ...totals, error_count: errorRow.error_count },
+    });
   });
 }

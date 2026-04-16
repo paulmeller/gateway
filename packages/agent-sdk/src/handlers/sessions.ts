@@ -157,6 +157,7 @@ export function handleCreateSession(request: Request): Promise<Response> {
         max_budget_usd: parsed.data.max_budget_usd ?? null,
         resources: parsed.data.resources?.length ? parsed.data.resources : null,
         vault_ids: parsed.data.vault_ids?.length ? parsed.data.vault_ids : null,
+        api_key_id: auth.keyId,
       });
 
       // Map local session → remote session, mark as proxied
@@ -181,6 +182,7 @@ export function handleCreateSession(request: Request): Promise<Response> {
       max_budget_usd: parsed.data.max_budget_usd ?? null,
       resources: parsed.data.resources?.length ? parsed.data.resources : null,
       vault_ids: parsed.data.vault_ids?.length ? parsed.data.vault_ids : null,
+      api_key_id: auth.keyId,
     });
 
     getActor(session.id);

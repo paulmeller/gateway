@@ -75,6 +75,7 @@ import {
   handleGetApiKey,
   handlePatchApiKey,
   handleRevokeApiKey,
+  handleGetApiKeyActivity,
 } from "@agentstep/agent-sdk/handlers";
 
 const app = new Hono();
@@ -226,6 +227,8 @@ app.get("/v1/metrics", (c) => handleGetMetrics(c.req.raw));
 // ── Virtual keys (admin-only) ──────────────────────────────────────────────
 app.post("/v1/api-keys", (c) => handleCreateApiKey(c.req.raw));
 app.get("/v1/api-keys", (c) => handleListApiKeys(c.req.raw));
+// :id/activity before :id so the more-specific route doesn't get shadowed.
+app.get("/v1/api-keys/:id/activity", (c) => handleGetApiKeyActivity(c.req.raw, c.req.param("id")));
 app.get("/v1/api-keys/:id", (c) => handleGetApiKey(c.req.raw, c.req.param("id")));
 app.patch("/v1/api-keys/:id", (c) => handlePatchApiKey(c.req.raw, c.req.param("id")));
 app.delete("/v1/api-keys/:id", (c) => handleRevokeApiKey(c.req.raw, c.req.param("id")));
