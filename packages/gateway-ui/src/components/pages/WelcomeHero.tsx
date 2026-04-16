@@ -6,7 +6,7 @@ import { useProviderStatus } from "@/hooks/use-providers";
 import { LOCAL_PROVIDERS, CLOUD_PROVIDERS } from "@/lib/constants";
 import { toast } from "sonner";
 
-const VERSION = "0.3.2";
+const VERSION = "0.3.3";
 const GITHUB_URL = "https://github.com/agentstep/gateway";
 
 const PROVIDER_DOMAINS: Record<string, string> = {
@@ -103,9 +103,9 @@ export function WelcomeHero({ apiKey }: Props) {
         </div>
 
         {/* ── Right column: proof panel ──────────────────────────── */}
-        <Card className="divide-y divide-border">
+        <Card className="!py-0 divide-y divide-border">
           {/* curl snippet */}
-          <CardContent className="flex flex-col gap-2">
+          <CardContent className="flex flex-col gap-2 py-4">
             <div className="flex items-center justify-between">
               <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Test it</span>
               <button
@@ -121,7 +121,7 @@ export function WelcomeHero({ apiKey }: Props) {
           </CardContent>
 
           {/* Provider status chips */}
-          <CardContent className="flex flex-col gap-2 pt-4">
+          <CardContent className="flex flex-col gap-2 py-4">
             <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Providers</span>
             <div className="flex flex-wrap gap-1.5">
               {[...LOCAL_PROVIDERS, ...CLOUD_PROVIDERS].map((p) => {
@@ -160,7 +160,7 @@ export function WelcomeHero({ apiKey }: Props) {
           </CardContent>
 
           {/* API Key */}
-          <CardContent className="flex flex-col gap-2 pt-4">
+          <CardContent className="flex flex-col gap-2 py-4">
             <span className="text-[10px] uppercase tracking-wider text-muted-foreground">API Key</span>
             <div className="flex items-center gap-2">
               <code className="flex-1 font-mono text-[11px] text-foreground bg-muted rounded px-2 py-1.5 break-all select-all">
