@@ -17,7 +17,7 @@ function getInitialRoute(): Route {
       dashboardOpen: true,
     };
   }
-  const agentMatch = path.match(/^\/settings\/agents\/(.+)$/);
+  const agentMatch = path.match(/^\/agents\/(.+)$/);
   if (agentMatch) {
     return {
       sessionId: null,
@@ -102,14 +102,10 @@ export const useAppStore = create<AppState>((set) => ({
   debugOpen: false,
   toggleDebug: () => set((s) => ({ debugOpen: !s.debugOpen })),
   selectedAgentId: initial.selectedAgentId,
-  setSelectedAgentId: (id) => {
-    if (id) {
-      window.history.pushState(null, "", `/settings/agents/${id}`);
-    } else {
-      window.history.pushState(null, "", "/settings");
-    }
-    set({ selectedAgentId: id, settingsOpen: true });
-  },
+  // URL-agnostic: callers should use the router (`navigate({to: "/agents/$id"})`).
+  // This store action only syncs the state — the agentDetailRoute's useEffect
+  // calls it with the param on navigation.
+  setSelectedAgentId: (id) => set({ selectedAgentId: id }),
   settingsOpen: initial.settingsOpen,
   setSettingsOpen: (open) => {
     if (open) {

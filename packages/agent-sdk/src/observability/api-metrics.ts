@@ -267,7 +267,9 @@ export function snapshotApiMetrics(
           if (agg.latencies.length < 30_000) agg.latencies.push(l);
         }
         minuteCount += bucket.count;
-        minuteErrors += bucket.status_4xx + bucket.status_5xx;
+        // error_count is 5xx-only: 4xx is client behavior (404 on lookups,
+        // 401 from unauthed clients, 400 from bad requests), not server health.
+        minuteErrors += bucket.status_5xx;
       }
     }
     timeline.push({
@@ -290,7 +292,8 @@ export function snapshotApiMetrics(
   for (const [route, agg] of routeAgg) {
     const sorted = [...agg.latencies].sort((a, b) => a - b);
     const mean = agg.count > 0 ? agg.latency_sum / agg.count : null;
-    const errors = agg.status_4xx + agg.status_5xx;
+    // error_rate is 5xx-only — see comment on minuteErrors above.
+    const errors = agg.status_5xx;
     routes.push({
       route,
       count: agg.count,
@@ -317,7 +320,7 @@ export function snapshotApiMetrics(
   routes.sort((a, b) => b.count - a.count);
 
   const totalSorted = allLatencies.sort((a, b) => a - b);
-  const totalErrors = total4xx + total5xx;
+  const totalErrors = total5xx;
 
   return {
     window_ms: windowMs,

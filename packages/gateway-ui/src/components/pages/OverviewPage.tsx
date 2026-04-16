@@ -67,7 +67,7 @@ export function OverviewPage() {
   const totalSessions = sessions?.length ?? 0;
   const activeSessions = sessions?.filter((s) => s.status === "active" || s.status === "running").length ?? 0;
 
-  const recentSessions = sessions?.slice(0, 8) ?? [];
+  const recentSessions = sessions?.slice(0, 20) ?? [];
   const apiKey = window.__MA_API_KEY__ ?? "";
 
   // Empty-state onboarding logic
@@ -97,38 +97,43 @@ export function OverviewPage() {
   const turns15m = agentTotals?.turn_count ?? 0;
   const errors15m = agentTotals?.error_count ?? 0;
   const cost15m = agentTotals?.cost_usd ?? 0;
-  const p95ms = apiTotals?.p95_ms ?? null;
-  const errorRate = apiTotals?.error_rate ?? 0;
   const totalRequests15m = apiTotals?.count ?? 0;
 
   // Tone thresholds
   const errorsTone: "warn" | "danger" | "neutral" = errors15m > 5 ? "danger" : errors15m > 0 ? "warn" : "neutral";
-  const p95Tone: "warn" | "danger" | "neutral" = p95ms == null ? "neutral" : p95ms > 2000 ? "danger" : p95ms > 500 ? "warn" : "neutral";
-  const errorRateTone: "warn" | "danger" | "neutral" = errorRate > 0.05 ? "danger" : errorRate > 0.01 ? "warn" : "neutral";
   const activeTone: "accent" | "neutral" = activeSessions > 0 ? "accent" : "neutral";
 
   return (
-    <div className="px-6 py-6">
-      <div className="grid grid-cols-3 gap-6">
+    <div className="flex-1 overflow-y-auto px-6 py-6">
+      <div className="grid grid-cols-3 gap-6 h-full">
         {/* Left column */}
-        <div className="col-span-2 flex flex-col gap-6">
+        <div className="col-span-2 flex flex-col gap-6 min-h-0">
           {/* Pulse tiles */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            <StatTile label="Active" value={activeSessions} tone={activeTone} />
-            <StatTile label="Turns / 15m" value={turns15m} loading={metricsLoading} />
-            <StatTile label="Errors / 15m" value={errors15m} tone={errorsTone} loading={metricsLoading} />
-            <StatTile label="Cost / 15m" value={formatUsd(cost15m)} loading={metricsLoading} />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <StatTile
-              label="API p95"
-              value={p95ms != null ? `${Math.round(p95ms)}ms` : "—"}
-              tone={p95Tone}
-              loading={metricsLoading}
+              label="Active"
+              value={activeSessions}
+              tone={activeTone}
+              info="Sessions currently running a turn. Counts sessions whose status is active or running."
             />
             <StatTile
-              label="Error rate"
-              value={`${(errorRate * 100).toFixed(1)}%`}
-              tone={errorRateTone}
+              label="Turns / 15m"
+              value={turns15m}
               loading={metricsLoading}
+              info="Agent turns completed in the last 15 minutes. A turn is one user-message → agent-response round (may include multiple tool calls)."
+            />
+            <StatTile
+              label="Errors / 15m"
+              value={errors15m}
+              tone={errorsTone}
+              loading={metricsLoading}
+              info="Agent turns that ended in an error stop reason over the last 15 minutes (separate from API 5xx errors)."
+            />
+            <StatTile
+              label="Cost / 15m"
+              value={formatUsd(cost15m)}
+              loading={metricsLoading}
+              info="Estimated model cost accrued in the last 15 minutes, summed across all agents and sessions."
             />
           </div>
 
@@ -154,12 +159,12 @@ export function OverviewPage() {
             </Card>
           </Link>
 
-          {/* Recent Activity — trimmed to 8 rows */}
-          <Card>
+          {/* Recent Activity — fills remaining vertical space */}
+          <Card className="flex-1 flex flex-col min-h-0">
             <CardHeader>
               <CardTitle>Recent Activity</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 overflow-y-auto min-h-0">
               {recentSessions.length > 0 ? (
                 <Table>
                   <TableHeader>

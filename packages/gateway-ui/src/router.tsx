@@ -59,7 +59,7 @@ function RootLayout() {
           <PageBreadcrumb />
           <SkipOnboardingButton />
         </header>
-        <div className="flex flex-1 flex-col overflow-y-auto">
+        <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
           <Outlet />
         </div>
       </SidebarInset>
@@ -157,7 +157,7 @@ const rootRoute = createRootRoute({
 
 function Page({ children }: { children: React.ReactNode }) {
   return (
-    <div className="px-6 py-6">{children}</div>
+    <div className="flex-1 overflow-y-auto px-6 py-6">{children}</div>
   );
 }
 
@@ -280,7 +280,7 @@ const playgroundSessionRoute = createRoute({
   path: "/playground/$sessionId",
   component: function PlaygroundSessionRoute() {
     const { sessionId } = playgroundSessionRoute.useParams();
-    return <div className="h-full overflow-hidden"><PlaygroundPage sessionId={sessionId} /></div>;
+    return <PlaygroundPage sessionId={sessionId} />;
   },
 });
 

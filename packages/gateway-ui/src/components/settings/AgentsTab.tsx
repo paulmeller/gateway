@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { Pencil, Trash2, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,7 +7,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useAgents, useDeleteAgent } from "@/hooks/use-agents";
-import { useAppStore } from "@/stores/app-store";
 import { CreateAgentDialog } from "./CreateAgentDialog";
 import { PageHeader } from "./PageHeader";
 
@@ -25,7 +25,8 @@ function timeAgo(ts: number | string): string {
 export function AgentsTab() {
   const { data: agents } = useAgents();
   const del = useDeleteAgent();
-  const setSelectedAgentId = useAppStore((s) => s.setSelectedAgentId);
+  const navigate = useNavigate();
+  const openAgent = (id: string) => navigate({ to: "/agents/$id", params: { id } });
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteAgent, setDeleteAgent] = useState<{ id: string; name: string } | null>(null);
 
@@ -53,7 +54,7 @@ export function AgentsTab() {
             </TableHeader>
             <TableBody>
               {agents.map((a) => (
-                <TableRow key={a.id} className="cursor-pointer" onClick={() => setSelectedAgentId(a.id)}>
+                <TableRow key={a.id} className="cursor-pointer" onClick={() => openAgent(a.id)}>
                   <TableCell className="font-mono text-xs text-muted-foreground">{a.id.slice(0, 16)}...</TableCell>
                   <TableCell className="font-medium text-foreground">{a.name}</TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{a.model}</TableCell>
@@ -67,7 +68,7 @@ export function AgentsTab() {
                           <MoreHorizontal className="size-4" />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onSelect={() => setTimeout(() => setSelectedAgentId(a.id), 0)}>
+                        <DropdownMenuItem onSelect={() => setTimeout(() => openAgent(a.id), 0)}>
                           <Pencil className="mr-2 size-3.5" /> Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive" onSelect={() => setDeleteAgent({ id: a.id, name: a.name })}>
