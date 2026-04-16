@@ -4,6 +4,17 @@ All notable changes to AgentStep Gateway are documented here. Dates are UTC.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this
 project uses [SemVer](https://semver.org/).
 
+## [0.3.6] — 2026-04-16
+
+Closes four blockers from the third-architect review:
+
+- gateway-next `x-real-ip` no longer trusted without `TRUST_PROXY=1` (same class as the original LAN leak)
+- `docker-compose.yml` volume path fixed (`/home/node/app/data`) — previously bypassed the vault-key persistence
+- Deleted 1700 lines of dead legacy static UI from the agent-sdk tarball
+- Cleaned up scrubbed attribution stubs, verbose [tee] and [lifecycle] logs gated behind DEBUG_SYNC and DEBUG_LIFECYCLE
+- Added npm metadata (keywords, homepage, bugs, author) for discoverability
+- README Packages table relabeled (4 of 6 packages are source-only, not npm)
+
 ## [0.3.5] — 2026-04-16
 
 ### Security
