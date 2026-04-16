@@ -48,7 +48,7 @@ export function DashboardPage() {
   const apiQuery = useApiMetrics({ windowMinutes: apiWindow });
 
   return (
-    <div className="px-6 py-6">
+    <div className="flex-1 overflow-y-auto px-6 py-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold text-foreground">Analytics</h1>

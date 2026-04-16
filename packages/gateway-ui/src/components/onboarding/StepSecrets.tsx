@@ -13,16 +13,20 @@ interface Props {
   provider: string;
   /** Agent ID — used to filter vaults (only this agent's vaults can be used) */
   agentId?: string | null;
+  /** Agent name — used to suggest a default vault name */
+  agentName?: string;
   hasExistingVaults?: boolean;
-  onNext: (secrets: Record<string, string>) => void;
+  onNext: (secrets: Record<string, string>, vaultName: string) => void;
   onSkip: () => void;
   onSelectVault?: (vaultId: string, vaultName: string) => void;
   onBack?: () => void;
 }
 
-export function StepSecrets({ engine, model, provider, agentId, hasExistingVaults, onNext, onSkip, onSelectVault, onBack }: Props) {
+export function StepSecrets({ engine, model, provider, agentId, agentName, hasExistingVaults, onNext, onSkip, onSelectVault, onBack }: Props) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [selectedVaultId, setSelectedVaultId] = useState("");
+  const defaultVaultName = agentName ? `${agentName}-vault` : "my-vault";
+  const [vaultName, setVaultName] = useState(defaultVaultName);
   const { data: vaults } = useVaults();
 
   // Filter vaults to only those owned by this agent (enforced server-side too)
@@ -81,6 +85,11 @@ export function StepSecrets({ engine, model, provider, agentId, hasExistingVault
     );
   }
 
+  const trimmedName = vaultName.trim();
+  const nameConflict = mode === "create"
+    && trimmedName.length > 0
+    && ownedVaults.some(v => v.name === trimmedName);
+
   function handleContinue() {
     if (mode === "select") {
       if (hasExistingVaults) {
@@ -91,7 +100,8 @@ export function StepSecrets({ engine, model, provider, agentId, hasExistingVault
         onSelectVault?.(selectedVaultId, name);
       }
     } else {
-      onNext(values);
+      if (!trimmedName || nameConflict) return;
+      onNext(values, trimmedName);
     }
   }
 
@@ -135,6 +145,18 @@ export function StepSecrets({ engine, model, provider, agentId, hasExistingVault
 
       {mode === "create" && (
         <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs text-muted-foreground">Vault name</Label>
+            <Input
+              value={vaultName}
+              onChange={(e) => setVaultName(e.target.value)}
+              placeholder={defaultVaultName}
+              className="h-10 w-full text-foreground border-border bg-muted text-sm placeholder:text-muted-foreground focus-visible:ring-ring"
+            />
+            {nameConflict && (
+              <p className="text-xs text-red-400">A vault named "{trimmedName}" already exists for this agent.</p>
+            )}
+          </div>
           {fields.map((f) => (
             <div key={f.key} className="flex flex-col gap-1.5">
               <Label className="text-xs text-muted-foreground">{f.label}</Label>
@@ -151,7 +173,10 @@ export function StepSecrets({ engine, model, provider, agentId, hasExistingVault
         <Button
           className="flex-1 h-10 bg-cta-gradient text-sm font-medium text-black hover:opacity-90"
           onClick={handleContinue}
-          disabled={mode === "select" && !hasExistingVaults && !selectedVaultId}
+          disabled={
+            (mode === "select" && !hasExistingVaults && !selectedVaultId) ||
+            (mode === "create" && (!trimmedName || nameConflict))
+          }
         >
           Continue
         </Button>

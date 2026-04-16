@@ -26,6 +26,7 @@ export function OnboardingWizard() {
   const [agentChoice, setAgentChoice] = useState<AgentChoice | null>(null);
   const [envChoice, setEnvChoice] = useState<EnvChoice | null>(null);
   const [secrets, setSecrets] = useState<Record<string, string>>({});
+  const [vaultName, setVaultName] = useState<string>("");
   const [selectedVault, setSelectedVault] = useState<{ id: string; name: string } | null>(null);
   const [existingVaultIds, setExistingVaultIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -76,8 +77,9 @@ export function OnboardingWizard() {
     setStep(2);
   }
 
-  function handleSecretsNext(s: Record<string, string>) {
+  function handleSecretsNext(s: Record<string, string>, name: string) {
     setSecrets(s);
+    setVaultName(name);
     setSelectedVault(null);
     setStep(3);
   }
@@ -151,18 +153,20 @@ export function OnboardingWizard() {
           if (existingVaultIds.length > 0) {
             vaultId = existingVaultIds[0];
           } else {
-            // Check if agent already has a "default" vault from a previous run
+            // Reuse an existing vault with the same name (idempotent retry),
+            // otherwise create a new one with the user-provided name.
+            const desiredName = vaultName.trim() || "my-vault";
             try {
               const res = await api<{ data: Array<{ id: string; name: string }> }>(`/vaults?agent_id=${agentId}`);
-              const existing = res.data.find(v => v.name === "my-vault");
+              const existing = res.data.find(v => v.name === desiredName);
               if (existing) {
                 vaultId = existing.id;
               } else {
-                const vault = await createVault.mutateAsync({ name: "my-vault", agent_id: agentId });
+                const vault = await createVault.mutateAsync({ name: desiredName, agent_id: agentId });
                 vaultId = vault.id;
               }
             } catch {
-              const vault = await createVault.mutateAsync({ name: `vault-${Date.now()}`, agent_id: agentId });
+              const vault = await createVault.mutateAsync({ name: `${desiredName}-${Date.now()}`, agent_id: agentId });
               vaultId = vault.id;
             }
           }
@@ -210,7 +214,7 @@ export function OnboardingWizard() {
     <div className="flex flex-1 items-center justify-center p-8">
       {step === 0 && <StepAgent onNext={handleAgentNext} />}
       {step === 1 && <StepEnvironment onNext={handleEnvNext} onBack={() => setStep(0)} engine={agentData.engine} />}
-      {step === 2 && <StepSecrets engine={agentData.engine} model={agentData.model} provider={envData.provider} agentId={agentChoice?.mode === "select" ? agentChoice.agent.id : null} hasExistingVaults={existingVaultIds.length > 0} onNext={handleSecretsNext} onSkip={() => setStep(3)} onSelectVault={handleSelectVault} onBack={() => setStep(1)} />}
+      {step === 2 && <StepSecrets engine={agentData.engine} model={agentData.model} provider={envData.provider} agentId={agentChoice?.mode === "select" ? agentChoice.agent.id : null} agentName={agentData.name} hasExistingVaults={existingVaultIds.length > 0} onNext={handleSecretsNext} onSkip={() => setStep(3)} onSelectVault={handleSelectVault} onBack={() => setStep(1)} />}
       {step === 3 && <StepReady agentName={agentData.name} envName={envData.name} secretsLabel={getSecretsLabel()} onStart={handleStart} loading={loading} error={error} isExistingAgent={isExistingAgent} isExistingEnv={isExistingEnv} onBack={() => setStep(2)} />}
     </div>
   );
