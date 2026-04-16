@@ -142,3 +142,20 @@ export function writeTokenSetting(envVarName: string, value: string): void {
     writeSetting(settingKey, value);
   }
 }
+
+/**
+ * Provider env var fallback — read from env first, then the settings DB.
+ * Used by provider modules so credentials stored via the quickstart
+ * wizard (which writes to settings) are picked up without the user
+ * having to re-export them on every shell.
+ *
+ * Snake-cased setting key derived from the env var name:
+ *   VERCEL_TEAM_ID → vercel_team_id
+ *   MODAL_TOKEN_SECRET → modal_token_secret
+ */
+export function readEnvOrSetting(envVarName: string): string | undefined {
+  const fromEnv = process.env[envVarName];
+  if (fromEnv) return fromEnv;
+  const settingKey = envVarName.toLowerCase();
+  return readSetting(settingKey) || undefined;
+}

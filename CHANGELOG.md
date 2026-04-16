@@ -4,6 +4,29 @@ All notable changes to AgentStep Gateway are documented here. Dates are UTC.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this
 project uses [SemVer](https://semver.org/).
 
+## [0.3.7] — 2026-04-16
+
+### Fixed
+
+- **`gateway version` printed "dev"** on the installed npm tarball
+  because the path resolver didn't know it was running from the bundled
+  `dist/`. Now tries multiple candidate paths and validates by
+  package name. Every 0.3.6 install will see "dev" until upgraded.
+- **README overclaimed `@anthropic-ai/sdk` compatibility.** The
+  upstream SDK doesn't yet expose the `managed-agents-2026-04-01` beta
+  endpoints, so the README now honestly recommends raw `fetch` / curl
+  with the `anthropic-beta` header.
+- **Quickstart Vercel/Modal/Fly fields were single-use** — non-secret
+  fields (`VERCEL_TEAM_ID`, `VERCEL_PROJECT_ID`, `MODAL_TOKEN_SECRET`,
+  `FLY_APP_NAME`) were only set on `process.env` for the quickstart's
+  lifetime. After exit, providers failed at runtime. All fields now
+  persist to the settings table. Provider modules read env→settings
+  fallback via a new `readEnvOrSetting` helper.
+- **Hono + Fastify adapters leaked the API key behind a reverse
+  proxy.** Same-host Caddy/Nginx deployments see the socket as
+  127.0.0.1 always. Honors `X-Forwarded-For` only when `TRUST_PROXY=1`
+  is set, matching the Next adapter's default-closed posture.
+
 ## [0.3.6] — 2026-04-16
 
 Closes four blockers from the third-architect review:
@@ -43,8 +66,6 @@ Closes four blockers from the third-architect review:
   SQLite DB files with vault secrets. All leaked keys have been rotated
   with their providers; the old commits and tags are removed from both
   public remotes. Single-commit history starts at v0.3.5.
-- `docker-compose.yml` volume path corrected to `/home/node/app/data`
-  (was `/app/data` — would have bypassed the volume entirely).
 
 ## [0.3.4] — 2026-04-16
 

@@ -18,6 +18,7 @@
  */
 import type { ContainerProvider, ExecOptions, ExecSession, ProviderSecrets } from "./types";
 import { shellEscape } from "./shared";
+import { readEnvOrSetting } from "../config";
 
 // Lazy-loaded SDK types matching @vercel/sandbox v1.9.x
 // stdout() and stderr() are async methods on CommandFinished, not properties.
@@ -108,7 +109,7 @@ export const vercelProvider: ContainerProvider = {
       return { available: false, message: "Vercel Sandbox requires the @vercel/sandbox package. Install with: npm install @vercel/sandbox" };
     }
     // Auth is via env vars read by the SDK automatically.
-    const hasToken = secrets?.VERCEL_TOKEN ?? process.env.VERCEL_TOKEN;
+    const hasToken = secrets?.VERCEL_TOKEN ?? readEnvOrSetting("VERCEL_TOKEN");
     const hasOidc = process.env.VERCEL_OIDC_TOKEN;
     if (!hasToken && !hasOidc) {
       return { available: false, message: "VERCEL_TOKEN required — add to vault or .env (or set VERCEL_OIDC_TOKEN)" };
@@ -123,9 +124,9 @@ export const vercelProvider: ContainerProvider = {
     // The SDK also supports VERCEL_OIDC_TOKEN / vercel link as fallback.
     const sandbox = await Sandbox.create({
       runtime,
-      token: secrets?.VERCEL_TOKEN ?? process.env.VERCEL_TOKEN,
-      teamId: secrets?.VERCEL_TEAM_ID ?? process.env.VERCEL_TEAM_ID,
-      projectId: secrets?.VERCEL_PROJECT_ID ?? process.env.VERCEL_PROJECT_ID,
+      token: secrets?.VERCEL_TOKEN ?? readEnvOrSetting("VERCEL_TOKEN"),
+      teamId: secrets?.VERCEL_TEAM_ID ?? readEnvOrSetting("VERCEL_TEAM_ID"),
+      projectId: secrets?.VERCEL_PROJECT_ID ?? readEnvOrSetting("VERCEL_PROJECT_ID"),
     });
     sandboxes.set(name, sandbox);
   },

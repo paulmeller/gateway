@@ -83,15 +83,30 @@ const app = new Hono();
 // key — the user has to paste it via the UI's "API Key" input (stored in
 // localStorage).
 //
-// Running behind a reverse proxy: we only read the raw socket address,
-// not X-Forwarded-For. If you deploy behind Caddy/Traefik/Nginx and want
-// the UI to auto-login for localhost clients, have your proxy forward
-// the request as-is OR set the TRUST_PROXY env var and rely on
-// X-Forwarded-For (not implemented today — open an issue if you need it).
+// Reverse-proxy deployments: running on the same host behind Caddy/Nginx
+// means the socket.remoteAddress is *always* 127.0.0.1 (the proxy),
+// which would otherwise cause us to inject the key for public clients.
+// Require TRUST_PROXY=1 to opt in to X-Forwarded-For honoring; without
+// it, behind-a-proxy deployments fail closed (no key injection at all).
+// The UI still works — users just paste the API key once into localStorage.
 function isLoopbackRemote(c: Context): boolean {
+  const trustProxy = process.env.TRUST_PROXY === "1";
+  if (trustProxy) {
+    // When TRUST_PROXY is set, the reverse proxy is responsible for
+    // stripping spoofed headers from incoming requests. We honor the
+    // leftmost forwarded address so loopback clients through a proxy
+    // still auto-login.
+    const forwardedFor = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
+    const realIp = c.req.header("x-real-ip");
+    const proxied = forwardedFor ?? realIp;
+    if (proxied) {
+      const addr = proxied.replace(/^::ffff:/, "");
+      return addr === "127.0.0.1" || addr === "::1" || addr === "localhost";
+    }
+  }
+  // Default: trust only the raw socket.
   const env = c.env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined;
   const raw = env?.incoming?.socket?.remoteAddress ?? "";
-  // Normalize IPv4-mapped IPv6 (::ffff:127.0.0.1) to IPv4.
   const addr = raw.replace(/^::ffff:/, "");
   return addr === "127.0.0.1" || addr === "::1" || addr === "localhost";
 }

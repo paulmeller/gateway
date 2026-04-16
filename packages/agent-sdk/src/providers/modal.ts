@@ -16,6 +16,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ContainerProvider, ProviderSecrets } from "./types";
 import { shellEscape } from "./shared";
+import { readEnvOrSetting } from "../config";
 
 // Lazy-loaded SDK types matching modal@0.7.x
 type ModalSandbox = {
@@ -74,14 +75,26 @@ type ModalClient = {
 let clientInstance: ModalClient | null = null;
 
 async function getClient(secrets?: Record<string, string>): Promise<ModalClient> {
-  // If vault secrets provide auth, create a fresh client (not cached)
-  // to avoid cross-session credential leakage.
-  if (secrets?.MODAL_TOKEN_ID || secrets?.MODAL_TOKEN_SECRET) {
+  // Resolve auth: vault secrets first, then env, then gateway settings.
+  // If any source provides creds we create a fresh client with them set
+  // on process.env for the modal SDK's lifetime; we restore the
+  // previous values in finally.
+  const resolvedId = secrets?.MODAL_TOKEN_ID ?? readEnvOrSetting("MODAL_TOKEN_ID");
+  const resolvedSecret = secrets?.MODAL_TOKEN_SECRET ?? readEnvOrSetting("MODAL_TOKEN_SECRET");
+  // Only take the "fresh client" path when we're overriding from a
+  // source other than pure process.env — otherwise the cached client
+  // path below handles it.
+  const needsOverride = Boolean(
+    secrets?.MODAL_TOKEN_ID || secrets?.MODAL_TOKEN_SECRET ||
+    (resolvedId && resolvedId !== process.env.MODAL_TOKEN_ID) ||
+    (resolvedSecret && resolvedSecret !== process.env.MODAL_TOKEN_SECRET),
+  );
+  if (needsOverride) {
     const origId = process.env.MODAL_TOKEN_ID;
     const origSecret = process.env.MODAL_TOKEN_SECRET;
     try {
-      if (secrets.MODAL_TOKEN_ID) process.env.MODAL_TOKEN_ID = secrets.MODAL_TOKEN_ID;
-      if (secrets.MODAL_TOKEN_SECRET) process.env.MODAL_TOKEN_SECRET = secrets.MODAL_TOKEN_SECRET;
+      if (resolvedId) process.env.MODAL_TOKEN_ID = resolvedId;
+      if (resolvedSecret) process.env.MODAL_TOKEN_SECRET = resolvedSecret;
       const mod = await import("modal");
       const ClientClass = (mod as any).ModalClient ?? (mod as any).default?.ModalClient;
       if (!ClientClass) throw new Error("ModalClient not found in modal exports");
@@ -151,8 +164,8 @@ export const modalProvider: ContainerProvider = {
       return { available: false, message: "Modal requires the modal npm package. Install with: npm install modal" };
     }
     // Auth is read from env vars or ~/.modal.toml by the SDK automatically
-    const hasTokenId = secrets?.MODAL_TOKEN_ID ?? process.env.MODAL_TOKEN_ID;
-    const hasTokenSecret = secrets?.MODAL_TOKEN_SECRET ?? process.env.MODAL_TOKEN_SECRET;
+    const hasTokenId = secrets?.MODAL_TOKEN_ID ?? readEnvOrSetting("MODAL_TOKEN_ID");
+    const hasTokenSecret = secrets?.MODAL_TOKEN_SECRET ?? readEnvOrSetting("MODAL_TOKEN_SECRET");
     if (!hasTokenId && !hasTokenSecret) {
       const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
       const tomlPath = process.env.MODAL_CONFIG_PATH ?? join(home, ".modal.toml");

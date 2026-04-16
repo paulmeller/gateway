@@ -8,7 +8,7 @@ Run AI coding agents in sandboxed environments — any engine, any sandbox, one 
 
 ## Why AgentStep Gateway?
 
-- **Drop-in alternative to Anthropic's Managed Agents API** — same resource model (agents, vaults, sessions, environments), same SSE event stream. Point `@anthropic-ai/sdk` at `http://localhost:4000/v1` and it just works.
+- **Drop-in alternative to Anthropic's Managed Agents API** — same resource model (agents, vaults, sessions, environments), same SSE event stream. Point any HTTP client at `http://localhost:4000/v1` with the `anthropic-beta: managed-agents-2026-04-01` header and you get the same API surface. (The `@anthropic-ai/sdk` npm package doesn't yet expose the managed-agents beta endpoints — use raw `fetch` or curl until they land upstream.)
 - **Runs on your infrastructure** — prompts, code, and outputs stay local. SQLite storage. No telemetry without consent.
 - **Any agent engine** — Claude, Codex, OpenCode, Gemini, Factory, or sync-and-proxy to Anthropic's hosted Managed Agents. One config change to switch.
 - **10 sandbox providers** — Docker, Podman, Apple Container, Apple Firecracker, Sprites (default), E2B, Vercel, Daytona, Fly, Modal.
@@ -99,7 +99,7 @@ The server packages are reference implementations. The hosted product ([agentste
 ```bash
 npm install          # install deps
 npm run dev          # Hono dev server on :4000, hot reload
-npm test             # 515 tests across agent-sdk + gateway
+npm test             # 518 tests across agent-sdk + gateway
 npm run typecheck    # tsc --noEmit
 npm run build:ui     # rebuild React UI → inline into CLI bundle
 ```

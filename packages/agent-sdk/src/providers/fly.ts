@@ -19,18 +19,19 @@
  */
 import type { ContainerProvider, ExecOptions, ExecSession, ProviderSecrets } from "./types";
 import { shellEscape } from "./shared";
+import { readEnvOrSetting } from "../config";
 
 const BASE_URL = "https://api.machines.dev";
 
 function getToken(secrets?: ProviderSecrets): string {
-  const token = secrets?.FLY_API_TOKEN ?? process.env.FLY_API_TOKEN;
-  if (!token) throw new Error("FLY_API_TOKEN required — add to vault or .env");
+  const token = secrets?.FLY_API_TOKEN ?? readEnvOrSetting("FLY_API_TOKEN");
+  if (!token) throw new Error("FLY_API_TOKEN required — add to vault, .env, or gateway settings");
   return token;
 }
 
 function getAppName(secrets?: ProviderSecrets): string {
-  const app = secrets?.FLY_APP_NAME ?? process.env.FLY_APP_NAME;
-  if (!app) throw new Error("FLY_APP_NAME required — add to vault or .env");
+  const app = secrets?.FLY_APP_NAME ?? readEnvOrSetting("FLY_APP_NAME");
+  if (!app) throw new Error("FLY_APP_NAME required — add to vault, .env, or gateway settings");
   return app;
 }
 
@@ -110,11 +111,11 @@ export const flyProvider: ContainerProvider = {
   stripControlChars: false,
 
   async checkAvailability(secrets?: ProviderSecrets) {
-    if (!(secrets?.FLY_API_TOKEN ?? process.env.FLY_API_TOKEN)) {
-      return { available: false, message: "FLY_API_TOKEN required — add to vault or .env" };
+    if (!(secrets?.FLY_API_TOKEN ?? readEnvOrSetting("FLY_API_TOKEN"))) {
+      return { available: false, message: "FLY_API_TOKEN required — add to vault, .env, or gateway settings" };
     }
-    if (!(secrets?.FLY_APP_NAME ?? process.env.FLY_APP_NAME)) {
-      return { available: false, message: "FLY_APP_NAME required — add to vault or .env" };
+    if (!(secrets?.FLY_APP_NAME ?? readEnvOrSetting("FLY_APP_NAME"))) {
+      return { available: false, message: "FLY_APP_NAME required — add to vault, .env, or gateway settings" };
     }
     return { available: true };
   },

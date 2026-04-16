@@ -126,8 +126,29 @@ function route(
  * interface. When the server is bound publicly, the key must not be
  * returned to arbitrary LAN clients. The UI will fall back to
  * localStorage / manual paste.
+ *
+ * Reverse-proxy deployments (same-host Caddy/Nginx) will see the
+ * socket as 127.0.0.1 always, which would otherwise leak the key to
+ * public clients. Require TRUST_PROXY=1 to honor X-Forwarded-For.
  */
-function isLoopbackFastifyRequest(req: { ip?: string; socket?: { remoteAddress?: string } }): boolean {
+function isLoopbackFastifyRequest(req: {
+  ip?: string;
+  socket?: { remoteAddress?: string };
+  headers?: Record<string, string | string[] | undefined>;
+}): boolean {
+  const trustProxy = process.env.TRUST_PROXY === "1";
+  if (trustProxy) {
+    const h = req.headers ?? {};
+    const xff = h["x-forwarded-for"];
+    const xri = h["x-real-ip"];
+    const first = Array.isArray(xff) ? xff[0] : xff;
+    const realIp = Array.isArray(xri) ? xri[0] : xri;
+    const proxied = (typeof first === "string" ? first.split(",")[0]?.trim() : undefined) ?? realIp;
+    if (typeof proxied === "string" && proxied) {
+      const addr = proxied.replace(/^::ffff:/, "");
+      return addr === "127.0.0.1" || addr === "::1" || addr === "localhost";
+    }
+  }
   const raw = req.ip ?? req.socket?.remoteAddress ?? "";
   const addr = raw.replace(/^::ffff:/, "");
   return addr === "127.0.0.1" || addr === "::1" || addr === "localhost";
@@ -139,7 +160,7 @@ export function buildApp() {
   // ── Built-in Web UI ──────────────────────────────────────────────────
   app.get("/", async (req, reply) => {
     const response = await handleGetUI({
-      apiKey: isLoopbackFastifyRequest(req) ? process.env.SEED_API_KEY : undefined,
+      apiKey: isLoopbackFastifyRequest({ ip: req.ip, socket: req.socket, headers: req.headers }) ? process.env.SEED_API_KEY : undefined,
     });
     await sendWebResponse(reply, response);
   });
