@@ -193,21 +193,15 @@ export function handleCreateSession(request: Request): Promise<Response> {
 
       // ── Anthropic provider: sync local config → Anthropic, then proxy ──
       if (env.config?.provider === "anthropic") {
-        // Prefer vault-provided key, fall back to server config
-        let apiKey: string | undefined;
-        if (data.vault_ids?.length) {
-          const { listEntries } = await import("../db/vaults");
-          for (const vid of data.vault_ids) {
-            const entries = listEntries(vid);
-            const found = entries.find(e => e.key === "ANTHROPIC_API_KEY");
-            if (found) { apiKey = found.value; break; }
-          }
+        // Unified resolver: vault → pool → config cascade (v0.4 PR4).
+        const { resolveAnthropicKey } = await import("../providers/upstream-keys");
+        const resolved = resolveAnthropicKey({ vaultIds: data.vault_ids ?? undefined });
+        if (!resolved) {
+          throw badRequest(
+            "ANTHROPIC_API_KEY required for anthropic provider " +
+            "(add to vault, upstream-key pool, or .env)",
+          );
         }
-        if (!apiKey) {
-          const cfg = getConfig();
-          apiKey = cfg.anthropicApiKey;
-        }
-        if (!apiKey) throw badRequest("ANTHROPIC_API_KEY required for anthropic provider (add to vault or .env)");
 
         const { remoteSessionId } = await syncAndCreateSession({
           agentId: agent.id,
@@ -215,7 +209,7 @@ export function handleCreateSession(request: Request): Promise<Response> {
           environmentId: env.id,
           vaultIds: data.vault_ids ?? undefined,
           title: data.title ?? undefined,
-          apiKey,
+          apiKey: resolved.value,
         });
 
         const session = createSession({

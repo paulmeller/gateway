@@ -437,4 +437,25 @@ export function runMigrations(db: InstanceType<typeof Database>): void {
   if (!agentColsFallback.some((c) => c.name === "fallback_json")) {
     db.exec(`ALTER TABLE agents ADD COLUMN fallback_json TEXT`);
   }
+
+  // Upstream-key pool (v0.4 PR4). Per-provider pool with LRU selection and
+  // per-row disable-on-failure. Values encrypted via the same AES-256-GCM
+  // machinery that protects vault entries (see db/vault-crypto.ts).
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS upstream_keys (
+      id TEXT PRIMARY KEY,
+      provider TEXT NOT NULL,
+      hash TEXT NOT NULL UNIQUE,
+      prefix TEXT NOT NULL,
+      value_encrypted TEXT NOT NULL,
+      weight INTEGER NOT NULL DEFAULT 1,
+      disabled_at INTEGER,
+      last_used_at INTEGER,
+      created_at INTEGER NOT NULL
+    )
+  `);
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_upstream_keys_provider_active
+       ON upstream_keys(provider, disabled_at, last_used_at)`,
+  );
 }

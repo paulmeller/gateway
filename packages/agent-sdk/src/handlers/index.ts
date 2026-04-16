@@ -18,3 +18,4 @@ export { handleGetMetrics, handleGetApiMetrics } from "./metrics";
 export { handleUploadFile, handleListFiles, handleGetFile, handleGetFileContent, handleDeleteFile } from "./files";
 export { handleAddResource, handleListResources, handleDeleteResource } from "./resources";
 export { handleCreateApiKey, handleListApiKeys, handleGetApiKey, handlePatchApiKey, handleRevokeApiKey, handleGetApiKeyActivity } from "./api_keys";
+export { handleAddUpstreamKey, handleListUpstreamKeys, handleGetUpstreamKey, handlePatchUpstreamKey, handleDeleteUpstreamKey } from "./upstream_keys";

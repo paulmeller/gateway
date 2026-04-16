@@ -76,6 +76,11 @@ import {
   handlePatchApiKey,
   handleRevokeApiKey,
   handleGetApiKeyActivity,
+  handleAddUpstreamKey,
+  handleListUpstreamKeys,
+  handleGetUpstreamKey,
+  handlePatchUpstreamKey,
+  handleDeleteUpstreamKey,
 } from "@agentstep/agent-sdk/handlers";
 
 const app = new Hono();
@@ -232,6 +237,13 @@ app.get("/v1/api-keys/:id/activity", (c) => handleGetApiKeyActivity(c.req.raw, c
 app.get("/v1/api-keys/:id", (c) => handleGetApiKey(c.req.raw, c.req.param("id")));
 app.patch("/v1/api-keys/:id", (c) => handlePatchApiKey(c.req.raw, c.req.param("id")));
 app.delete("/v1/api-keys/:id", (c) => handleRevokeApiKey(c.req.raw, c.req.param("id")));
+
+// ── Upstream-key pool (admin-only) ─────────────────────────────────────────
+app.post("/v1/upstream-keys", (c) => handleAddUpstreamKey(c.req.raw));
+app.get("/v1/upstream-keys", (c) => handleListUpstreamKeys(c.req.raw));
+app.get("/v1/upstream-keys/:id", (c) => handleGetUpstreamKey(c.req.raw, c.req.param("id")));
+app.patch("/v1/upstream-keys/:id", (c) => handlePatchUpstreamKey(c.req.raw, c.req.param("id")));
+app.delete("/v1/upstream-keys/:id", (c) => handleDeleteUpstreamKey(c.req.raw, c.req.param("id")));
 
 // ── SPA catch-all (must be last) ────────────────────────────────────────────
 app.get("*", (c) => {

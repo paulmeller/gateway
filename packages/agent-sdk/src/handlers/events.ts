@@ -11,35 +11,9 @@ import { pushPendingUserInput, type TurnInput } from "../state";
 import { isProxied } from "../db/proxy";
 import { resolveRemoteSessionId } from "../db/sync";
 import { forwardToAnthropic } from "../proxy/forward";
-import { getConfig } from "../config";
-import { listEntries as listVaultEntries } from "../db/vaults";
 import { badRequest, notFound } from "../errors";
 import { getAgent } from "../db/agents";
-
-/**
- * Resolve the Anthropic API key for a session: prefer vault, fall back to
- * config. Rejects `sk-ant-oat*` OAuth tokens — Anthropic's Managed Agents
- * API requires real API keys (sk-ant-api03-*). We filter here so the UI
- * gets a clean local error instead of a cryptic 401 from the upstream.
- */
-function resolveAnthropicKey(sessionId: string): string | null {
-  const candidate = resolveAnthropicKeyRaw(sessionId);
-  if (candidate && candidate.startsWith("sk-ant-oat")) return null;
-  return candidate;
-}
-
-function resolveAnthropicKeyRaw(sessionId: string): string | null {
-  const session = getSession(sessionId);
-  if (session?.vault_ids?.length) {
-    for (const vid of session.vault_ids) {
-      const entries = listVaultEntries(vid);
-      const found = entries.find(e => e.key === "ANTHROPIC_API_KEY");
-      if (found) return found.value;
-    }
-  }
-  const cfg = getConfig();
-  return cfg.anthropicApiKey ?? null;
-}
+import { resolveAnthropicKey as resolveAnthropicKeyShared, reportUpstreamFailure, reportUpstreamSuccess } from "../providers/upstream-keys";
 
 /**
  * Background-stream the remote Anthropic session and tee events into the
@@ -54,8 +28,9 @@ const teeLog = (...args: unknown[]): void => {
 };
 
 async function teeRemoteStream(localSessionId: string, remoteSessionId: string): Promise<void> {
-  const apiKey = resolveAnthropicKey(localSessionId);
-  if (!apiKey) { teeLog("[tee] no API key"); return; }
+  const resolved = resolveAnthropicKeyShared({ sessionId: localSessionId });
+  if (!resolved) { teeLog("[tee] no API key"); return; }
+  const { value: apiKey, poolId } = resolved;
 
   teeLog(`[tee] connecting to Anthropic stream for ${remoteSessionId}`);
   const res = await fetch(`https://api.anthropic.com/v1/sessions/${remoteSessionId}/stream`, {
@@ -66,7 +41,16 @@ async function teeRemoteStream(localSessionId: string, remoteSessionId: string):
       "accept": "text/event-stream",
     },
   });
-  if (!res.ok || !res.body) { teeLog(`[tee] stream failed: ${res.status}`); return; }
+  if (!res.ok || !res.body) {
+    teeLog(`[tee] stream failed: ${res.status}`);
+    // Any upstream failure counts against the pool key (if that's where
+    // it came from). 3 consecutive failures → disabled_at set.
+    if (res.status >= 500 || res.status === 429 || res.status === 401) {
+      reportUpstreamFailure(poolId);
+    }
+    return;
+  }
+  reportUpstreamSuccess(poolId);
   teeLog(`[tee] stream connected`);
 
   const reader = res.body.getReader();
@@ -187,9 +171,19 @@ export function handlePostEvents(request: Request, sessionId: string): Promise<R
           }
         } catch { /* best-effort */ }
 
-        // Forward to Anthropic (use vault key if available), then tee the response into local bus
-        const apiKey = resolveAnthropicKey(sessionId);
-        const proxyRes = await forwardToAnthropic(request, `/v1/sessions/${remoteId}/events`, { body: rawBody, apiKey: apiKey ?? undefined });
+        // Forward to Anthropic (use vault / pool / config key), then tee the response into local bus
+        const resolvedKey = resolveAnthropicKeyShared({ sessionId });
+        const proxyRes = await forwardToAnthropic(
+          request,
+          `/v1/sessions/${remoteId}/events`,
+          { body: rawBody, apiKey: resolvedKey?.value },
+        );
+        // Pool-source failure tracking for the forward leg.
+        if (!proxyRes.ok && (proxyRes.status >= 500 || proxyRes.status === 429 || proxyRes.status === 401)) {
+          reportUpstreamFailure(resolvedKey?.poolId ?? null);
+        } else if (proxyRes.ok) {
+          reportUpstreamSuccess(resolvedKey?.poolId ?? null);
+        }
 
         // Background: stream remote session to capture agent responses
         teeRemoteStream(sessionId, remoteId).catch(() => {});

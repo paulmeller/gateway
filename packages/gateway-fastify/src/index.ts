@@ -56,6 +56,11 @@ import {
   handlePatchApiKey,
   handleRevokeApiKey,
   handleGetApiKeyActivity,
+  handleAddUpstreamKey,
+  handleListUpstreamKeys,
+  handleGetUpstreamKey,
+  handlePatchUpstreamKey,
+  handleDeleteUpstreamKey,
 } from "@agentstep/agent-sdk/handlers";
 
 /**
@@ -259,6 +264,22 @@ export function buildApp() {
     const { id } = req.params as { id: string };
     const response = await handleRevokeApiKey(toWebRequest(req), id);
     await sendWebResponse(reply, response);
+  });
+
+  // ── Upstream-key pool (admin-only) ──────────────────────────────────
+  route(app, "post", "/v1/upstream-keys", handleAddUpstreamKey);
+  route(app, "get", "/v1/upstream-keys", handleListUpstreamKeys);
+  app.get("/v1/upstream-keys/:id", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    await sendWebResponse(reply, await handleGetUpstreamKey(toWebRequest(req), id));
+  });
+  app.patch("/v1/upstream-keys/:id", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    await sendWebResponse(reply, await handlePatchUpstreamKey(toWebRequest(req), id));
+  });
+  app.delete("/v1/upstream-keys/:id", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    await sendWebResponse(reply, await handleDeleteUpstreamKey(toWebRequest(req), id));
   });
 
   return app;
