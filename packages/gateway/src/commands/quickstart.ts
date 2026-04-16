@@ -354,58 +354,112 @@ async function ensureEngineSecretsNonInteractive(b: any, backend: string, agentI
 // Provider token helpers
 // ---------------------------------------------------------------------------
 
-const PROVIDER_TOKENS: Record<string, { envVar: string; settingKey: string; label: string }> = {
-  anthropic: { envVar: "ANTHROPIC_API_KEY", settingKey: "anthropic_api_key", label: "Anthropic API Key" },
-  sprites: { envVar: "SPRITE_TOKEN", settingKey: "sprite_token", label: "Sprites.dev Token" },
-  e2b: { envVar: "E2B_API_KEY", settingKey: "e2b_api_key", label: "E2B API Key" },
-  vercel: { envVar: "VERCEL_TOKEN", settingKey: "vercel_token", label: "Vercel Token" },
-  daytona: { envVar: "DAYTONA_API_KEY", settingKey: "daytona_api_key", label: "Daytona API Key" },
-  fly: { envVar: "FLY_API_TOKEN", settingKey: "fly_api_token", label: "Fly.io API Token" },
-  modal: { envVar: "MODAL_TOKEN_ID", settingKey: "modal_token_id", label: "Modal Token ID" },
+interface TokenField {
+  envVar: string;
+  settingKey?: string; // undefined for fields the quickstart can't persist to config
+  label: string;
+}
+
+/**
+ * Per-provider auth requirements. Most providers need one env var; a few
+ * (vercel, modal, fly) need multiple. The quickstart walks through each
+ * field one-by-one and persists what it can to settings.
+ *
+ * Fields without a `settingKey` are printed as "also export this env var"
+ * hints — the gateway settings table doesn't store them, but the user
+ * needs them in their shell environment.
+ */
+const PROVIDER_TOKENS: Record<string, TokenField[]> = {
+  anthropic: [{ envVar: "ANTHROPIC_API_KEY", settingKey: "anthropic_api_key", label: "Anthropic API Key" }],
+  sprites: [{ envVar: "SPRITE_TOKEN", settingKey: "sprite_token", label: "Sprites.dev Token" }],
+  e2b: [{ envVar: "E2B_API_KEY", settingKey: "e2b_api_key", label: "E2B API Key" }],
+  daytona: [{ envVar: "DAYTONA_API_KEY", settingKey: "daytona_api_key", label: "Daytona API Key" }],
+  vercel: [
+    { envVar: "VERCEL_TOKEN", settingKey: "vercel_token", label: "Vercel Token" },
+    { envVar: "VERCEL_TEAM_ID", label: "Vercel Team ID" },
+    { envVar: "VERCEL_PROJECT_ID", label: "Vercel Project ID" },
+  ],
+  fly: [
+    { envVar: "FLY_API_TOKEN", settingKey: "fly_api_token", label: "Fly.io API Token" },
+    { envVar: "FLY_APP_NAME", label: "Fly App Name" },
+  ],
+  modal: [
+    { envVar: "MODAL_TOKEN_ID", settingKey: "modal_token_id", label: "Modal Token ID" },
+    { envVar: "MODAL_TOKEN_SECRET", label: "Modal Token Secret" },
+  ],
 };
 
-async function providerTokenPresent(provider: string): Promise<boolean> {
-  const tokenInfo = PROVIDER_TOKENS[provider];
-  if (!tokenInfo) return true; // local providers don't need tokens
-  if (process.env[tokenInfo.envVar]) return true;
+/** Is the field populated from env or settings? */
+async function fieldPresent(field: TokenField): Promise<boolean> {
+  if (process.env[field.envVar]) return true;
+  if (!field.settingKey) return false;
   try {
     const { getConfig } = await import("@agentstep/agent-sdk/config");
     const cfg = getConfig() as Record<string, unknown>;
-    const camelKey = tokenInfo.settingKey.replace(/_([a-z])/g, (_: string, c: string) => c.toUpperCase());
-    if (cfg[camelKey]) return true;
-  } catch {}
-  return false;
+    const camelKey = field.settingKey.replace(/_([a-z])/g, (_: string, c: string) => c.toUpperCase());
+    return Boolean(cfg[camelKey]);
+  } catch {
+    return false;
+  }
+}
+
+async function providerTokenPresent(provider: string): Promise<boolean> {
+  const fields = PROVIDER_TOKENS[provider];
+  if (!fields) return true; // local providers don't need tokens
+  for (const field of fields) {
+    if (!(await fieldPresent(field))) return false;
+  }
+  return true;
 }
 
 async function ensureProviderTokenInteractive(provider: string): Promise<void> {
-  const tokenInfo = PROVIDER_TOKENS[provider];
-  if (!tokenInfo) return; // local providers
+  const fields = PROVIDER_TOKENS[provider];
+  if (!fields) return; // local providers
 
-  if (await providerTokenPresent(provider)) return;
+  for (const field of fields) {
+    if (await fieldPresent(field)) continue;
 
-  const token = await p.password({ message: `Paste your ${tokenInfo.label}` });
-  if (p.isCancel(token)) { p.cancel("Cancelled."); process.exit(0); }
+    // Non-secret fields (team_id, app_name, project_id) use text prompt;
+    // secrets use password prompt.
+    const isSecret = field.envVar.toLowerCase().includes("token") || field.envVar.toLowerCase().includes("secret") || field.envVar.toLowerCase().includes("key");
+    const value = isSecret
+      ? await p.password({ message: `Paste your ${field.label}` })
+      : await p.text({ message: `Enter your ${field.label}` });
+    if (p.isCancel(value)) { p.cancel("Cancelled."); process.exit(0); }
 
-  const trimmed = (token as string).trim();
-  if (!trimmed) {
-    p.log.error("No token provided.");
-    process.exit(1);
+    const trimmed = String(value).trim();
+    if (!trimmed) {
+      p.log.error(`${field.label} is required for the ${provider} provider.`);
+      process.exit(1);
+    }
+
+    if (field.settingKey) {
+      const s = p.spinner();
+      s.start(`Saving ${field.label}...`);
+      const { writeSetting } = await import("@agentstep/agent-sdk/config");
+      writeSetting(field.settingKey, trimmed);
+      s.stop(`Saved ${field.label}.`);
+    } else {
+      // Field can't be persisted to settings — set in-process for this run
+      // and remind the user to export it in their shell.
+      process.env[field.envVar] = trimmed;
+      p.log.info(`Set ${field.envVar} for this session. Export it in your shell to persist.`);
+    }
   }
-
-  const s = p.spinner();
-  s.start(`Saving ${tokenInfo.label} to settings...`);
-  const { writeSetting } = await import("@agentstep/agent-sdk/config");
-  writeSetting(tokenInfo.settingKey, trimmed);
-  s.stop(`Saved ${tokenInfo.label} to settings.`);
 }
 
 async function ensureProviderTokenNonInteractive(provider: string): Promise<void> {
-  const tokenInfo = PROVIDER_TOKENS[provider];
-  if (!tokenInfo) return;
+  const fields = PROVIDER_TOKENS[provider];
+  if (!fields) return;
 
-  if (await providerTokenPresent(provider)) return;
+  const missing: string[] = [];
+  for (const field of fields) {
+    if (!(await fieldPresent(field))) missing.push(field.envVar);
+  }
+  if (missing.length === 0) return;
 
-  console.error(`Error: ${provider} provider requires ${tokenInfo.envVar}.\n\n  export ${tokenInfo.envVar}=<your-token>\n`);
+  const exports = missing.map((v) => `  export ${v}=<your-value>`).join("\n");
+  console.error(`Error: ${provider} provider requires:\n\n${exports}\n`);
   process.exit(1);
 }
 

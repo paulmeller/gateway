@@ -30,8 +30,14 @@ export async function ensureTelemetryConsent(): Promise<boolean> {
     return false;
   }
 
+  // Default "no" — destructive defaults on usage data are a bad look.
+  // Users who want to help opt in explicitly. Details in docs/telemetry.md.
   const answer = await p.confirm({
-    message: "Help improve AgentStep Gateway by sending anonymous usage data?",
+    message:
+      "Send anonymous command usage to help improve AgentStep Gateway? " +
+      "(command name, success, OS, CLI version — no prompts or content. " +
+      "See https://github.com/agentstep/gateway/blob/main/docs/telemetry.md)",
+    initialValue: false,
   });
   if (p.isCancel(answer)) {
     cfg.telemetry = false;

@@ -5,8 +5,8 @@ Thanks for your interest in contributing! This project is Apache 2.0-licensed an
 ## Development Setup
 
 ```bash
-git clone https://github.com/agentstep/managed-agents.git
-cd managed-agents
+git clone https://github.com/agentstep/gateway.git
+cd gateway
 npm install
 npm test
 npm run dev          # starts Hono dev server on :4000
