@@ -324,7 +324,7 @@ describe("Quickstart Flow", () => {
       "API_KEY",
     );
     expect(got.key).toBe("API_KEY");
-    expect(got.value).toBe("sk-12345");
+    expect(got.value).toBe("sk-1****45"); // masked
   });
 
   it("session creation with vault_ids", async () => {
@@ -997,7 +997,7 @@ describe("Vault CLI Operations", () => {
       "DB_URL",
     );
     expect(result.key).toBe("DB_URL");
-    expect(result.value).toBe("postgres://localhost/db");
+    expect(result.value).toBe("post****db"); // masked
   });
 
   it("vault entries delete removes entry", async () => {

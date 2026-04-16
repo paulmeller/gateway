@@ -4,6 +4,16 @@ import { createVault, getVault, deleteVault, listVaults, listEntries, getEntry, 
 import { getAgent } from "../db/agents";
 import { badRequest, notFound, conflict } from "../errors";
 
+/**
+ * Mask a secret value for API responses. Returns preview showing
+ * at most the first 4 chars and the last 2 chars, separated by asterisks.
+ * Short values (<=6 chars) are fully masked.
+ */
+function maskValue(value: string): string {
+  if (value.length <= 6) return "******";
+  return `${value.slice(0, 4)}****${value.slice(-2)}`;
+}
+
 const CreateVaultSchema = z.object({
   agent_id: z.string().min(1),
   name: z.string().min(1),
@@ -65,7 +75,9 @@ export function handleListEntries(request: Request, vaultId: string): Promise<Re
   return routeWrap(request, async () => {
     const vault = getVault(vaultId);
     if (!vault) throw notFound(`vault not found: ${vaultId}`);
-    const data = listEntries(vaultId);
+    // Return keys with masked values — never expose plaintext via list API
+    const entries = listEntries(vaultId);
+    const data = entries.map(e => ({ key: e.key, value: maskValue(e.value) }));
     return jsonOk({ data });
   });
 }
@@ -76,7 +88,8 @@ export function handleGetEntry(request: Request, vaultId: string, key: string): 
     if (!vault) throw notFound(`vault not found: ${vaultId}`);
     const entry = getEntry(vaultId, key);
     if (!entry) throw notFound(`entry not found: ${key}`);
-    return jsonOk(entry);
+    // Mask value — plaintext is only available to server-side consumers (driver, sync)
+    return jsonOk({ key: entry.key, value: maskValue(entry.value) });
   });
 }
 

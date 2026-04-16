@@ -21,8 +21,9 @@ import { getAgent } from "../db/agents";
  */
 async function teeRemoteStream(localSessionId: string, remoteSessionId: string): Promise<void> {
   const cfg = getConfig();
-  if (!cfg.anthropicApiKey) return;
+  if (!cfg.anthropicApiKey) { console.log("[tee] no API key"); return; }
 
+  console.log(`[tee] connecting to Anthropic stream for ${remoteSessionId}`);
   const res = await fetch(`https://api.anthropic.com/v1/sessions/${remoteSessionId}/stream`, {
     headers: {
       "x-api-key": cfg.anthropicApiKey,
@@ -31,7 +32,8 @@ async function teeRemoteStream(localSessionId: string, remoteSessionId: string):
       "accept": "text/event-stream",
     },
   });
-  if (!res.ok || !res.body) return;
+  if (!res.ok || !res.body) { console.log(`[tee] stream failed: ${res.status}`); return; }
+  console.log(`[tee] stream connected`);
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -70,6 +72,7 @@ async function teeRemoteStream(localSessionId: string, remoteSessionId: string):
               "model_request_end": "span.model_request_end",
             };
             const localType = typeMap[evt.type] ?? evt.type;
+            console.log(`[tee] event: ${localType}`);
             appendEvent(localSessionId, {
               type: localType,
               payload: evt,
@@ -81,7 +84,7 @@ async function teeRemoteStream(localSessionId: string, remoteSessionId: string):
         }
       }
     }
-  } catch { /* stream ended */ }
+  } catch (err) { console.log(`[tee] stream ended:`, err); }
 }
 import { nowMs } from "../util/clock";
 import type { EventRow } from "../types";

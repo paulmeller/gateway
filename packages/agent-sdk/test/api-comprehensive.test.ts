@@ -1165,7 +1165,8 @@ describe("Vaults", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.key).toBe("k1");
-    expect(body.value).toBe("v1");
+    // Values are masked in API responses for security (full values only via server-side)
+    expect(body.value).toBe("******");
   });
 
   it("gets non-existent entry -> 404", async () => {
@@ -1263,7 +1264,7 @@ describe("Vaults", () => {
     );
     const res = await handleGetEntry(req(`/v1/vaults/${vault.id}/entries/k`), vault.id, "k");
     const body = await res.json();
-    expect(body.value).toBe("new");
+    expect(body.value).toBe("******"); // masked in API response
   });
 
   it("vault has correct fields", async () => {
@@ -3033,7 +3034,8 @@ describe("Vault Entries — Additional Coverage", () => {
     expect(getRes.status).toBe(200);
     const entry = await getRes.json() as Record<string, unknown>;
     expect(entry.key).toBe("MY_KEY");
-    expect(entry.value).toBe("secret123");
+    // Masked in API response — plaintext only available server-side
+    expect(entry.value).toBe("secr****23");
   });
 
   it("delete vault entry", async () => {
