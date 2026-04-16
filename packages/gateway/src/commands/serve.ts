@@ -26,10 +26,21 @@ function getOrCreateKey(): string {
   return key;
 }
 
+/** Show only the first 6 and last 4 characters of a key. */
+function maskKey(key: string): string {
+  if (key.length <= 10) return "••••••••";
+  return `${key.slice(0, 6)}••••${key.slice(-4)}`;
+}
+
 export function registerServeCommand(parent: Command): void {
   parent.command("serve")
     .description("Start the Managed Agents API server")
     .option("--port <port>", "Port to listen on", "4000")
+    .option(
+      "--host <addr>",
+      "Bind address. Default is 127.0.0.1 (loopback). Pass 0.0.0.0 to expose to the network — requires you to understand the security implications.",
+      "127.0.0.1",
+    )
     .action(async (opts) => {
       await import("dotenv/config");
 
@@ -38,6 +49,8 @@ export function registerServeCommand(parent: Command): void {
       const { serve } = await import("@hono/node-server");
       const { default: app } = await import("@agentstep/gateway-hono");
       const port = Number(opts.port);
+      const hostname = String(opts.host);
+      const isPublic = hostname === "0.0.0.0" || hostname === "::";
 
       let version = "dev";
       try {
@@ -57,18 +70,28 @@ export function registerServeCommand(parent: Command): void {
       } catch {}
       process.env.GATEWAY_VERSION = version;
 
+      const display = hostname === "0.0.0.0" || hostname === "::" ? "localhost" : hostname;
+
       console.log("");
       console.log(`  AgentStep Gateway v${version}`);
       console.log("");
-      console.log(`  → UI:      http://localhost:${port}`);
-      console.log(`  → API:     http://localhost:${port}/v1`);
-      console.log(`  → Docs:    http://localhost:${port}/v1/docs`);
-      console.log(`  → Key:     ${key}`);
+      console.log(`  → UI:      http://${display}:${port}`);
+      console.log(`  → API:     http://${display}:${port}/v1`);
+      console.log(`  → Docs:    http://${display}:${port}/v1/docs`);
+      // Mask the key by default. The unmasked value is written to .env /
+      // data/.api-key — that's the only place it should appear.
+      console.log(`  → Key:     ${maskKey(key)}   (unmasked key in data/.api-key)`);
+      if (isPublic) {
+        console.log("");
+        console.log("  ⚠  Bound to a public address — anyone on this network can reach the API.");
+        console.log("     The embedded UI injects the API key into HTML at /. Use only on trusted");
+        console.log("     networks, behind a reverse proxy with auth, or bind to 127.0.0.1.");
+      }
       console.log("");
       console.log(`  → Website: https://www.agentstep.com`);
       console.log(`  → Docs:    https://www.agentstep.com/docs`);
       console.log("");
 
-      serve({ fetch: app.fetch, port });
+      serve({ fetch: app.fetch, port, hostname });
     });
 }

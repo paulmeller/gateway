@@ -10,6 +10,25 @@ const ALLOWED_KEYS = [
   "saved_repositories",
 ];
 
+/**
+ * Keys whose values are secrets. Responses for these always mask the value
+ * so the API doesn't echo secrets back in plaintext. The vault (with per-
+ * instance AES encryption) is the authoritative store for agent-side use.
+ */
+const SECRET_KEYS = new Set([
+  "sprite_token", "anthropic_api_key", "openai_api_key",
+  "gemini_api_key", "factory_api_key", "claude_token",
+  "e2b_api_key", "vercel_token", "daytona_api_key",
+  "fly_api_token", "modal_token_id",
+]);
+
+/** Render a secret as "sk-an••••••••••lAQR" — first 6 + last 4 chars, ≥8 bullets. */
+function maskSecret(value: string): string {
+  if (!value) return "";
+  if (value.length <= 12) return "••••••••";
+  return `${value.slice(0, 6)}${"•".repeat(Math.max(8, value.length - 10))}${value.slice(-4)}`;
+}
+
 export function handlePutSetting(request: Request): Promise<Response> {
   return routeWrap(request, async () => {
     const body = await request.json().catch(() => null) as { key?: string; value?: string } | null;
@@ -33,8 +52,14 @@ export function handleGetSetting(request: Request, key: string): Promise<Respons
     }
     const value = readSetting(key);
     if (value === undefined) {
-      return jsonOk({ key, value: null });
+      return jsonOk({ key, value: null, configured: false });
     }
-    return jsonOk({ key, value });
+    if (SECRET_KEYS.has(key)) {
+      // Never return the raw secret over the API — return a masked preview
+      // plus a boolean so the UI can show "configured" state without
+      // exposing the value. This is consistent with /v1/vaults masking.
+      return jsonOk({ key, value: maskSecret(value), configured: true, masked: true });
+    }
+    return jsonOk({ key, value, configured: true });
   });
 }

@@ -4,7 +4,7 @@
  * All business logic lives in @agentstep/agent-sdk. This file registers
  * routes and delegates to core handler functions.
  */
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import {
   handleCreateAgent,
   handleListAgents,
@@ -75,7 +75,28 @@ import {
 const app = new Hono();
 
 // ── Built-in Web UI helper ────────────────────────────────────────────────
-const serveUI = () => handleGetUI({ apiKey: process.env.SEED_API_KEY, version: process.env.GATEWAY_VERSION, sentryDsn: process.env.SENTRY_DSN });
+//
+// Security: the UI HTML injects window.__MA_API_KEY__ so the SPA can call
+// the API without asking the user to paste a key. That convenience is only
+// safe when the request is from the loopback interface. When the server is
+// bound to 0.0.0.0 and reached from the LAN, we serve the UI *without* the
+// key — the user has to paste it via the UI's "API Key" input (stored in
+// localStorage). Any proxy in front of us should set a trusted
+// X-Forwarded-For / X-Real-IP so we can still tell.
+function isLoopbackRemote(c: Context): boolean {
+  const env = c.env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined;
+  const raw = env?.incoming?.socket?.remoteAddress ?? "";
+  // Normalize IPv4-mapped IPv6 (::ffff:127.0.0.1) to IPv4.
+  const addr = raw.replace(/^::ffff:/, "");
+  return addr === "127.0.0.1" || addr === "::1" || addr === "localhost";
+}
+
+const serveUI = (c: Context) =>
+  handleGetUI({
+    apiKey: isLoopbackRemote(c) ? process.env.SEED_API_KEY : undefined,
+    version: process.env.GATEWAY_VERSION,
+    sentryDsn: process.env.SENTRY_DSN,
+  });
 
 // ── Health ────────────────────────────────────────────────────────────────
 app.get("/api/health", (c) => c.json({ status: "ok" }));
@@ -183,7 +204,7 @@ app.get("*", (c) => {
   if (path.startsWith("/v1/") || path.startsWith("/api/")) {
     return c.json({ error: { type: "not_found_error", message: "Not found" } }, 404);
   }
-  return serveUI();
+  return serveUI(c);
 });
 
 export default app;

@@ -3010,6 +3010,46 @@ describe("Settings — Additional Coverage", () => {
     }));
     expect(res.status).toBe(401);
   });
+
+  it("GET /v1/settings/:key masks secret values instead of echoing them", async () => {
+    await bootDb();
+    const { handlePutSetting, handleGetSetting } = await import("../src/handlers/settings");
+    await handlePutSetting(req("/v1/settings", {
+      method: "PUT",
+      body: { key: "anthropic_api_key", value: "sk-ant-api03-superSecretValueThatMustNotLeak" },
+    }));
+    const res = await handleGetSetting(req("/v1/settings/anthropic_api_key"), "anthropic_api_key");
+    expect(res.status).toBe(200);
+    const body = await res.json() as { key: string; value: string; configured: boolean; masked?: boolean };
+    expect(body.configured).toBe(true);
+    expect(body.masked).toBe(true);
+    expect(body.value).not.toContain("superSecretValueThatMustNotLeak");
+    expect(body.value.startsWith("sk-ant")).toBe(true);
+    expect(body.value.endsWith("Leak")).toBe(true);
+  });
+
+  it("GET /v1/settings/:key returns non-secret keys in plaintext", async () => {
+    await bootDb();
+    const { handlePutSetting, handleGetSetting } = await import("../src/handlers/settings");
+    const repoJson = '[{"url":"https://github.com/foo/bar"}]';
+    await handlePutSetting(req("/v1/settings", {
+      method: "PUT",
+      body: { key: "saved_repositories", value: repoJson },
+    }));
+    const res = await handleGetSetting(req("/v1/settings/saved_repositories"), "saved_repositories");
+    const body = await res.json() as { value: string; configured: boolean; masked?: boolean };
+    expect(body.value).toBe(repoJson);
+    expect(body.masked).toBeUndefined();
+  });
+
+  it("GET /v1/settings/:key returns configured=false when unset", async () => {
+    await bootDb();
+    const { handleGetSetting } = await import("../src/handlers/settings");
+    const res = await handleGetSetting(req("/v1/settings/openai_api_key"), "openai_api_key");
+    const body = await res.json() as { value: unknown; configured: boolean };
+    expect(body.value).toBeNull();
+    expect(body.configured).toBe(false);
+  });
 });
 
 // ── Vault Entry CRUD ────────────────────────────────────────────────────────

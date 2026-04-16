@@ -141,7 +141,9 @@ function seedDefaultApiKey(): void {
     // Also set in process.env so CLI can pick it up immediately
     process.env.SEED_API_KEY = key;
     console.log(`  id:  ${id}`);
-    console.log(`  key: ${key}`);
+    // Don't log the raw key — it's now persisted to .env. Logging it here
+    // writes it into docker/journalctl/pm2 output unnecessarily.
+    console.log(`  key: (written to .env — see SEED_API_KEY)`);
   } catch (err) {
     console.error("[init] failed to seed default API key:", err);
   }

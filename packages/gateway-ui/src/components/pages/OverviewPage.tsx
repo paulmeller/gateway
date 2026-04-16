@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
-import { Server, Zap, Plus, Play, Key, ArrowRight } from "lucide-react";
+import { Server, Zap, Plus, Play, Key, ArrowRight, Eye, EyeOff, Copy, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -11,6 +11,61 @@ import { useAgentMetrics, useApiMetrics } from "@/hooks/use-metrics";
 import { StatTile, formatUsd } from "@/components/dashboard/StatTile";
 import { Sparkline } from "@/components/dashboard/Sparkline";
 import { WelcomeHero, WelcomeHeroSkeleton } from "./WelcomeHero";
+import { toast } from "sonner";
+
+function maskKey(key: string): string {
+  if (key.length <= 10) return "••••••••";
+  return `${key.slice(0, 6)}••••${key.slice(-4)}`;
+}
+
+function ApiKeyCard({ apiKey }: { apiKey: string }) {
+  const [revealed, setRevealed] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    if (!apiKey) return;
+    await navigator.clipboard.writeText(apiKey);
+    setCopied(true);
+    toast.success("API key copied");
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <Card size="sm" className="mt-2">
+      <CardContent>
+        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <Key className="size-3.5" />
+          API Key
+        </div>
+        {apiKey ? (
+          <div className="mt-2 flex items-center gap-2">
+            <code className="flex-1 rounded bg-muted px-2 py-1.5 font-mono text-xs text-foreground break-all select-all">
+              {revealed ? apiKey : maskKey(apiKey)}
+            </code>
+            <button
+              type="button"
+              onClick={() => setRevealed((r) => !r)}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              title={revealed ? "Hide" : "Reveal"}
+            >
+              {revealed ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+            </button>
+            <button
+              type="button"
+              onClick={copy}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              title="Copy"
+            >
+              {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+            </button>
+          </div>
+        ) : (
+          <p className="mt-2 text-xs text-muted-foreground">No API key found</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -228,22 +283,8 @@ export function OverviewPage() {
             </Link>
           </div>
 
-          {/* API Key display */}
-          <Card size="sm" className="mt-2">
-            <CardContent>
-              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                <Key className="size-3.5" />
-                API Key
-              </div>
-              {apiKey ? (
-                <code className="mt-2 block rounded bg-muted px-2 py-1.5 font-mono text-xs text-foreground break-all select-all">
-                  {apiKey}
-                </code>
-              ) : (
-                <p className="mt-2 text-xs text-muted-foreground">No API key found</p>
-              )}
-            </CardContent>
-          </Card>
+          {/* API Key display — masked by default, reveal + copy */}
+          <ApiKeyCard apiKey={apiKey} />
 
           {/* System mini-card */}
           <Card size="sm">
