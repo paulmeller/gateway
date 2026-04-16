@@ -81,8 +81,13 @@ const app = new Hono();
 // safe when the request is from the loopback interface. When the server is
 // bound to 0.0.0.0 and reached from the LAN, we serve the UI *without* the
 // key — the user has to paste it via the UI's "API Key" input (stored in
-// localStorage). Any proxy in front of us should set a trusted
-// X-Forwarded-For / X-Real-IP so we can still tell.
+// localStorage).
+//
+// Running behind a reverse proxy: we only read the raw socket address,
+// not X-Forwarded-For. If you deploy behind Caddy/Traefik/Nginx and want
+// the UI to auto-login for localhost clients, have your proxy forward
+// the request as-is OR set the TRUST_PROXY env var and rely on
+// X-Forwarded-For (not implemented today — open an issue if you need it).
 function isLoopbackRemote(c: Context): boolean {
   const env = c.env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined;
   const raw = env?.incoming?.socket?.remoteAddress ?? "";

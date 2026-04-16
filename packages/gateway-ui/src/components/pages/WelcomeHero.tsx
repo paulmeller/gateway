@@ -6,7 +6,7 @@ import { useProviderStatus } from "@/hooks/use-providers";
 import { LOCAL_PROVIDERS, CLOUD_PROVIDERS } from "@/lib/constants";
 import { toast } from "sonner";
 
-const VERSION = "0.3.4";
+const VERSION = "0.3.5";
 const GITHUB_URL = "https://github.com/agentstep/gateway";
 
 const PROVIDER_DOMAINS: Record<string, string> = {

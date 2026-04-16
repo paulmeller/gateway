@@ -21,6 +21,10 @@ import { serve } from "@hono/node-server";
 import app from "./index";
 
 const port = Number(process.env.PORT ?? 4000);
+// Loopback default mirrors `gateway serve` — dev server is not a public
+// artifact. Pass HOST=0.0.0.0 to expose; the UI handler won't inject
+// the API key for non-loopback requests regardless.
+const hostname = process.env.HOST ?? "127.0.0.1";
 
-console.log(`[hono] starting on http://localhost:${port}`);
-serve({ fetch: app.fetch, port });
+console.log(`[hono] starting on http://${hostname === "0.0.0.0" ? "localhost" : hostname}:${port}`);
+serve({ fetch: app.fetch, port, hostname });

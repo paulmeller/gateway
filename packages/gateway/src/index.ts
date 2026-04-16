@@ -118,8 +118,13 @@ program.parseAsync(process.argv).then(() => {
     process.exit(0);
   }
 }).catch((err) => {
+  // Only report the command *name* (first non-flag arg chain), never
+  // the raw argv — positional args can contain secrets
+  // (`gateway vaults put-entry vlt_xxx KEY sk-ant-...`).
+  // Example: `gateway vaults put-entry vlt_xxx KEY sk-ant-abc -o json` → "vaults put-entry"
+  const cmdName = process.argv.slice(2).filter((a) => !a.startsWith("-")).slice(0, 2).join(" ") || "unknown";
   trackCommand({
-    command: process.argv.slice(2).join(" "),
+    command: cmdName,
     backendType: program.opts().remote ? "remote" : "local",
     success: false,
   });

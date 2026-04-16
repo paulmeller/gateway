@@ -2,6 +2,12 @@ import { routeWrap, jsonOk } from "../http";
 import { writeSetting, readSetting } from "../config";
 import { badRequest, notFound } from "../errors";
 
+/** Non-secret settings — plain JSON-like values the UI can read verbatim. */
+const NON_SECRET_KEYS = new Set([
+  "saved_repositories",
+]);
+
+/** All writable/readable setting keys. Anything not in NON_SECRET_KEYS is a secret. */
 const ALLOWED_KEYS = [
   "sprite_token", "anthropic_api_key", "openai_api_key",
   "gemini_api_key", "factory_api_key", "claude_token",
@@ -11,16 +17,12 @@ const ALLOWED_KEYS = [
 ];
 
 /**
- * Keys whose values are secrets. Responses for these always mask the value
- * so the API doesn't echo secrets back in plaintext. The vault (with per-
- * instance AES encryption) is the authoritative store for agent-side use.
+ * Derived from ALLOWED_KEYS / NON_SECRET_KEYS so the two sets can't drift.
+ * Responses for secret keys always mask the value so the API doesn't echo
+ * secrets back in plaintext. The vault (with per-instance AES encryption)
+ * is the authoritative store for agent-side use.
  */
-const SECRET_KEYS = new Set([
-  "sprite_token", "anthropic_api_key", "openai_api_key",
-  "gemini_api_key", "factory_api_key", "claude_token",
-  "e2b_api_key", "vercel_token", "daytona_api_key",
-  "fly_api_token", "modal_token_id",
-]);
+const SECRET_KEYS = new Set(ALLOWED_KEYS.filter((k) => !NON_SECRET_KEYS.has(k)));
 
 /** Render a secret as "sk-an••••••••••lAQR" — first 6 + last 4 chars, ≥8 bullets. */
 function maskSecret(value: string): string {

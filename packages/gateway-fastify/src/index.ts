@@ -121,12 +121,26 @@ function route(
   });
 }
 
+/**
+ * Only inject the API key into HTML for requests from the loopback
+ * interface. When the server is bound publicly, the key must not be
+ * returned to arbitrary LAN clients. The UI will fall back to
+ * localStorage / manual paste.
+ */
+function isLoopbackFastifyRequest(req: { ip?: string; socket?: { remoteAddress?: string } }): boolean {
+  const raw = req.ip ?? req.socket?.remoteAddress ?? "";
+  const addr = raw.replace(/^::ffff:/, "");
+  return addr === "127.0.0.1" || addr === "::1" || addr === "localhost";
+}
+
 export function buildApp() {
   const app = Fastify({ logger: false });
 
   // ── Built-in Web UI ──────────────────────────────────────────────────
-  app.get("/", async (_req, reply) => {
-    const response = await handleGetUI({ apiKey: process.env.SEED_API_KEY });
+  app.get("/", async (req, reply) => {
+    const response = await handleGetUI({
+      apiKey: isLoopbackFastifyRequest(req) ? process.env.SEED_API_KEY : undefined,
+    });
     await sendWebResponse(reply, response);
   });
 

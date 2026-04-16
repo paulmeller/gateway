@@ -48,6 +48,38 @@ function loadOrGenerateKey(): Buffer {
     return key;
   }
 
+  // VAULT_ENCRYPTION_KEY_FILE: an on-disk path to the hex key. Preferred
+  // for container deployments where .env lives outside the persistent
+  // volume. If the file exists, read it. If not, generate and write it.
+  const keyFile = process.env.VAULT_ENCRYPTION_KEY_FILE;
+  if (keyFile) {
+    try {
+      if (fs.existsSync(keyFile)) {
+        const hex = fs.readFileSync(keyFile, "utf-8").trim();
+        const key = Buffer.from(hex, "hex");
+        if (key.length !== KEY_LEN) {
+          throw new Error(`${keyFile} must contain ${KEY_LEN * 2} hex chars`);
+        }
+        process.env.VAULT_ENCRYPTION_KEY = hex;
+        cachedKey = key;
+        return key;
+      }
+      // Generate and write. mode 0600 = owner read/write only.
+      const newKey = crypto.randomBytes(KEY_LEN);
+      const hex = newKey.toString("hex");
+      fs.mkdirSync(path.dirname(keyFile), { recursive: true });
+      fs.writeFileSync(keyFile, hex, { mode: 0o600 });
+      console.log(`[vault] generated VAULT_ENCRYPTION_KEY and wrote to ${keyFile}`);
+      console.warn(`[vault] BACK UP ${keyFile} — losing this key makes vault entries unrecoverable`);
+      process.env.VAULT_ENCRYPTION_KEY = hex;
+      cachedKey = newKey;
+      return newKey;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`[vault] Cannot read/write VAULT_ENCRYPTION_KEY_FILE (${keyFile}): ${msg}`);
+    }
+  }
+
   // Auto-generate and persist to .env so it survives restarts.
   // Walk up from CWD to find an existing .env (monorepo root), or fall
   // back to CWD for single-package setups.
@@ -68,7 +100,8 @@ function loadOrGenerateKey(): Buffer {
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(
       `[vault] Cannot write VAULT_ENCRYPTION_KEY to ${envPath}: ${msg}\n` +
-      `Set VAULT_ENCRYPTION_KEY manually in your environment:\n` +
+      `Set VAULT_ENCRYPTION_KEY manually in your environment, or use\n` +
+      `VAULT_ENCRYPTION_KEY_FILE=<path> to point at a persistent on-disk key file.\n` +
       `  VAULT_ENCRYPTION_KEY=${hex}\n` +
       `Without a persistent key, vault entries would be unrecoverable on restart.`,
     );

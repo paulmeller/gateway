@@ -12,8 +12,12 @@ FROM node:22-slim
 USER node
 WORKDIR /home/node/app
 
-# Persist data, .env, and vault-encrypted secrets across restarts via a
-# volume mounted at /home/node/app/data.
+# Persist data + vault encryption key across restarts via a volume.
+# VAULT_ENCRYPTION_KEY_FILE points inside the volume so the key survives
+# container recreation. Without this the vault module would write to .env
+# at the project root, which is *outside* the VOLUME — every restart
+# would regenerate the key and orphan all previously-encrypted entries.
+ENV VAULT_ENCRYPTION_KEY_FILE=/home/node/app/data/.vault-key
 VOLUME ["/home/node/app/data"]
 
 # Install the CLI into a private prefix owned by `node`, avoiding the
