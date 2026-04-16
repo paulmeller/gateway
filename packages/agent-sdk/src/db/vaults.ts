@@ -7,6 +7,7 @@
 import { getDb } from "./client";
 import { newId } from "../util/ids";
 import { nowMs, toIso } from "../util/clock";
+import { encryptValue, decryptValue } from "./vault-crypto";
 import type { Vault, VaultEntry, VaultEntryRow, VaultRow } from "../types";
 
 function hydrateVault(row: VaultRow): Vault {
@@ -68,11 +69,12 @@ export function deleteVault(id: string): boolean {
 export function setEntry(vaultId: string, key: string, value: string): void {
   const db = getDb();
   const now = nowMs();
+  const encrypted = encryptValue(value);
   db.prepare(
     `INSERT INTO vault_entries (vault_id, key, value, updated_at)
      VALUES (?, ?, ?, ?)
      ON CONFLICT(vault_id, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
-  ).run(vaultId, key, value, now);
+  ).run(vaultId, key, encrypted, now);
 
   // Update vault's updated_at timestamp
   db.prepare(`UPDATE vaults SET updated_at = ? WHERE id = ?`).run(now, vaultId);
@@ -88,7 +90,7 @@ export function getEntry(
       `SELECT * FROM vault_entries WHERE vault_id = ? AND key = ?`,
     )
     .get(vaultId, key) as VaultEntryRow | undefined;
-  return row ? { key: row.key, value: row.value } : null;
+  return row ? { key: row.key, value: decryptValue(row.value) } : null;
 }
 
 export function listEntries(vaultId: string): VaultEntry[] {
@@ -98,7 +100,7 @@ export function listEntries(vaultId: string): VaultEntry[] {
       `SELECT * FROM vault_entries WHERE vault_id = ? ORDER BY key ASC`,
     )
     .all(vaultId) as VaultEntryRow[];
-  return rows.map((r) => ({ key: r.key, value: r.value }));
+  return rows.map((r) => ({ key: r.key, value: decryptValue(r.value) }));
 }
 
 export function deleteEntry(vaultId: string, key: string): boolean {

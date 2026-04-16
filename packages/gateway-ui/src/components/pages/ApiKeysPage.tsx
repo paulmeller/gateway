@@ -27,7 +27,7 @@ export function ApiKeysPage() {
   }
 
   return (
-    <div className="px-6 py-6 flex flex-col gap-6">
+    <div className="flex-1 overflow-y-auto px-6 py-6 flex flex-col gap-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">API Keys</h1>

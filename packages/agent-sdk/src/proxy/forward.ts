@@ -31,10 +31,11 @@ const BETA_HEADER = "managed-agents-2026-04-01";
 export async function forwardToAnthropic(
   request: Request,
   path: string,
-  opts?: { body?: string },
+  opts?: { body?: string; apiKey?: string },
 ): Promise<Response> {
   const cfg = getConfig();
-  if (!cfg.anthropicApiKey) {
+  const apiKey = opts?.apiKey ?? cfg.anthropicApiKey;
+  if (!apiKey) {
     throw new ApiError(
       500,
       "server_error",
@@ -47,9 +48,14 @@ export async function forwardToAnthropic(
   const origUrl = new URL(request.url);
   url.search = origUrl.search;
 
+  // Stream endpoint requires agent-api beta; all others use managed-agents
+  const isStreamEndpoint = path.endsWith("/stream");
+  const beta = isStreamEndpoint ? "agent-api-2026-03-01" : BETA_HEADER;
+
   const headers = new Headers();
-  headers.set("x-api-key", cfg.anthropicApiKey);
-  headers.set("anthropic-beta", BETA_HEADER);
+  headers.set("x-api-key", apiKey);
+  headers.set("anthropic-version", "2023-06-01");
+  headers.set("anthropic-beta", beta);
 
   // Forward select headers from the original request
   const ct = request.headers.get("content-type");
@@ -84,6 +90,8 @@ export async function forwardToAnthropic(
     "te",
     "trailer",
     "upgrade",
+    "content-encoding",  // Node fetch auto-decompresses; forwarding this causes ERR_CONTENT_DECODING_FAILED
+    "content-length",    // Length changes after decompression
   ]);
   const responseHeaders = new Headers();
   for (const [k, v] of res.headers) {

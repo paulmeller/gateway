@@ -73,4 +73,25 @@ describe("resolveToolset", () => {
     expect(r.allowedTools).toEqual([]);
     expect(r.customToolNames.has("foo")).toBe(true);
   });
+
+  // Regression: agents created without an explicit tools config ended up with
+  // tools: [], which hit this "no toolset declared" branch and disabled every
+  // built-in. The wizard fix is to send agent_toolset_20260401 explicitly —
+  // this test locks in the empty-array behavior so callers know they must
+  // opt in.
+  it("returns no built-ins when tools is empty array", () => {
+    const r = resolveToolset([]);
+    expect(r.allowedTools).toEqual([]);
+    expect(r.disallowedTools).toEqual([
+      "Bash",
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch",
+    ]);
+    expect(r.customToolNames.size).toBe(0);
+  });
 });

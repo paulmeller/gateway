@@ -16,6 +16,9 @@ import { interruptSession } from "../sessions/interrupt";
 import { releaseSession } from "../containers/lifecycle";
 import { isProxied, markProxied, unmarkProxied } from "../db/proxy";
 import { forwardToAnthropic } from "../proxy/forward";
+import { syncAndCreateSession } from "../sync/anthropic";
+import { upsertSync, resolveRemoteSessionId } from "../db/sync";
+import { getConfig } from "../config";
 import { badRequest, notFound } from "../errors";
 import { nowMs } from "../util/clock";
 import type { SessionStatus } from "../types";
@@ -82,6 +85,76 @@ export function handleCreateSession(request: Request): Promise<Response> {
 
     const env = getEnvironment(parsed.data.environment_id);
     if (!env) throw notFound(`environment not found: ${parsed.data.environment_id}`);
+
+    // Engine-provider compatibility: anthropic provider only runs Claude models
+    if (env.config?.provider === "anthropic" && agent.engine !== "claude") {
+      throw badRequest(
+        `${agent.engine} engine cannot run on the anthropic provider — ` +
+        `Anthropic's managed agents API only supports Claude models. ` +
+        `Use a container provider (docker, e2b, fly, etc.) instead.`,
+      );
+    }
+
+    // Vault ownership: all vault_ids must belong to this agent
+    if (parsed.data.vault_ids?.length) {
+      const { getVault } = await import("../db/vaults");
+      for (const vid of parsed.data.vault_ids) {
+        const vault = getVault(vid);
+        if (!vault) throw badRequest(`vault not found: ${vid}`);
+        if (vault.agent_id !== agent.id) {
+          throw badRequest(
+            `vault ${vid} belongs to a different agent — vaults are scoped per-agent`,
+          );
+        }
+      }
+    }
+
+    // ── Anthropic provider: sync local config → Anthropic, then proxy ──
+    if (env.config?.provider === "anthropic") {
+      // Prefer vault-provided key, fall back to server config
+      let apiKey: string | undefined;
+      if (parsed.data.vault_ids?.length) {
+        const { listEntries } = await import("../db/vaults");
+        for (const vid of parsed.data.vault_ids) {
+          const entries = listEntries(vid);
+          const found = entries.find(e => e.key === "ANTHROPIC_API_KEY");
+          if (found) { apiKey = found.value; break; }
+        }
+      }
+      if (!apiKey) {
+        const cfg = getConfig();
+        apiKey = cfg.anthropicApiKey;
+      }
+      if (!apiKey) throw badRequest("ANTHROPIC_API_KEY required for anthropic provider (add to vault or .env)");
+
+      const { remoteSessionId } = await syncAndCreateSession({
+        agentId,
+        agentVersion: typeof parsed.data.agent === "string" ? undefined : parsed.data.agent.version,
+        environmentId: parsed.data.environment_id,
+        vaultIds: parsed.data.vault_ids ?? undefined,
+        title: parsed.data.title ?? undefined,
+        apiKey,
+      });
+
+      // Create local session record (for UI, event bus, analytics)
+      const session = createSession({
+        agent_id: agent.id,
+        agent_version: agent.version,
+        environment_id: env.id,
+        title: parsed.data.title ?? null,
+        metadata: { ...parsed.data.metadata, _anthropic_session_id: remoteSessionId },
+        max_budget_usd: parsed.data.max_budget_usd ?? null,
+        resources: parsed.data.resources?.length ? parsed.data.resources : null,
+        vault_ids: parsed.data.vault_ids?.length ? parsed.data.vault_ids : null,
+      });
+
+      // Map local session → remote session, mark as proxied
+      upsertSync(session.id, "session", remoteSessionId);
+      markProxied(session.id, "session");
+      getActor(session.id);
+      return jsonOk(session, 201);
+    }
+
     if (env.state !== "ready") {
       throw badRequest(
         `environment is not ready (state=${env.state}${env.state_message ? `: ${env.state_message}` : ""})`,
@@ -149,7 +222,13 @@ export function handleListSessions(request: Request): Promise<Response> {
 
 export function handleGetSession(request: Request, id: string): Promise<Response> {
   return routeWrap(request, async () => {
-    if (isProxied(id)) return forwardToAnthropic(request, `/v1/sessions/${id}`);
+    if (isProxied(id)) {
+      // Sync-and-proxy sessions have a local record — return it
+      const localSession = getSession(id);
+      if (localSession) return jsonOk(localSession);
+      // Pure proxy: forward to Anthropic
+      return forwardToAnthropic(request, `/v1/sessions/${resolveRemoteSessionId(id)}`);
+    }
     const session = getSession(id);
     if (!session) throw notFound(`session ${id} not found`);
     return jsonOk(session);
@@ -158,7 +237,7 @@ export function handleGetSession(request: Request, id: string): Promise<Response
 
 export function handleUpdateSession(request: Request, id: string): Promise<Response> {
   return routeWrap(request, async () => {
-    if (isProxied(id)) return forwardToAnthropic(request, `/v1/sessions/${id}`);
+    if (isProxied(id)) return forwardToAnthropic(request, `/v1/sessions/${resolveRemoteSessionId(id)}`);
     const body = await request.json().catch(() => null);
     const parsed = UpdateSchema.safeParse(body);
     if (!parsed.success) throw badRequest(parsed.error.message);
@@ -175,7 +254,7 @@ export function handleUpdateSession(request: Request, id: string): Promise<Respo
 export function handleDeleteSession(request: Request, id: string): Promise<Response> {
   return routeWrap(request, async () => {
     if (isProxied(id)) {
-      const res = await forwardToAnthropic(request, `/v1/sessions/${id}`);
+      const res = await forwardToAnthropic(request, `/v1/sessions/${resolveRemoteSessionId(id)}`);
       if (res.ok) unmarkProxied(id);
       return res;
     }
@@ -203,7 +282,7 @@ export function handleDeleteSession(request: Request, id: string): Promise<Respo
 export function handleArchiveSession(request: Request, id: string): Promise<Response> {
   return routeWrap(request, async () => {
     if (isProxied(id)) {
-      const res = await forwardToAnthropic(request, `/v1/sessions/${id}/archive`);
+      const res = await forwardToAnthropic(request, `/v1/sessions/${resolveRemoteSessionId(id)}/archive`);
       if (res.ok) unmarkProxied(id);
       return res;
     }

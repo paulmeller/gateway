@@ -317,7 +317,7 @@ export function PlaygroundPage({ sessionId: initialSessionId }: { sessionId?: st
   }
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex flex-1 min-h-0 overflow-hidden">
       {/* Left panel — Config */}
       <aside className="w-64 shrink-0 border-r border-border overflow-y-auto bg-background">
         <ConfigPanel
@@ -326,10 +326,12 @@ export function PlaygroundPage({ sessionId: initialSessionId }: { sessionId?: st
         />
       </aside>
 
-      {/* Center panel — Chat */}
-      <div className="flex flex-1 flex-col overflow-hidden bg-background">
+      {/* Center panel — Chat: thread scrolls, input pinned to bottom */}
+      <div className="flex flex-1 flex-col min-h-0 min-w-0 overflow-hidden bg-background">
         <ChatThread />
-        <ChatInput />
+        <div className="shrink-0 border-t border-border">
+          <ChatInput />
+        </div>
       </div>
 
       {/* Right panel — Inspector */}

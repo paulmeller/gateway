@@ -38,7 +38,7 @@ const NetworkingSchema = z.union([
 
 const ConfigSchema = z.object({
   type: z.literal("cloud"),
-  provider: z.enum(["sprites", "docker", "apple-container", "apple-firecracker", "podman", "e2b", "vercel", "daytona", "fly", "modal", "mvm"]).optional(),
+  provider: z.enum(["sprites", "docker", "apple-container", "apple-firecracker", "podman", "e2b", "vercel", "daytona", "fly", "modal", "mvm", "anthropic"]).optional(),
   packages: PackagesSchema,
   networking: NetworkingSchema.optional(),
 });
@@ -87,7 +87,7 @@ export function handleCreateEnvironment(request: Request): Promise<Response> {
     // Pre-flight: check provider is available before creating the environment
     // Skip for cloud providers — their API keys are configured separately (vaults/secrets)
     const providerName = parsed.data.config.provider ?? "sprites";
-    const CLOUD_PROVIDERS = new Set(["sprites", "e2b", "vercel", "daytona", "fly", "modal"]);
+    const CLOUD_PROVIDERS = new Set(["sprites", "e2b", "vercel", "daytona", "fly", "modal", "anthropic"]);
     if (!CLOUD_PROVIDERS.has(providerName)) {
       const provider = await resolveProvider(providerName);
       if (provider.checkAvailability) {

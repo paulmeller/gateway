@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { ModeToggle } from "./ModeToggle";
 
 const PROVIDER_DOMAINS: Record<string, string> = {
+  anthropic: "anthropic.com",
   docker: "docker.com",
   "apple-container": "apple.com",
   podman: "podman.io",
@@ -27,12 +28,28 @@ export type EnvResult =
   | { mode: "create"; data: { name: string; provider: string } }
   | { mode: "select"; env: { id: string; name: string; provider: string } };
 
-interface Props { onNext: (result: EnvResult) => void; }
+interface Props {
+  onNext: (result: EnvResult) => void;
+  onBack?: () => void;
+  /** The agent's engine — used to filter incompatible providers (anthropic only works with claude) */
+  engine?: string;
+}
 
-export function StepEnvironment({ onNext }: Props) {
+export function StepEnvironment({ onNext, onBack, engine }: Props) {
   const { data: envs, isLoading, isError } = useEnvironments();
   const { data: providerStatus } = useProviderStatus();
-  const readyEnvs = envs?.filter(e => e.state === "ready" || e.state === "active" || e.state === "idle") ?? [];
+  const canUseAnthropic = engine === "claude";
+
+  // Filter to healthy envs. Also exclude anthropic envs if engine isn't claude.
+  const readyEnvs = envs?.filter(e => {
+    const healthy = e.state === "ready" || e.state === "active" || e.state === "idle";
+    if (!healthy) return false;
+    if (e.config?.provider === "anthropic" && !canUseAnthropic) return false;
+    return true;
+  }) ?? [];
+
+  // Surface unhealthy envs for debugging (user sees we have envs, they're just broken)
+  const unhealthyCount = (envs?.length ?? 0) - readyEnvs.length;
   const hasExisting = !isLoading && !isError && readyEnvs.length > 0;
   const [mode, setMode] = useState<"select" | "create">("create");
   const [selectedId, setSelectedId] = useState("");
@@ -43,14 +60,16 @@ export function StepEnvironment({ onNext }: Props) {
     if (!isLoading) setMode(hasExisting ? "select" : "create");
   }, [isLoading, hasExisting]);
 
-  // Auto-select first available provider
+  // Auto-select first available provider (excluding anthropic if engine != claude)
   useEffect(() => {
     if (providerStatus && !provider) {
-      const allProviders = [...LOCAL_PROVIDERS, ...CLOUD_PROVIDERS];
+      const allProviders = [...LOCAL_PROVIDERS, ...CLOUD_PROVIDERS].filter(p =>
+        p !== "anthropic" || canUseAnthropic
+      );
       const first = allProviders.find(p => providerStatus[p]?.available);
       if (first) setProvider(first);
     }
-  }, [providerStatus, provider]);
+  }, [providerStatus, provider, canUseAnthropic]);
 
   function handleContinue() {
     if (mode === "select") {
@@ -87,6 +106,12 @@ export function StepEnvironment({ onNext }: Props) {
         <p className="text-sm text-muted-foreground mt-1">Select an existing environment or create a new one.</p>
       </div>
 
+      {unhealthyCount > 0 && (
+        <p className="text-xs text-muted-foreground rounded-md border border-amber-400/20 bg-amber-400/5 p-2">
+          {unhealthyCount} existing environment{unhealthyCount > 1 ? "s are" : " is"} unavailable (unhealthy or incompatible with {engine ?? "this"} engine).
+        </p>
+      )}
+
       {hasExisting && <ModeToggle mode={mode} onModeChange={setMode} />}
 
       {mode === "select" && hasExisting && (
@@ -117,17 +142,27 @@ export function StepEnvironment({ onNext }: Props) {
           </div>
 
           <ProviderGroup label="Local" providers={LOCAL_PROVIDERS} providerStatus={providerStatus} selected={provider} onSelect={setProvider} />
-          <ProviderGroup label="Cloud" providers={CLOUD_PROVIDERS} providerStatus={providerStatus} selected={provider} onSelect={setProvider} cloud />
+          <ProviderGroup
+            label="Cloud"
+            providers={CLOUD_PROVIDERS.filter(p => p !== "anthropic" || canUseAnthropic)}
+            providerStatus={providerStatus}
+            selected={provider}
+            onSelect={setProvider}
+            cloud
+          />
         </div>
       )}
 
-      <Button
-        className="w-full h-10 bg-cta-gradient text-sm font-medium text-black hover:opacity-90"
-        onClick={handleContinue}
-        disabled={mode === "select" ? !selectedId : !name.trim() || !provider}
-      >
-        Continue
-      </Button>
+      <div className="flex gap-2">
+        {onBack && <Button variant="outline" className="h-10 px-4 text-sm" onClick={onBack}>Back</Button>}
+        <Button
+          className="flex-1 h-10 bg-cta-gradient text-sm font-medium text-black hover:opacity-90"
+          onClick={handleContinue}
+          disabled={mode === "select" ? !selectedId : !name.trim() || !provider}
+        >
+          Continue
+        </Button>
+      </div>
     </div>
   );
 }

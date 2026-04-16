@@ -202,7 +202,7 @@ export function SkillsPage() {
   };
 
   return (
-    <div className="px-6 py-6">
+    <div className="flex-1 overflow-y-auto px-6 py-6">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-foreground">Skills Catalog</h1>

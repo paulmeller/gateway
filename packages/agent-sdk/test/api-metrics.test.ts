@@ -116,7 +116,8 @@ describe("recordApiRequest + snapshotApiMetrics", () => {
     expect(snap.totals.status_2xx).toBe(3);
     expect(snap.totals.status_4xx).toBe(1);
     expect(snap.totals.status_5xx).toBe(1);
-    expect(snap.totals.error_rate).toBeCloseTo(2 / 5, 5);
+    // error_rate is 5xx-only — 4xx is client behavior, not server health
+    expect(snap.totals.error_rate).toBeCloseTo(1 / 5, 5);
 
     // Per-route breakdown
     const agents = snap.routes.find((r) => r.route === "/v1/agents")!;
@@ -130,7 +131,12 @@ describe("recordApiRequest + snapshotApiMetrics", () => {
     const agentsId = snap.routes.find((r) => r.route === "/v1/agents/:id")!;
     expect(agentsId.count).toBe(1);
     expect(agentsId.status_4xx).toBe(1);
-    expect(agentsId.error_rate).toBe(1);
+    // 404 alone is not an error — error_rate stays 0, status_4xx surfaces separately
+    expect(agentsId.error_rate).toBe(0);
+
+    const sessions = snap.routes.find((r) => r.route === "/v1/sessions")!;
+    expect(sessions.status_5xx).toBe(1);
+    expect(sessions.error_rate).toBe(1);
 
     // Timeline: should have MAX_MINUTES entries, all zero except the
     // current one which has the 5 recorded requests

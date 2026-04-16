@@ -52,7 +52,7 @@ export function SessionDetailPage({ id }: Props) {
     "—";
 
   return (
-    <div className="px-6 py-6 flex flex-col gap-4">
+    <div className="flex-1 overflow-y-auto px-6 py-6 flex flex-col gap-4">
       {/* Back button */}
       <div>
         <Link

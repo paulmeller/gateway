@@ -10,9 +10,10 @@ interface Props {
   error?: string | null;
   isExistingAgent?: boolean;
   isExistingEnv?: boolean;
+  onBack?: () => void;
 }
 
-export function StepReady({ agentName, envName, secretsLabel, onStart, loading, error, isExistingAgent, isExistingEnv }: Props) {
+export function StepReady({ agentName, envName, secretsLabel, onStart, loading, error, isExistingAgent, isExistingEnv, onBack }: Props) {
   return (
     <div className="w-full max-w-md flex flex-col gap-6">
       <div>
@@ -33,16 +34,19 @@ export function StepReady({ agentName, envName, secretsLabel, onStart, loading, 
         <p className="text-sm text-destructive">{error}</p>
       )}
 
-      <Button className="w-full h-10 bg-cta-gradient text-sm font-medium text-black hover:opacity-90" onClick={onStart} disabled={loading}>
-        {loading ? (
-          <span className="flex items-center gap-2">
-            <Loader2 className="size-4 animate-spin" />
-            Starting session...
-          </span>
-        ) : (
-          "Start Session"
-        )}
-      </Button>
+      <div className="flex gap-2">
+        {onBack && <Button variant="outline" className="h-10 px-4 text-sm" onClick={onBack} disabled={loading}>Back</Button>}
+        <Button className="flex-1 h-10 bg-cta-gradient text-sm font-medium text-black hover:opacity-90" onClick={onStart} disabled={loading}>
+          {loading ? (
+            <span className="flex items-center gap-2">
+              <Loader2 className="size-4 animate-spin" />
+              Starting session...
+            </span>
+          ) : (
+            "Start Session"
+          )}
+        </Button>
+      </div>
     </div>
   );
 }

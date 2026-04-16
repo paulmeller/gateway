@@ -1,4 +1,5 @@
 import { ArrowLeft } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,7 +12,7 @@ import { AgentEditTab } from "./AgentEditTab";
 
 export function AgentDetailPage() {
   const agentId = useAppStore((s) => s.selectedAgentId);
-  const setSelectedAgentId = useAppStore((s) => s.setSelectedAgentId);
+  const navigate = useNavigate();
   const { data: agent, isLoading } = useAgent(agentId);
 
   if (isLoading || !agent) return null;
@@ -23,7 +24,7 @@ export function AgentDetailPage() {
           variant="ghost"
           size="icon"
           className="size-7 text-muted-foreground"
-          onClick={() => setSelectedAgentId(null)}
+          onClick={() => navigate({ to: "/agents" })}
         >
           <ArrowLeft className="size-4" />
         </Button>

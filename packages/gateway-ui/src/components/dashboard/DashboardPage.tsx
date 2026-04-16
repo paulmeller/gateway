@@ -24,6 +24,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAppStore } from "@/stores/app-store";
 import { useAgentMetrics, useApiMetrics } from "@/hooks/use-metrics";
 import { Sparkline, BarList } from "./Sparkline";
+import { StatTile, formatUsd } from "./StatTile";
 
 const WINDOWS = [
   { label: "15 min", minutes: 15 },
@@ -47,7 +48,7 @@ export function DashboardPage() {
   const apiQuery = useApiMetrics({ windowMinutes: apiWindow });
 
   return (
-    <div className="px-6 py-6">
+    <div className="flex-1 overflow-y-auto px-6 py-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold text-foreground">Analytics</h1>
@@ -330,39 +331,6 @@ export function DashboardPage() {
 // Tiles + helpers
 // ─────────────────────────────────────────────────────────────────────────
 
-function StatTile({
-  label,
-  value,
-  loading,
-  tone = "neutral",
-}: {
-  label: string;
-  value: number | string;
-  loading?: boolean;
-  tone?: "neutral" | "warn";
-}) {
-  const toneClass =
-    tone === "warn" && value !== 0 && value !== "0"
-      ? "text-amber-500"
-      : "text-foreground";
-  return (
-    <Card size="sm">
-      <CardContent>
-        <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-          {label}
-        </p>
-        <p
-          className={`mt-1 font-mono text-lg tabular-nums ${toneClass} ${
-            loading ? "opacity-40" : ""
-          }`}
-        >
-          {typeof value === "number" ? value.toLocaleString() : value}
-        </p>
-      </CardContent>
-    </Card>
-  );
-}
-
 function LatencyStat({ label, value }: { label: string; value: number | null }) {
   return (
     <Card size="sm">
@@ -379,13 +347,6 @@ function LatencyStat({ label, value }: { label: string; value: number | null }) 
       </CardContent>
     </Card>
   );
-}
-
-function formatUsd(n: number): string {
-  if (n === 0) return "$0.00";
-  if (n < 0.01) return `$${n.toFixed(4)}`;
-  if (n < 1) return `$${n.toFixed(3)}`;
-  return `$${n.toFixed(2)}`;
 }
 
 function stopReasonColor(key: string): string {

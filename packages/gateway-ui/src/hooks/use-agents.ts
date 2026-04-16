@@ -49,8 +49,15 @@ export function useAgent(id: string | null) {
 export function useCreateAgent() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { name: string; engine: string; model: string }) =>
-      api<Agent>("/agents", { method: "POST", body: JSON.stringify(body) }),
+    mutationFn: (body: { name: string; engine: string; model: string }) => {
+      // Only the claude engine accepts tool configs. Other engines manage
+      // tools through their own permission systems (and error if tools are set).
+      const payload: Record<string, unknown> = { ...body };
+      if (body.engine === "claude") {
+        payload.tools = [{ type: "agent_toolset_20260401" }];
+      }
+      return api<Agent>("/agents", { method: "POST", body: JSON.stringify(payload) });
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["agents"] }),
   });
 }

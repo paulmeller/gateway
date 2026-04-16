@@ -51,7 +51,7 @@ export function SessionsPage() {
   const navigate = useNavigate();
 
   return (
-    <div className="px-6 py-6 flex flex-col gap-6">
+    <div className="flex-1 overflow-y-auto px-6 py-6 flex flex-col gap-6">
       <PageHeader
         title="Sessions"
         description="View and manage agent sessions."

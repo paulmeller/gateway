@@ -5,7 +5,7 @@ import { waitForEnvironment } from "./environments.js";
 import { runChatLoop } from "./chat-loop.js";
 
 const LOCAL_PROVIDERS = ["docker", "apple-container", "apple-firecracker", "podman", "mvm"];
-const CLOUD_PROVIDERS = ["sprites", "e2b", "vercel", "daytona", "fly", "modal"];
+const CLOUD_PROVIDERS = ["anthropic", "sprites", "e2b", "vercel", "daytona", "fly", "modal"];
 
 const ENGINES = ["claude", "opencode", "codex", "gemini", "factory", "pi"] as const;
 type Engine = typeof ENGINES[number];
@@ -355,6 +355,7 @@ async function ensureEngineSecretsNonInteractive(b: any, backend: string, agentI
 // ---------------------------------------------------------------------------
 
 const PROVIDER_TOKENS: Record<string, { envVar: string; settingKey: string; label: string }> = {
+  anthropic: { envVar: "ANTHROPIC_API_KEY", settingKey: "anthropic_api_key", label: "Anthropic API Key" },
   sprites: { envVar: "SPRITE_TOKEN", settingKey: "sprite_token", label: "Sprites.dev Token" },
   e2b: { envVar: "E2B_API_KEY", settingKey: "e2b_api_key", label: "E2B API Key" },
   vercel: { envVar: "VERCEL_TOKEN", settingKey: "vercel_token", label: "Vercel Token" },
