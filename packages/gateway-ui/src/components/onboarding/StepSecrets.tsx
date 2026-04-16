@@ -11,6 +11,8 @@ interface Props {
   engine: string;
   model: string;
   provider: string;
+  /** Agent ID — used to filter vaults (only this agent's vaults can be used) */
+  agentId?: string | null;
   hasExistingVaults?: boolean;
   onNext: (secrets: Record<string, string>) => void;
   onSkip: () => void;
@@ -18,14 +20,17 @@ interface Props {
   onBack?: () => void;
 }
 
-export function StepSecrets({ engine, model, provider, hasExistingVaults, onNext, onSkip, onSelectVault, onBack }: Props) {
+export function StepSecrets({ engine, model, provider, agentId, hasExistingVaults, onNext, onSkip, onSelectVault, onBack }: Props) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [selectedVaultId, setSelectedVaultId] = useState("");
   const { data: vaults } = useVaults();
 
+  // Filter vaults to only those owned by this agent (enforced server-side too)
+  const ownedVaults = agentId ? (vaults ?? []).filter(v => v.agent_id === agentId) : (vaults ?? []);
+
   // Deduplicate by name — keep the most recent (first in list, API returns desc)
   const seen = new Set<string>();
-  const availableVaults = (vaults ?? []).filter(v => {
+  const availableVaults = ownedVaults.filter(v => {
     if (seen.has(v.name)) return false;
     seen.add(v.name);
     return true;

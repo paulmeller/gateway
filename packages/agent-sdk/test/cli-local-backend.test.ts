@@ -1220,7 +1220,7 @@ describe("Batch CLI Operations", () => {
     const { createAgent: dbCreateAgent } = await import("../src/db/agents");
     const realAgent = dbCreateAgent({
       name: "BatchErrorAgent",
-      model: "m",
+      model: "claude-sonnet-4-6",
       system: null,
       tools: [],
       mcp_servers: {},
@@ -1310,16 +1310,16 @@ describe("Error Handling", () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
     await expect(
-      callHandler(handleCreateAgent, "POST", "/v1/agents", { name: "", model: "m" }),
+      callHandler(handleCreateAgent, "POST", "/v1/agents", { name: "", model: "claude-sonnet-4-6" }),
     ).rejects.toThrow();
   });
 
   it("handler 409 conflict error", async () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
-    await callHandler(handleCreateAgent, "POST", "/v1/agents", { name: "DuplicateAgent", model: "m" });
+    await callHandler(handleCreateAgent, "POST", "/v1/agents", { name: "DuplicateAgent", model: "claude-sonnet-4-6" });
     await expect(
-      callHandler(handleCreateAgent, "POST", "/v1/agents", { name: "DuplicateAgent", model: "m" }),
+      callHandler(handleCreateAgent, "POST", "/v1/agents", { name: "DuplicateAgent", model: "claude-sonnet-4-6" }),
     ).rejects.toThrow(/409|conflict|already.exists/i);
   });
 

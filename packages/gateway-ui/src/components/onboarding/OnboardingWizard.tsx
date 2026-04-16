@@ -30,6 +30,9 @@ export function OnboardingWizard() {
   const [existingVaultIds, setExistingVaultIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Track partial-failure state: if we created an agent/env then failed, reuse the IDs on retry
+  const [createdAgentId, setCreatedAgentId] = useState<string | null>(null);
+  const [createdEnvId, setCreatedEnvId] = useState<string | null>(null);
   const createAgent = useCreateAgent();
   const createEnv = useCreateEnvironment();
   const createVault = useCreateVault();
@@ -90,25 +93,31 @@ export function OnboardingWizard() {
     setLoading(true);
     setError(null);
     try {
-      // 1. Create or resolve agent
+      // 1. Create or resolve agent (reuse from previous failed attempt if present)
       let agentId: string;
       if (agentChoice.mode === "select") {
         agentId = agentChoice.agent.id;
+      } else if (createdAgentId) {
+        agentId = createdAgentId; // Retry — don't re-create
       } else {
         const agent = await createAgent.mutateAsync(agentChoice.data);
         agentId = agent.id;
+        setCreatedAgentId(agent.id);
       }
 
-      // 2. Create or resolve environment
+      // 2. Create or resolve environment (reuse from previous failed attempt if present)
       let envId: string;
       if (envChoice.mode === "select") {
         envId = envChoice.env.id;
+      } else if (createdEnvId) {
+        envId = createdEnvId;
       } else {
         const env = await createEnv.mutateAsync({
           name: envChoice.data.name,
           config: { provider: envChoice.data.provider },
         });
         envId = env.id;
+        setCreatedEnvId(env.id);
       }
 
       // 3. Resolve vault — from selection, new secrets, or existing agent vaults
@@ -118,11 +127,20 @@ export function OnboardingWizard() {
         // User picked an existing vault from the picker
         vaultIds = [selectedVault.id];
       } else {
-        // Auto-detect sk-ant-oat tokens and store as CLAUDE_CODE_OAUTH_TOKEN
+        // Auto-detect sk-ant-oat OAuth tokens and remap to CLAUDE_CODE_OAUTH_TOKEN.
+        // Store trimmed values — whitespace from paste breaks runtime auth.
+        const isAnthropicProvider = envData.provider === "anthropic";
         const secretEntries = Object.entries(secrets)
-          .filter(([, v]) => v.trim())
+          .map(([key, rawValue]) => [key, rawValue.trim()] as [string, string])
+          .filter(([, v]) => v.length > 0)
           .map(([key, value]) => {
-            if (key === "ANTHROPIC_API_KEY" && value.trim().startsWith("sk-ant-oat")) {
+            const isOauth = value.startsWith("sk-ant-oat");
+            if (isOauth && isAnthropicProvider) {
+              throw new Error(
+                "OAuth tokens (sk-ant-oat) are not supported with the Anthropic provider. Use a regular API key (sk-ant-api03-...) instead.",
+              );
+            }
+            if (key === "ANTHROPIC_API_KEY" && isOauth) {
               return ["CLAUDE_CODE_OAUTH_TOKEN", value] as [string, string];
             }
             return [key, value] as [string, string];
@@ -183,8 +201,8 @@ export function OnboardingWizard() {
   return (
     <div className="flex flex-1 items-center justify-center p-8">
       {step === 0 && <StepAgent onNext={handleAgentNext} />}
-      {step === 1 && <StepEnvironment onNext={handleEnvNext} onBack={() => setStep(0)} />}
-      {step === 2 && <StepSecrets engine={agentData.engine} model={agentData.model} provider={envData.provider} hasExistingVaults={existingVaultIds.length > 0} onNext={handleSecretsNext} onSkip={() => setStep(3)} onSelectVault={handleSelectVault} onBack={() => setStep(1)} />}
+      {step === 1 && <StepEnvironment onNext={handleEnvNext} onBack={() => setStep(0)} engine={agentData.engine} />}
+      {step === 2 && <StepSecrets engine={agentData.engine} model={agentData.model} provider={envData.provider} agentId={agentChoice?.mode === "select" ? agentChoice.agent.id : null} hasExistingVaults={existingVaultIds.length > 0} onNext={handleSecretsNext} onSkip={() => setStep(3)} onSelectVault={handleSelectVault} onBack={() => setStep(1)} />}
       {step === 3 && <StepReady agentName={agentData.name} envName={envData.name} secretsLabel={getSecretsLabel()} onStart={handleStart} loading={loading} error={error} isExistingAgent={isExistingAgent} isExistingEnv={isExistingEnv} onBack={() => setStep(2)} />}
     </div>
   );

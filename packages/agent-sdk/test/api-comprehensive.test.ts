@@ -174,8 +174,8 @@ describe("Agents", () => {
   it("creates an agent with duplicate name -> 409", async () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
-    await handleCreateAgent(req("/v1/agents", { body: { name: "Dupe", model: "m" } }));
-    const res = await handleCreateAgent(req("/v1/agents", { body: { name: "Dupe", model: "m" } }));
+    await handleCreateAgent(req("/v1/agents", { body: { name: "Dupe", model: "claude-sonnet-4-6" } }));
+    const res = await handleCreateAgent(req("/v1/agents", { body: { name: "Dupe", model: "claude-sonnet-4-6" } }));
     expect(res.status).toBe(409);
   });
 
@@ -289,7 +289,7 @@ describe("Agents", () => {
       req("/v1/agents", {
         body: {
           name: "CodexTools",
-          model: "m",
+          model: "claude-sonnet-4-6",
           engine: "codex",
           tools: [{ type: "agent_toolset_20260401" }],
         },
@@ -691,10 +691,16 @@ describe("Sessions", () => {
     await bootDb();
     const agent = await createTestAgent({ name: "VaultSessAgent" });
     const env = await createTestEnv({ name: "VaultSessEnv" });
+    // Create a real vault owned by this agent (server enforces ownership)
+    const { handleCreateVault } = await import("../src/handlers/vaults");
+    const vaultRes = await handleCreateVault(req("/v1/vaults", {
+      body: { agent_id: agent.id as string, name: "vault-for-session" },
+    }));
+    const vault = await vaultRes.json() as { id: string };
     const session = await createTestSession(agent.id as string, env.id as string, {
-      vault_ids: ["vault_abc"],
+      vault_ids: [vault.id],
     });
-    expect(session.vault_ids).toEqual(["vault_abc"]);
+    expect(session.vault_ids).toEqual([vault.id]);
   });
 
   it("lists sessions with pagination (next_page)", async () => {
@@ -1670,7 +1676,7 @@ describe("Batch", () => {
     const ops = Array.from({ length: 51 }, (_, i) => ({
       method: "POST",
       path: "/v1/agents",
-      body: { name: `BatchOverflow${i}`, model: "m" },
+      body: { name: `BatchOverflow${i}`, model: "claude-sonnet-4-6" },
     }));
     const res = await handleBatch(
       req("/v1/batch", { body: { operations: ops } }),
@@ -1684,7 +1690,7 @@ describe("Batch", () => {
     const { createAgent } = await import("../src/db/agents");
     const realAgent = createAgent({
       name: "BatchRealAgent",
-      model: "m",
+      model: "claude-sonnet-4-6",
       system: null,
       tools: [],
       mcp_servers: {},
@@ -1942,9 +1948,9 @@ describe("Error Handling", () => {
   it("conflict has correct error type and status", async () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
-    await handleCreateAgent(req("/v1/agents", { body: { name: "Conflict", model: "m" } }));
+    await handleCreateAgent(req("/v1/agents", { body: { name: "Conflict", model: "claude-sonnet-4-6" } }));
     const res = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "Conflict", model: "m" } }),
+      req("/v1/agents", { body: { name: "Conflict", model: "claude-sonnet-4-6" } }),
     );
     expect(res.status).toBe(409);
     const body = (await res.json()) as { error: { type: string } };

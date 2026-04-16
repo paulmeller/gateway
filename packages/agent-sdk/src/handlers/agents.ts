@@ -122,6 +122,15 @@ export function handleCreateAgent(request: Request): Promise<Response> {
 
     const backend = resolveBackend(backendName);
 
+    // Validate model is supported by this engine
+    const { isValidModelForEngine, MODELS } = await import("../backends/models");
+    if (!isValidModelForEngine(backendName, parsed.data.model)) {
+      throw badRequest(
+        `Model "${parsed.data.model}" is not supported by the ${backendName} engine. ` +
+        `Supported models: ${(MODELS[backendName] ?? []).join(", ")}`,
+      );
+    }
+
     if (backendName !== "claude" && parsed.data.tools && parsed.data.tools.length > 0) {
       throw badRequest(
         `${backendName} backend does not use agent tool configs; tools are managed by the backend's internal permission system. Omit the tools field for ${backendName} agents.`,

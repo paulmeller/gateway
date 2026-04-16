@@ -28,12 +28,28 @@ export type EnvResult =
   | { mode: "create"; data: { name: string; provider: string } }
   | { mode: "select"; env: { id: string; name: string; provider: string } };
 
-interface Props { onNext: (result: EnvResult) => void; onBack?: () => void; }
+interface Props {
+  onNext: (result: EnvResult) => void;
+  onBack?: () => void;
+  /** The agent's engine — used to filter incompatible providers (anthropic only works with claude) */
+  engine?: string;
+}
 
-export function StepEnvironment({ onNext, onBack }: Props) {
+export function StepEnvironment({ onNext, onBack, engine }: Props) {
   const { data: envs, isLoading, isError } = useEnvironments();
   const { data: providerStatus } = useProviderStatus();
-  const readyEnvs = envs?.filter(e => e.state === "ready" || e.state === "active" || e.state === "idle") ?? [];
+  const canUseAnthropic = engine === "claude";
+
+  // Filter to healthy envs. Also exclude anthropic envs if engine isn't claude.
+  const readyEnvs = envs?.filter(e => {
+    const healthy = e.state === "ready" || e.state === "active" || e.state === "idle";
+    if (!healthy) return false;
+    if (e.config?.provider === "anthropic" && !canUseAnthropic) return false;
+    return true;
+  }) ?? [];
+
+  // Surface unhealthy envs for debugging (user sees we have envs, they're just broken)
+  const unhealthyCount = (envs?.length ?? 0) - readyEnvs.length;
   const hasExisting = !isLoading && !isError && readyEnvs.length > 0;
   const [mode, setMode] = useState<"select" | "create">("create");
   const [selectedId, setSelectedId] = useState("");
@@ -44,14 +60,16 @@ export function StepEnvironment({ onNext, onBack }: Props) {
     if (!isLoading) setMode(hasExisting ? "select" : "create");
   }, [isLoading, hasExisting]);
 
-  // Auto-select first available provider
+  // Auto-select first available provider (excluding anthropic if engine != claude)
   useEffect(() => {
     if (providerStatus && !provider) {
-      const allProviders = [...LOCAL_PROVIDERS, ...CLOUD_PROVIDERS];
+      const allProviders = [...LOCAL_PROVIDERS, ...CLOUD_PROVIDERS].filter(p =>
+        p !== "anthropic" || canUseAnthropic
+      );
       const first = allProviders.find(p => providerStatus[p]?.available);
       if (first) setProvider(first);
     }
-  }, [providerStatus, provider]);
+  }, [providerStatus, provider, canUseAnthropic]);
 
   function handleContinue() {
     if (mode === "select") {
@@ -88,6 +106,12 @@ export function StepEnvironment({ onNext, onBack }: Props) {
         <p className="text-sm text-muted-foreground mt-1">Select an existing environment or create a new one.</p>
       </div>
 
+      {unhealthyCount > 0 && (
+        <p className="text-xs text-muted-foreground rounded-md border border-amber-400/20 bg-amber-400/5 p-2">
+          {unhealthyCount} existing environment{unhealthyCount > 1 ? "s are" : " is"} unavailable (unhealthy or incompatible with {engine ?? "this"} engine).
+        </p>
+      )}
+
       {hasExisting && <ModeToggle mode={mode} onModeChange={setMode} />}
 
       {mode === "select" && hasExisting && (
@@ -118,7 +142,14 @@ export function StepEnvironment({ onNext, onBack }: Props) {
           </div>
 
           <ProviderGroup label="Local" providers={LOCAL_PROVIDERS} providerStatus={providerStatus} selected={provider} onSelect={setProvider} />
-          <ProviderGroup label="Cloud" providers={CLOUD_PROVIDERS} providerStatus={providerStatus} selected={provider} onSelect={setProvider} cloud />
+          <ProviderGroup
+            label="Cloud"
+            providers={CLOUD_PROVIDERS.filter(p => p !== "anthropic" || canUseAnthropic)}
+            providerStatus={providerStatus}
+            selected={provider}
+            onSelect={setProvider}
+            cloud
+          />
         </div>
       )}
 

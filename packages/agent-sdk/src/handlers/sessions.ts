@@ -86,6 +86,29 @@ export function handleCreateSession(request: Request): Promise<Response> {
     const env = getEnvironment(parsed.data.environment_id);
     if (!env) throw notFound(`environment not found: ${parsed.data.environment_id}`);
 
+    // Engine-provider compatibility: anthropic provider only runs Claude models
+    if (env.config?.provider === "anthropic" && agent.engine !== "claude") {
+      throw badRequest(
+        `${agent.engine} engine cannot run on the anthropic provider — ` +
+        `Anthropic's managed agents API only supports Claude models. ` +
+        `Use a container provider (docker, e2b, fly, etc.) instead.`,
+      );
+    }
+
+    // Vault ownership: all vault_ids must belong to this agent
+    if (parsed.data.vault_ids?.length) {
+      const { getVault } = await import("../db/vaults");
+      for (const vid of parsed.data.vault_ids) {
+        const vault = getVault(vid);
+        if (!vault) throw badRequest(`vault not found: ${vid}`);
+        if (vault.agent_id !== agent.id) {
+          throw badRequest(
+            `vault ${vid} belongs to a different agent — vaults are scoped per-agent`,
+          );
+        }
+      }
+    }
+
     // ── Anthropic provider: sync local config → Anthropic, then proxy ──
     if (env.config?.provider === "anthropic") {
       const cfg = getConfig();
