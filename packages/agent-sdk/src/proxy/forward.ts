@@ -31,10 +31,11 @@ const BETA_HEADER = "managed-agents-2026-04-01";
 export async function forwardToAnthropic(
   request: Request,
   path: string,
-  opts?: { body?: string },
+  opts?: { body?: string; apiKey?: string },
 ): Promise<Response> {
   const cfg = getConfig();
-  if (!cfg.anthropicApiKey) {
+  const apiKey = opts?.apiKey ?? cfg.anthropicApiKey;
+  if (!apiKey) {
     throw new ApiError(
       500,
       "server_error",
@@ -52,7 +53,7 @@ export async function forwardToAnthropic(
   const beta = isStreamEndpoint ? "agent-api-2026-03-01" : BETA_HEADER;
 
   const headers = new Headers();
-  headers.set("x-api-key", cfg.anthropicApiKey);
+  headers.set("x-api-key", apiKey);
   headers.set("anthropic-version", "2023-06-01");
   headers.set("anthropic-beta", beta);
 

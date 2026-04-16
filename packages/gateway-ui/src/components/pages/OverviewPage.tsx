@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { Server, Zap, Plus, Play, Key } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -6,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useAgents } from "@/hooks/use-agents";
 import { useSessions } from "@/hooks/use-sessions";
 import { useEnvironments } from "@/hooks/use-environments";
+import { WelcomeHero, WelcomeHeroSkeleton } from "./WelcomeHero";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -33,10 +35,24 @@ function statusBadge(status: string) {
 
 // ─── OverviewPage ─────────────────────────────────────────────────────────────
 
+const HERO_DISMISSED_KEY = "as.hero_dismissed";
+
 export function OverviewPage() {
-  const { data: agents } = useAgents();
-  const { data: sessions } = useSessions();
-  const { data: environments } = useEnvironments();
+  const agentsQ = useAgents();
+  const sessionsQ = useSessions();
+  const envsQ = useEnvironments();
+  const [dismissed, setDismissed] = useState(() => localStorage.getItem(HERO_DISMISSED_KEY) === "1");
+
+  // Sync dismissal when header's Skip button fires (via dispatched storage event)
+  useEffect(() => {
+    const handler = () => setDismissed(localStorage.getItem(HERO_DISMISSED_KEY) === "1");
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, []);
+
+  const agents = agentsQ.data;
+  const sessions = sessionsQ.data;
+  const environments = envsQ.data;
 
   const agentCount = agents?.length ?? 0;
   const envCount = environments?.length ?? 0;
@@ -46,6 +62,19 @@ export function OverviewPage() {
   const recentSessions = sessions?.slice(0, 10) ?? [];
 
   const apiKey = window.__MA_API_KEY__ ?? "";
+
+  // Empty-state onboarding logic
+  const allLoaded = !agentsQ.isPending && !sessionsQ.isPending && !envsQ.isPending;
+  const anyError = agentsQ.isError || sessionsQ.isError || envsQ.isError;
+  const isEmpty = allLoaded && !anyError && agentCount === 0 && envCount === 0 && totalSessions === 0;
+
+  if (!allLoaded && !anyError) {
+    return <WelcomeHeroSkeleton />;
+  }
+
+  if (isEmpty && !dismissed) {
+    return <WelcomeHero apiKey={apiKey} />;
+  }
 
   return (
     <div className="px-6 py-6">

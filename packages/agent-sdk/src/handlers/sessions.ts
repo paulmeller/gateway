@@ -111,9 +111,21 @@ export function handleCreateSession(request: Request): Promise<Response> {
 
     // ── Anthropic provider: sync local config → Anthropic, then proxy ──
     if (env.config?.provider === "anthropic") {
-      const cfg = getConfig();
-      const apiKey = cfg.anthropicApiKey;
-      if (!apiKey) throw badRequest("ANTHROPIC_API_KEY required for anthropic provider");
+      // Prefer vault-provided key, fall back to server config
+      let apiKey: string | undefined;
+      if (parsed.data.vault_ids?.length) {
+        const { listEntries } = await import("../db/vaults");
+        for (const vid of parsed.data.vault_ids) {
+          const entries = listEntries(vid);
+          const found = entries.find(e => e.key === "ANTHROPIC_API_KEY");
+          if (found) { apiKey = found.value; break; }
+        }
+      }
+      if (!apiKey) {
+        const cfg = getConfig();
+        apiKey = cfg.anthropicApiKey;
+      }
+      if (!apiKey) throw badRequest("ANTHROPIC_API_KEY required for anthropic provider (add to vault or .env)");
 
       const { remoteSessionId } = await syncAndCreateSession({
         agentId,

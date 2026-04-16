@@ -179,6 +179,14 @@ export function OnboardingWizard() {
         environment_id: envId,
         vault_ids: vaultIds.length > 0 ? vaultIds : undefined,
       });
+
+      // One-time first-session toast
+      const firstSessionKey = "as.first_session_shown";
+      if (!localStorage.getItem(firstSessionKey)) {
+        localStorage.setItem(firstSessionKey, "1");
+        toast.success("Session started — try saying 'hi' in the chat.");
+      }
+
       navigate({ to: "/playground/$sessionId", params: { sessionId: session.id } });
     } catch (err: unknown) {
       const msg = (err as { body?: { error?: { message?: string } } })?.body?.error?.message

@@ -12,21 +12,38 @@ import { isProxied } from "../db/proxy";
 import { resolveRemoteSessionId } from "../db/sync";
 import { forwardToAnthropic } from "../proxy/forward";
 import { getConfig } from "../config";
+import { listEntries as listVaultEntries } from "../db/vaults";
 import { badRequest, notFound } from "../errors";
 import { getAgent } from "../db/agents";
+
+/**
+ * Resolve the Anthropic API key for a session: prefer vault, fall back to config.
+ */
+function resolveAnthropicKey(sessionId: string): string | null {
+  const session = getSession(sessionId);
+  if (session?.vault_ids?.length) {
+    for (const vid of session.vault_ids) {
+      const entries = listVaultEntries(vid);
+      const found = entries.find(e => e.key === "ANTHROPIC_API_KEY");
+      if (found) return found.value;
+    }
+  }
+  const cfg = getConfig();
+  return cfg.anthropicApiKey ?? null;
+}
 
 /**
  * Background-stream the remote Anthropic session and tee events into the
  * local event bus. This powers the local SSE stream for the UI.
  */
 async function teeRemoteStream(localSessionId: string, remoteSessionId: string): Promise<void> {
-  const cfg = getConfig();
-  if (!cfg.anthropicApiKey) { console.log("[tee] no API key"); return; }
+  const apiKey = resolveAnthropicKey(localSessionId);
+  if (!apiKey) { console.log("[tee] no API key"); return; }
 
   console.log(`[tee] connecting to Anthropic stream for ${remoteSessionId}`);
   const res = await fetch(`https://api.anthropic.com/v1/sessions/${remoteSessionId}/stream`, {
     headers: {
-      "x-api-key": cfg.anthropicApiKey,
+      "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
       "anthropic-beta": "agent-api-2026-03-01",
       "accept": "text/event-stream",
@@ -153,8 +170,9 @@ export function handlePostEvents(request: Request, sessionId: string): Promise<R
           }
         } catch { /* best-effort */ }
 
-        // Forward to Anthropic, then tee the response stream events into local bus
-        const proxyRes = await forwardToAnthropic(request, `/v1/sessions/${remoteId}/events`, { body: rawBody });
+        // Forward to Anthropic (use vault key if available), then tee the response into local bus
+        const apiKey = resolveAnthropicKey(sessionId);
+        const proxyRes = await forwardToAnthropic(request, `/v1/sessions/${remoteId}/events`, { body: rawBody, apiKey: apiKey ?? undefined });
 
         // Background: stream remote session to capture agent responses
         teeRemoteStream(sessionId, remoteId).catch(() => {});

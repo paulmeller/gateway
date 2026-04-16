@@ -1,6 +1,11 @@
+import { useState, useEffect } from "react";
 import { createRouter, createRoute, createRootRoute, redirect, Outlet, useRouterState } from "@tanstack/react-router";
+import { SkipForward } from "lucide-react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
+import { useAgents } from "@/hooks/use-agents";
+import { useEnvironments } from "@/hooks/use-environments";
+import { useSessions } from "@/hooks/use-sessions";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -24,7 +29,6 @@ import { SkillsPage } from "@/components/pages/SkillsPage";
 import { ApiKeysPage } from "@/components/pages/ApiKeysPage";
 import { DocsPage } from "@/components/pages/DocsPage";
 import { useAppStore } from "@/stores/app-store";
-import { useEffect } from "react";
 
 // ─── Root ────────────────────────────────────────────────────────────────────
 
@@ -53,6 +57,7 @@ function RootLayout() {
           <SidebarTrigger className="-ml-1 text-muted-foreground" />
           <Separator orientation="vertical" className="mr-2 !self-center h-4" />
           <PageBreadcrumb />
+          <SkipOnboardingButton />
         </header>
         <div className="flex flex-1 flex-col overflow-y-auto">
           <Outlet />
@@ -94,6 +99,53 @@ function PageBreadcrumb() {
         </BreadcrumbItem>
       </BreadcrumbList>
     </Breadcrumb>
+  );
+}
+
+const HERO_DISMISSED_KEY = "as.hero_dismissed";
+
+function SkipOnboardingButton() {
+  const routerState = useRouterState();
+  const isHome = routerState.location.pathname === "/";
+  const agentsQ = useAgents();
+  const envsQ = useEnvironments();
+  const sessionsQ = useSessions();
+
+  const [dismissed, setDismissed] = useState(
+    () => localStorage.getItem(HERO_DISMISSED_KEY) === "1",
+  );
+
+  // Listen for storage changes (in case another tab dismisses)
+  useEffect(() => {
+    const handler = () => setDismissed(localStorage.getItem(HERO_DISMISSED_KEY) === "1");
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, []);
+
+  const allLoaded = !agentsQ.isPending && !envsQ.isPending && !sessionsQ.isPending;
+  const anyError = agentsQ.isError || envsQ.isError || sessionsQ.isError;
+  const isEmpty = allLoaded && !anyError
+    && (agentsQ.data?.length ?? 0) === 0
+    && (envsQ.data?.length ?? 0) === 0
+    && (sessionsQ.data?.length ?? 0) === 0;
+
+  // Only show on home when hero is visible
+  if (!isHome || !isEmpty || dismissed) return null;
+
+  return (
+    <button
+      onClick={() => {
+        localStorage.setItem(HERO_DISMISSED_KEY, "1");
+        setDismissed(true);
+        // Nudge storage listeners in same tab
+        window.dispatchEvent(new StorageEvent("storage", { key: HERO_DISMISSED_KEY }));
+      }}
+      className="ml-auto inline-flex items-center gap-1.5 h-7 px-3 rounded-md bg-secondary text-secondary-foreground text-xs font-medium hover:bg-secondary/80 transition-colors"
+      title="Skip the welcome screen"
+    >
+      <SkipForward className="size-3.5" />
+      Skip onboarding
+    </button>
   );
 }
 
