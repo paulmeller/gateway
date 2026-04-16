@@ -51,4 +51,5 @@ describe("vault-crypto", () => {
     const tampered = encrypted.slice(0, -4) + "AAAA";
     expect(() => decryptValue(tampered)).toThrow();
   });
+
 });

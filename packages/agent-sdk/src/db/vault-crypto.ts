@@ -1,17 +1,18 @@
 /**
  * Vault value encryption at rest.
  *
- * Uses AES-256-GCM with a per-instance key derived from:
- *   1. VAULT_ENCRYPTION_KEY env var (hex-encoded 32 bytes), or
- *   2. A generated key persisted in the `settings` table
+ * Uses AES-256-GCM with a per-instance key from VAULT_ENCRYPTION_KEY.
+ * If not set, auto-generates a key and writes it to .env (same pattern
+ * as SEED_API_KEY). Losing the key means losing all vault contents —
+ * back up your .env file.
  *
- * Ciphertext format (base64): version(1) + iv(12) + tag(16) + ciphertext(n)
+ * Ciphertext format (base64): iv(12) + tag(16) + ciphertext(n)
  * Values prefixed with "enc:v1:" are encrypted; others are plaintext
- * (for backwards compat with pre-encryption values — they're re-encrypted
- * on next write).
+ * (for backwards compat — re-encrypted on next write).
  */
 import crypto from "crypto";
-import { getDb } from "./client";
+import fs from "fs";
+import path from "path";
 
 const ALGO = "aes-256-gcm";
 const KEY_LEN = 32;
@@ -21,10 +22,22 @@ const VERSION_PREFIX = "enc:v1:";
 
 let cachedKey: Buffer | null = null;
 
+/** Find the closest existing .env — walks up from CWD, falls back to CWD. */
+function findEnvPath(): string {
+  let dir = process.cwd();
+  for (let i = 0; i < 6; i++) {
+    const candidate = path.join(dir, ".env");
+    if (fs.existsSync(candidate)) return candidate;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return path.resolve(process.cwd(), ".env");
+}
+
 function loadOrGenerateKey(): Buffer {
   if (cachedKey) return cachedKey;
 
-  // 1. Env var takes precedence
   const fromEnv = process.env.VAULT_ENCRYPTION_KEY;
   if (fromEnv) {
     const key = Buffer.from(fromEnv, "hex");
@@ -35,23 +48,33 @@ function loadOrGenerateKey(): Buffer {
     return key;
   }
 
-  // 2. Persist a generated key in settings table
-  const db = getDb();
-  const existing = db
-    .prepare(`SELECT value FROM settings WHERE key = 'vault_encryption_key'`)
-    .get() as { value: string } | undefined;
-
-  if (existing) {
-    cachedKey = Buffer.from(existing.value, "hex");
-    return cachedKey;
-  }
-
+  // Auto-generate and persist to .env so it survives restarts.
+  // Walk up from CWD to find an existing .env (monorepo root), or fall
+  // back to CWD for single-package setups.
   const newKey = crypto.randomBytes(KEY_LEN);
-  db.prepare(
-    `INSERT INTO settings (key, value, type, updated_at) VALUES (?, ?, 'secret', ?)`,
-  ).run("vault_encryption_key", newKey.toString("hex"), Date.now());
+  const hex = newKey.toString("hex");
+  const envPath = findEnvPath();
+  try {
+    if (!fs.existsSync(envPath)) {
+      fs.writeFileSync(envPath, `VAULT_ENCRYPTION_KEY=${hex}\n`, "utf-8");
+    } else {
+      fs.appendFileSync(envPath, `\nVAULT_ENCRYPTION_KEY=${hex}\n`, "utf-8");
+    }
+    console.log(`[vault] generated VAULT_ENCRYPTION_KEY and wrote to ${envPath}`);
+    console.warn(`[vault] BACK UP YOUR .env — losing this key will make all vault entries unrecoverable`);
+  } catch (err) {
+    // Can't write .env — refuse to encrypt rather than silently using an
+    // ephemeral key that would make vault entries unrecoverable on restart.
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `[vault] Cannot write VAULT_ENCRYPTION_KEY to ${envPath}: ${msg}\n` +
+      `Set VAULT_ENCRYPTION_KEY manually in your environment:\n` +
+      `  VAULT_ENCRYPTION_KEY=${hex}\n` +
+      `Without a persistent key, vault entries would be unrecoverable on restart.`,
+    );
+  }
+  process.env.VAULT_ENCRYPTION_KEY = hex;
   cachedKey = newKey;
-  console.log("[vault] generated new encryption key and stored in settings");
   return newKey;
 }
 
