@@ -247,7 +247,7 @@ export function listEventsByTrace(traceId: string, limit = 2000): EventRow[] {
 }
 
 export function rowToManagedEvent(row: EventRow): ManagedEvent {
-  const payload = JSON.parse(row.payload_json) as Record<string, unknown>;
+  const { type: _rawType, ...payload } = JSON.parse(row.payload_json) as Record<string, unknown>;
   const base: ManagedEvent = {
     id: row.id,
     seq: row.seq,

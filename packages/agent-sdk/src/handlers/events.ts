@@ -61,8 +61,17 @@ async function teeRemoteStream(localSessionId: string, remoteSessionId: string):
             if (evtId) seenIds.add(evtId);
             // Skip user events — already stored by the POST handler
             if (evt.type === "user" || evt.type === "user.message") { eventData = ""; continue; }
+            // Map Anthropic event types to local format
+            const typeMap: Record<string, string> = {
+              "agent": "agent.message",
+              "status_running": "session.status_running",
+              "status_idle": "session.status_idle",
+              "model_request_start": "span.model_request_start",
+              "model_request_end": "span.model_request_end",
+            };
+            const localType = typeMap[evt.type] ?? evt.type;
             appendEvent(localSessionId, {
-              type: evt.type ?? "unknown",
+              type: localType,
               payload: evt,
               origin: "server",
               processedAt: Date.now(),
