@@ -84,9 +84,17 @@ export async function syncAgent(
       }))
     : [];
 
+  // Tools — our local Agent.tools is already in Anthropic's shape
+  // (agent_toolset_20260401 + custom). If the agent has no tools, default
+  // to enabling the full built-in toolset so the managed agent can do work.
+  const tools = agentWithAuth.tools && agentWithAuth.tools.length > 0
+    ? agentWithAuth.tools
+    : [{ type: "agent_toolset_20260401" }];
+
   const agentConfig: Record<string, unknown> = {
     name: agentWithAuth.name,
     model: agentWithAuth.model,
+    tools,
   };
   if (agentWithAuth.system) agentConfig.system = agentWithAuth.system;
   if (mcpArray.length > 0) agentConfig.mcp_servers = mcpArray;
