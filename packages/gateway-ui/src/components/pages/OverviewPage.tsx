@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
-import { Server, Zap, Plus, Play, Key } from "lucide-react";
+import { Server, Zap, Plus, Play, Key, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAgents } from "@/hooks/use-agents";
 import { useSessions } from "@/hooks/use-sessions";
 import { useEnvironments } from "@/hooks/use-environments";
+import { useAgentMetrics, useApiMetrics } from "@/hooks/use-metrics";
+import { StatTile, formatUsd } from "@/components/dashboard/StatTile";
+import { Sparkline } from "@/components/dashboard/Sparkline";
 import { WelcomeHero, WelcomeHeroSkeleton } from "./WelcomeHero";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -37,6 +40,11 @@ function statusBadge(status: string) {
 
 const HERO_DISMISSED_KEY = "as.hero_dismissed";
 
+// Fixed windows — Home is not tunable. Same keys as Analytics 15m selector
+// so TanStack Query caches are shared.
+const AGENT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const API_WINDOW_MIN = 60;              // 60 minutes (capped by recorder retention)
+
 export function OverviewPage() {
   const agentsQ = useAgents();
   const sessionsQ = useSessions();
@@ -59,14 +67,19 @@ export function OverviewPage() {
   const totalSessions = sessions?.length ?? 0;
   const activeSessions = sessions?.filter((s) => s.status === "active" || s.status === "running").length ?? 0;
 
-  const recentSessions = sessions?.slice(0, 10) ?? [];
-
+  const recentSessions = sessions?.slice(0, 8) ?? [];
   const apiKey = window.__MA_API_KEY__ ?? "";
 
   // Empty-state onboarding logic
   const allLoaded = !agentsQ.isPending && !sessionsQ.isPending && !envsQ.isPending;
   const anyError = agentsQ.isError || sessionsQ.isError || envsQ.isError;
   const isEmpty = allLoaded && !anyError && agentCount === 0 && envCount === 0 && totalSessions === 0;
+
+  // Metrics for pulse row — only fetch after initial resource load (avoid wasted
+  // calls during empty state and WelcomeHero)
+  const shouldFetchMetrics = allLoaded && !isEmpty;
+  const agentMetricsQ = useAgentMetrics({ windowMs: AGENT_WINDOW_MS, groupBy: "agent" });
+  const apiMetricsQ = useApiMetrics({ windowMinutes: API_WINDOW_MIN });
 
   if (!allLoaded && !anyError) {
     return <WelcomeHeroSkeleton />;
@@ -76,40 +89,72 @@ export function OverviewPage() {
     return <WelcomeHero apiKey={apiKey} />;
   }
 
+  // ── Pulse metrics ──────────────────────────────────────────────────────────
+  const agentTotals = agentMetricsQ.data?.totals;
+  const apiTotals = apiMetricsQ.data?.totals;
+  const metricsLoading = shouldFetchMetrics && (agentMetricsQ.isPending || apiMetricsQ.isPending);
+
+  const turns15m = agentTotals?.turn_count ?? 0;
+  const errors15m = agentTotals?.error_count ?? 0;
+  const cost15m = agentTotals?.cost_usd ?? 0;
+  const p95ms = apiTotals?.p95_ms ?? null;
+  const errorRate = apiTotals?.error_rate ?? 0;
+  const totalRequests15m = apiTotals?.count ?? 0;
+
+  // Tone thresholds
+  const errorsTone: "warn" | "danger" | "neutral" = errors15m > 5 ? "danger" : errors15m > 0 ? "warn" : "neutral";
+  const p95Tone: "warn" | "danger" | "neutral" = p95ms == null ? "neutral" : p95ms > 2000 ? "danger" : p95ms > 500 ? "warn" : "neutral";
+  const errorRateTone: "warn" | "danger" | "neutral" = errorRate > 0.05 ? "danger" : errorRate > 0.01 ? "warn" : "neutral";
+  const activeTone: "accent" | "neutral" = activeSessions > 0 ? "accent" : "neutral";
+
   return (
     <div className="px-6 py-6">
       <div className="grid grid-cols-3 gap-6">
         {/* Left column */}
         <div className="col-span-2 flex flex-col gap-6">
-          {/* Stats bar */}
-          <div className="grid grid-cols-4 gap-3">
-            <Card size="sm">
-              <CardContent>
-                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Agents</p>
-                <p className="mt-1 font-mono text-lg tabular-nums text-foreground">{agentCount}</p>
-              </CardContent>
-            </Card>
-            <Card size="sm">
-              <CardContent>
-                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Environments</p>
-                <p className="mt-1 font-mono text-lg tabular-nums text-foreground">{envCount}</p>
-              </CardContent>
-            </Card>
-            <Card size="sm">
-              <CardContent>
-                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Active Sessions</p>
-                <p className="mt-1 font-mono text-lg tabular-nums text-foreground">{activeSessions}</p>
-              </CardContent>
-            </Card>
-            <Card size="sm">
-              <CardContent>
-                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Total Sessions</p>
-                <p className="mt-1 font-mono text-lg tabular-nums text-foreground">{totalSessions}</p>
-              </CardContent>
-            </Card>
+          {/* Pulse tiles */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <StatTile label="Active" value={activeSessions} tone={activeTone} />
+            <StatTile label="Turns / 15m" value={turns15m} loading={metricsLoading} />
+            <StatTile label="Errors / 15m" value={errors15m} tone={errorsTone} loading={metricsLoading} />
+            <StatTile label="Cost / 15m" value={formatUsd(cost15m)} loading={metricsLoading} />
+            <StatTile
+              label="API p95"
+              value={p95ms != null ? `${Math.round(p95ms)}ms` : "—"}
+              tone={p95Tone}
+              loading={metricsLoading}
+            />
+            <StatTile
+              label="Error rate"
+              value={`${(errorRate * 100).toFixed(1)}%`}
+              tone={errorRateTone}
+              loading={metricsLoading}
+            />
           </div>
 
-          {/* Recent Activity */}
+          {/* Requests sparkline */}
+          <Link to="/dashboard" className="block group">
+            <Card size="sm" className="transition-colors group-hover:ring-foreground/20">
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                    Requests — last {API_WINDOW_MIN} min
+                  </span>
+                  <span className="text-[10px] text-muted-foreground font-mono">
+                    {totalRequests15m.toLocaleString()} total
+                  </span>
+                </div>
+                <div className="mt-2">
+                  <Sparkline
+                    data={apiMetricsQ.data?.timeline.map(t => t.count) ?? []}
+                    height={64}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          {/* Recent Activity — trimmed to 8 rows */}
           <Card>
             <CardHeader>
               <CardTitle>Recent Activity</CardTitle>
@@ -192,6 +237,39 @@ export function OverviewPage() {
               ) : (
                 <p className="mt-2 text-xs text-muted-foreground">No API key found</p>
               )}
+            </CardContent>
+          </Card>
+
+          {/* System mini-card */}
+          <Card size="sm">
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">System</span>
+                <Link to="/dashboard" className="text-[10px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-0.5">
+                  View analytics
+                  <ArrowRight className="size-3" />
+                </Link>
+              </div>
+              <div className="mt-2 flex flex-col gap-1 text-[11px] font-mono">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">requests</span>
+                  <span className="text-foreground tabular-nums">{totalRequests15m.toLocaleString()} <span className="text-muted-foreground">(60m)</span></span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">errors</span>
+                  <span className={`tabular-nums ${errors15m > 0 ? "text-amber-500" : "text-foreground"}`}>
+                    {errors15m} <span className="text-muted-foreground">(15m)</span>
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">agents</span>
+                  <span className="text-foreground tabular-nums">{agentCount}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">environments</span>
+                  <span className="text-foreground tabular-nums">{envCount}</span>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
