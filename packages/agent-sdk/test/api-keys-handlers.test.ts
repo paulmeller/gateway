@@ -391,6 +391,147 @@ describe("Per-key cost dashboard (PR2)", () => {
   });
 });
 
+describe("Metrics time-series per key (PR2.5)", () => {
+  beforeEach(() => freshDbEnv());
+
+  async function seedForTimeSeries(): Promise<{ adminKey: string; adminId: string; agentId: string; envId: string }> {
+    const { adminKey, adminId } = await bootDb();
+    const { createAgent } = await import("../src/db/agents");
+    const { getDb } = await import("../src/db/client");
+    const { newId } = await import("../src/util/ids");
+    const db = getDb();
+    const agent = createAgent({ name: "ts-test", model: "claude-sonnet-4-6" });
+    const envId = newId("env");
+    db.prepare(
+      `INSERT INTO environments (id, name, config_json, state, created_at) VALUES (?, ?, ?, 'ready', ?)`,
+    ).run(envId, "env-ts", JSON.stringify({ type: "cloud", provider: "docker" }), Date.now());
+    return { adminKey, adminId, agentId: agent.id, envId };
+  }
+
+  it("returns series shape when group_by=api_key + time_bucket are both present", async () => {
+    const { adminKey, adminId, agentId, envId } = await seedForTimeSeries();
+    const { getDb } = await import("../src/db/client");
+    const { newId } = await import("../src/util/ids");
+    const { handleGetMetrics } = await import("../src/handlers/metrics");
+    const db = getDb();
+
+    const dayMs = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    // Two sessions 2 days apart, both owned by adminId.
+    for (const daysAgo of [0, 2]) {
+      const id = newId("sess");
+      const at = now - daysAgo * dayMs;
+      db.prepare(
+        `INSERT INTO sessions (id, agent_id, agent_version, environment_id, status, metadata_json, usage_cost_usd, api_key_id, turn_count, created_at, updated_at)
+         VALUES (?, ?, 1, ?, 'idle', '{}', 0.50, ?, 3, ?, ?)`,
+      ).run(id, agentId, envId, adminId, at, at);
+    }
+
+    const from = now - 7 * dayMs;
+    const res = await handleGetMetrics(
+      req(`/v1/metrics?group_by=api_key&time_bucket=day&from=${from}&to=${now}`, { apiKey: adminKey }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      group_by: string;
+      time_bucket: string;
+      series: Array<{ key: string; name: string; points: Array<{ t: string; cost_usd: number; session_count: number }> }>;
+      totals: { cost_usd: number; session_count: number };
+    };
+    expect(body.group_by).toBe("api_key");
+    expect(body.time_bucket).toBe("day");
+    const adminSeries = body.series.find(s => s.key === adminId);
+    expect(adminSeries).toBeDefined();
+    expect(adminSeries!.points.length).toBeGreaterThanOrEqual(7);
+    // Two sessions × $0.50 = $1.00 aggregate
+    expect(body.totals.cost_usd).toBeCloseTo(1.0, 2);
+    expect(body.totals.session_count).toBe(2);
+    // Each point must have all four metric fields, zero-filled for empty buckets.
+    for (const p of adminSeries!.points) {
+      expect(typeof p.t).toBe("string");
+      expect(typeof p.cost_usd).toBe("number");
+    }
+  });
+
+  it("top-N cap collapses non-top keys into __other__", async () => {
+    const { adminKey } = await seedForTimeSeries();
+    const { getDb } = await import("../src/db/client");
+    const { createApiKey } = await import("../src/db/api_keys");
+    const { newId } = await import("../src/util/ids");
+    const { handleGetMetrics } = await import("../src/handlers/metrics");
+    const db = getDb();
+    const now = Date.now();
+
+    // 12 keys × 1 session each with varying cost. Top 10 get their own series;
+    // the remaining 2 should collapse to "__other__".
+    const { createAgent } = await import("../src/db/agents");
+    const agent = createAgent({ name: "topN", model: "claude-sonnet-4-6" });
+    const envId = newId("env");
+    db.prepare(
+      `INSERT INTO environments (id, name, config_json, state, created_at) VALUES (?, ?, ?, 'ready', ?)`,
+    ).run(envId, "env-topN", JSON.stringify({ type: "cloud", provider: "docker" }), now);
+
+    for (let i = 0; i < 12; i++) {
+      const { id: keyId } = createApiKey({
+        name: `key-${i}`,
+        permissions: { admin: false, scope: null },
+        rawKey: `ck_topn_${i}_padding_padding_x`,
+      });
+      const sessId = newId("sess");
+      db.prepare(
+        `INSERT INTO sessions (id, agent_id, agent_version, environment_id, status, metadata_json, usage_cost_usd, api_key_id, turn_count, created_at, updated_at)
+         VALUES (?, ?, 1, ?, 'idle', '{}', ?, ?, 1, ?, ?)`,
+      ).run(sessId, agent.id, envId, i + 1, keyId, now - 1000, now - 1000);
+    }
+
+    const res = await handleGetMetrics(
+      req(`/v1/metrics?group_by=api_key&time_bucket=day&from=${now - 86400000}&to=${now}`, { apiKey: adminKey }),
+    );
+    const body = await res.json() as { series: Array<{ key: string }> };
+    const keysInSeries = body.series.map(s => s.key);
+    expect(keysInSeries).toContain("__other__");
+    const topKeysCount = keysInSeries.filter(k => !k.startsWith("__")).length;
+    expect(topKeysCount).toBeLessThanOrEqual(10);
+  });
+
+  it("rejects hour bucket over a window > 30 days with a clear error", async () => {
+    const { adminKey } = await seedForTimeSeries();
+    const { handleGetMetrics } = await import("../src/handlers/metrics");
+    const now = Date.now();
+    const from = now - 31 * 24 * 60 * 60 * 1000;
+    const res = await handleGetMetrics(
+      req(`/v1/metrics?group_by=api_key&time_bucket=hour&from=${from}&to=${now}`, { apiKey: adminKey }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json() as { error: { message: string } };
+    expect(body.error.message).toMatch(/time_bucket=day/);
+  });
+
+  it("legacy sessions (api_key_id=null) collapse into __unattributed__", async () => {
+    const { adminKey, agentId, envId } = await seedForTimeSeries();
+    const { getDb } = await import("../src/db/client");
+    const { newId } = await import("../src/util/ids");
+    const { handleGetMetrics } = await import("../src/handlers/metrics");
+    const db = getDb();
+    const now = Date.now();
+
+    const sessId = newId("sess");
+    db.prepare(
+      `INSERT INTO sessions (id, agent_id, agent_version, environment_id, status, metadata_json, usage_cost_usd, api_key_id, turn_count, created_at, updated_at)
+       VALUES (?, ?, 1, ?, 'idle', '{}', 0.75, NULL, 1, ?, ?)`,
+    ).run(sessId, agentId, envId, now - 1000, now - 1000);
+
+    const res = await handleGetMetrics(
+      req(`/v1/metrics?group_by=api_key&time_bucket=day&from=${now - 86400000}&to=${now}`, { apiKey: adminKey }),
+    );
+    const body = await res.json() as { series: Array<{ key: string; points: Array<{ cost_usd: number }> }> };
+    const un = body.series.find(s => s.key === "__unattributed__");
+    expect(un).toBeDefined();
+    const total = un!.points.reduce((acc, p) => acc + p.cost_usd, 0);
+    expect(total).toBeCloseTo(0.75, 2);
+  });
+});
+
 describe("tenant_id passthrough (v0.5 reservation)", () => {
   beforeEach(() => freshDbEnv());
 

@@ -38,6 +38,7 @@ import {
   type ApiKeyView,
   type KeyPermissions,
 } from "@/hooks/use-api-keys";
+import { KeyCostOverTime } from "@/components/dashboard/KeyCostOverTime";
 
 function maskKey(key: string): string {
   if (key.length <= 10) return "••••••••";
@@ -302,6 +303,8 @@ export function ApiKeysPage() {
         </div>
       ) : (
         <>
+          <KeyCostOverTime />
+
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-medium text-foreground">Virtual keys</h2>
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
