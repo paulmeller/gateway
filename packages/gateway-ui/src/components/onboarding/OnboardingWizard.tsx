@@ -183,9 +183,9 @@ export function OnboardingWizard() {
   return (
     <div className="flex flex-1 items-center justify-center p-8">
       {step === 0 && <StepAgent onNext={handleAgentNext} />}
-      {step === 1 && <StepEnvironment onNext={handleEnvNext} />}
-      {step === 2 && <StepSecrets engine={agentData.engine} model={agentData.model} provider={envData.provider} hasExistingVaults={existingVaultIds.length > 0} onNext={handleSecretsNext} onSkip={() => setStep(3)} onSelectVault={handleSelectVault} />}
-      {step === 3 && <StepReady agentName={agentData.name} envName={envData.name} secretsLabel={getSecretsLabel()} onStart={handleStart} loading={loading} error={error} isExistingAgent={isExistingAgent} isExistingEnv={isExistingEnv} />}
+      {step === 1 && <StepEnvironment onNext={handleEnvNext} onBack={() => setStep(0)} />}
+      {step === 2 && <StepSecrets engine={agentData.engine} model={agentData.model} provider={envData.provider} hasExistingVaults={existingVaultIds.length > 0} onNext={handleSecretsNext} onSkip={() => setStep(3)} onSelectVault={handleSelectVault} onBack={() => setStep(1)} />}
+      {step === 3 && <StepReady agentName={agentData.name} envName={envData.name} secretsLabel={getSecretsLabel()} onStart={handleStart} loading={loading} error={error} isExistingAgent={isExistingAgent} isExistingEnv={isExistingEnv} onBack={() => setStep(2)} />}
     </div>
   );
 }

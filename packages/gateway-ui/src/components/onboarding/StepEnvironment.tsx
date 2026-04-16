@@ -28,9 +28,9 @@ export type EnvResult =
   | { mode: "create"; data: { name: string; provider: string } }
   | { mode: "select"; env: { id: string; name: string; provider: string } };
 
-interface Props { onNext: (result: EnvResult) => void; }
+interface Props { onNext: (result: EnvResult) => void; onBack?: () => void; }
 
-export function StepEnvironment({ onNext }: Props) {
+export function StepEnvironment({ onNext, onBack }: Props) {
   const { data: envs, isLoading, isError } = useEnvironments();
   const { data: providerStatus } = useProviderStatus();
   const readyEnvs = envs?.filter(e => e.state === "ready" || e.state === "active" || e.state === "idle") ?? [];
@@ -122,13 +122,16 @@ export function StepEnvironment({ onNext }: Props) {
         </div>
       )}
 
-      <Button
-        className="w-full h-10 bg-cta-gradient text-sm font-medium text-black hover:opacity-90"
-        onClick={handleContinue}
-        disabled={mode === "select" ? !selectedId : !name.trim() || !provider}
-      >
-        Continue
-      </Button>
+      <div className="flex gap-2">
+        {onBack && <Button variant="outline" className="h-10 px-4 text-sm" onClick={onBack}>Back</Button>}
+        <Button
+          className="flex-1 h-10 bg-cta-gradient text-sm font-medium text-black hover:opacity-90"
+          onClick={handleContinue}
+          disabled={mode === "select" ? !selectedId : !name.trim() || !provider}
+        >
+          Continue
+        </Button>
+      </div>
     </div>
   );
 }

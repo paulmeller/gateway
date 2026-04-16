@@ -12,8 +12,8 @@ export const anthropicProvider: ContainerProvider = {
   name: "anthropic",
   stripControlChars: false,
 
-  async checkAvailability() {
-    const key = process.env.ANTHROPIC_API_KEY;
+  async checkAvailability(secrets) {
+    const key = secrets?.ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_API_KEY;
     if (!key) {
       return { available: false, message: "ANTHROPIC_API_KEY required — add to vault or .env" };
     }

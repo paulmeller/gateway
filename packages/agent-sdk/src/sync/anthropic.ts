@@ -24,6 +24,7 @@ const BETA_HEADER = "managed-agents-2026-04-01";
 function anthropicHeaders(apiKey: string): Record<string, string> {
   return {
     "x-api-key": apiKey,
+    "anthropic-version": "2023-06-01",
     "anthropic-beta": BETA_HEADER,
     "content-type": "application/json",
   };
@@ -75,14 +76,23 @@ export async function syncAgent(
   // Inject MCP auth headers from vault before syncing
   const agentWithAuth = injectMcpAuthHeaders(agent, vaultEntries);
 
-  const agentConfig = {
+  // Convert mcp_servers from Record to array format for Anthropic API
+  const mcpArray = agentWithAuth.mcp_servers
+    ? Object.entries(agentWithAuth.mcp_servers).map(([name, config]) => ({
+        name,
+        ...config,
+      }))
+    : [];
+
+  const agentConfig: Record<string, unknown> = {
     name: agentWithAuth.name,
     model: agentWithAuth.model,
-    system: agentWithAuth.system,
-    tools: agentWithAuth.tools,
-    mcp_servers: agentWithAuth.mcp_servers,
-    model_config: agentWithAuth.model_config,
   };
+  if (agentWithAuth.system) agentConfig.system = agentWithAuth.system;
+  if (mcpArray.length > 0) agentConfig.mcp_servers = mcpArray;
+  if (agentWithAuth.model_config && Object.keys(agentWithAuth.model_config).length > 0) {
+    agentConfig.model_config = agentWithAuth.model_config;
+  }
   const hash = hashConfig(agentConfig);
 
   // Check if already synced with same config
@@ -120,21 +130,15 @@ export async function syncVault(
     return existing.remote_id;
   }
 
-  // Create vault on Anthropic
+  // Create vault on Anthropic (secrets are not synced — Anthropic's vault
+  // secrets API is not yet available. The vault is created empty and passed
+  // to the session for future use.)
   const remote = await anthropicPost<{ id: string }>("/v1/vaults", {
-    name: `agentstep-${vaultId.slice(0, 12)}`,
-    agent_id: agentRemoteId,
+    display_name: `agentstep-${vaultId.slice(0, 12)}`,
   }, apiKey);
 
-  // Put all entries
-  for (const entry of filteredEntries) {
-    await anthropicPut(`/v1/vaults/${remote.id}/entries/${entry.key}`, {
-      value: entry.value,
-    }, apiKey);
-  }
-
   upsertSync(vaultId, "vault", remote.id, hash);
-  console.log(`[sync] vault ${vaultId} → ${remote.id} (${filteredEntries.length} entries)`);
+  console.log(`[sync] vault ${vaultId} → ${remote.id}`);
   return remote.id;
 }
 

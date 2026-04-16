@@ -15,9 +15,10 @@ interface Props {
   onNext: (secrets: Record<string, string>) => void;
   onSkip: () => void;
   onSelectVault?: (vaultId: string, vaultName: string) => void;
+  onBack?: () => void;
 }
 
-export function StepSecrets({ engine, model, provider, hasExistingVaults, onNext, onSkip, onSelectVault }: Props) {
+export function StepSecrets({ engine, model, provider, hasExistingVaults, onNext, onSkip, onSelectVault, onBack }: Props) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [selectedVaultId, setSelectedVaultId] = useState("");
   const { data: vaults } = useVaults();
@@ -31,10 +32,23 @@ export function StepSecrets({ engine, model, provider, hasExistingVaults, onNext
   });
 
   const fields: Array<{ key: string; label: string }> = [];
+  const seenKeys = new Set<string>();
+
+  // Anthropic provider requires a real API key (not OAuth token)
+  if (provider === "anthropic") {
+    fields.push({ key: "ANTHROPIC_API_KEY", label: "Anthropic API Key (required for hosted execution)" });
+    seenKeys.add("ANTHROPIC_API_KEY");
+  }
+
   const engineKey = getEngineKey(engine, model);
-  if (engineKey) fields.push(engineKey);
+  if (engineKey && !seenKeys.has(engineKey.key)) {
+    fields.push(engineKey);
+    seenKeys.add(engineKey.key);
+  }
   const providerToken = PROVIDER_TOKENS[provider];
-  if (providerToken) fields.push({ key: providerToken.key, label: providerToken.label });
+  if (providerToken && !seenKeys.has(providerToken.key)) {
+    fields.push({ key: providerToken.key, label: providerToken.label });
+  }
 
   // "existing" = agent has vaults OR there are vaults to pick from
   const hasExisting = hasExistingVaults || availableVaults.length > 0;
@@ -54,7 +68,10 @@ export function StepSecrets({ engine, model, provider, hasExistingVaults, onNext
           <h2 className="text-lg font-semibold text-foreground">Secrets</h2>
           <p className="text-sm text-muted-foreground mt-1">No API keys needed for this combination.</p>
         </div>
-        <Button className="w-full h-10 bg-cta-gradient text-sm font-medium text-black hover:opacity-90" onClick={onSkip}>Continue</Button>
+        <div className="flex gap-2">
+          {onBack && <Button variant="outline" className="h-10 px-4 text-sm" onClick={onBack}>Back</Button>}
+          <Button className="flex-1 h-10 bg-cta-gradient text-sm font-medium text-black hover:opacity-90" onClick={onSkip}>Continue</Button>
+        </div>
       </div>
     );
   }
@@ -124,13 +141,16 @@ export function StepSecrets({ engine, model, provider, hasExistingVaults, onNext
         </div>
       )}
 
-      <Button
-        className="w-full h-10 bg-cta-gradient text-sm font-medium text-black hover:opacity-90"
-        onClick={handleContinue}
-        disabled={mode === "select" && !hasExistingVaults && !selectedVaultId}
-      >
-        Continue
-      </Button>
+      <div className="flex gap-2">
+        {onBack && <Button variant="outline" className="h-10 px-4 text-sm" onClick={onBack}>Back</Button>}
+        <Button
+          className="flex-1 h-10 bg-cta-gradient text-sm font-medium text-black hover:opacity-90"
+          onClick={handleContinue}
+          disabled={mode === "select" && !hasExistingVaults && !selectedVaultId}
+        >
+          Continue
+        </Button>
+      </div>
     </div>
   );
 }
