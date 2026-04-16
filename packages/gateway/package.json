@@ -11,16 +11,17 @@
   ],
   "scripts": {
     "build": "node build.js",
+    "test": "vitest run",
     "prepublishOnly": "npm run build"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/agentstep/managed-agents.git",
+    "url": "https://github.com/agentstep/gateway.git",
     "directory": "packages/gateway"
   },
   "license": "Apache-2.0",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "dependencies": {
     "@clack/prompts": "^1.2.0",
@@ -40,6 +41,7 @@
     "ora": "^8.2.0",
     "tsx": "^4.19.0",
     "typescript": "^5.9.3",
+    "vitest": "^4.1.4",
     "yaml": "^2.7.1"
   }
 }

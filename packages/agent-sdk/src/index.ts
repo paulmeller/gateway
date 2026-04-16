@@ -44,7 +44,7 @@ export type {
 export { pushPendingUserInput, type TurnInput } from "./state";
 
 // DB
-export { getDb } from "./db/client";
+export { getDb, closeDb } from "./db/client";
 export { createApiKey, listApiKeys } from "./db/api_keys";
 export { createAgent, getAgent, updateAgent, archiveAgent, listAgents } from "./db/agents";
 export {

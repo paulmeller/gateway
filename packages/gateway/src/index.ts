@@ -17,6 +17,7 @@ import { registerConfigCommands } from "./commands/config.js";
 import { registerVersionCommand } from "./commands/version.js";
 import { registerSkillsCommands } from "./commands/skills.js";
 import { registerProviderCommands } from "./commands/providers.js";
+import { registerDbCommands } from "./commands/db.js";
 import { ensureTelemetryConsent, trackCommand } from "./telemetry/index.js";
 
 const program = new Command("gateway")
@@ -33,7 +34,10 @@ const program = new Command("gateway")
   })
   .hook("preAction", async (_thisCmd, actionCommand) => {
     const name = actionCommand.name();
-    if (name === "config" || name === "version") return;
+    // Skip telemetry consent for non-network / admin commands so they can
+    // run offline and don't trigger any surrounding init that might open
+    // the DB (important for `db reset`, which needs the file free).
+    if (name === "config" || name === "version" || name === "reset") return;
     await ensureTelemetryConsent();
   })
   .hook("postAction", (_thisCmd, actionCommand) => {
@@ -106,6 +110,7 @@ registerSkillsCommands(program);
 registerProviderCommands(program);
 registerConfigCommands(program);
 registerVersionCommand(program);
+registerDbCommands(program);
 
 // Parse and run
 program.parseAsync(process.argv).then(() => {
