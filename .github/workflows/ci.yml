@@ -33,6 +33,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run build -w @agentstep/agent-sdk
       - run: cd packages/gateway && node build.js
       - run: node packages/gateway/dist/gateway.js version
       # Smoke: db reset help works end-to-end from the bundled CLI.
