@@ -357,7 +357,13 @@ export const SessionSchema = registry.register(
     agent: z.object({ id: UlidId, version: z.number().int().positive() }),
     environment_id: UlidId,
     status: SessionStatusSchema,
-    stop_reason: z.string().nullable(),
+    stop_reason: z.union([
+      z.object({
+        type: z.string().openapi({ description: "Stop reason type, e.g. 'end_turn', 'error', 'interrupted', 'requires_action'." }),
+        event_ids: z.array(z.string()).optional().openapi({ description: "Event IDs associated with this stop reason (e.g. custom_tool_use events for requires_action)." }),
+      }),
+      z.null(),
+    ]).openapi({ description: "Structured stop reason for the session's last turn, or null if no turn has completed." }),
     title: z.string().nullable(),
     metadata: z.record(z.unknown()),
     max_budget_usd: z.number().nullable().openapi({
@@ -692,5 +698,621 @@ export const EnvironmentDeletedResponseSchema = registry.register(
 
 export const UserEventAppendResponseSchema = registry.register(
   "UserEventAppendResponse",
-  z.object({ events: z.array(ManagedEventSchema) }),
+  z.object({ data: z.array(ManagedEventSchema) }),
+);
+
+// ---------------------------------------------------------------------------
+// Files
+// ---------------------------------------------------------------------------
+
+const FileScopeSchema = z.object({
+  type: z.enum(["session"]).openapi({ description: "Scope type. Currently only 'session' is supported." }),
+  id: z.string().openapi({ description: "ID of the owning session." }),
+});
+
+export const FileRecordSchema = registry.register(
+  "FileRecord",
+  z.object({
+    id: UlidId,
+    filename: z.string(),
+    size: z.number().int().nonnegative(),
+    content_type: z.string(),
+    scope: FileScopeSchema.nullable().openapi({
+      description: "Scope the file is attached to. Null for legacy unscoped files (global-admin only).",
+    }),
+    created_at: IsoTimestamp,
+  }),
+);
+
+export const FileListResponseSchema = registry.register(
+  "FileListResponse",
+  z.object({ data: z.array(FileRecordSchema) }),
+);
+
+export const FileDeletedResponseSchema = registry.register(
+  "FileDeletedResponse",
+  z.object({ id: UlidId, type: z.literal("file_deleted") }),
+);
+
+// ---------------------------------------------------------------------------
+// Vault Credentials
+// ---------------------------------------------------------------------------
+
+export const VaultCredentialSchema = registry.register(
+  "VaultCredential",
+  z.object({
+    id: UlidId,
+    vault_id: UlidId,
+    display_name: z.string(),
+    auth: z.object({
+      type: z.string().openapi({ description: "Auth type, e.g. 'static_bearer'." }),
+      mcp_server_url: z.string().nullable().openapi({ description: "Associated MCP server URL, if any." }),
+    }),
+    created_at: IsoTimestamp,
+    updated_at: IsoTimestamp,
+  }).openapi({ description: "Vault credential metadata. The secret token is NEVER returned in API responses." }),
+);
+
+export const CreateCredentialRequestSchema = registry.register(
+  "CreateCredentialRequest",
+  z.object({
+    display_name: z.string().min(1).max(200),
+    auth: z.object({
+      type: z.enum(["static_bearer"]),
+      token: z.string().min(1).openapi({ description: "Secret token value. Stored encrypted; never returned." }),
+      mcp_server_url: z.string().url().optional(),
+    }),
+  }),
+);
+
+export const UpdateCredentialRequestSchema = registry.register(
+  "UpdateCredentialRequest",
+  z.object({
+    display_name: z.string().min(1).max(200).optional(),
+    auth: z.object({
+      type: z.enum(["static_bearer"]).optional(),
+      token: z.string().min(1).optional(),
+      mcp_server_url: z.string().url().nullish(),
+    }).optional(),
+  }),
+);
+
+export const CredentialListResponseSchema = registry.register(
+  "CredentialListResponse",
+  z.object({ data: z.array(VaultCredentialSchema) }),
+);
+
+export const CredentialDeletedResponseSchema = registry.register(
+  "CredentialDeletedResponse",
+  z.object({ id: UlidId, type: z.literal("credential_deleted") }),
+);
+
+// ---------------------------------------------------------------------------
+// Memory Stores & Memories
+// ---------------------------------------------------------------------------
+
+export const MemoryStoreSchema = registry.register(
+  "MemoryStore",
+  z.object({
+    id: UlidId,
+    name: z.string(),
+    description: z.string().nullable(),
+    agent_id: z.string().nullable().openapi({ description: "Owning agent ID. Null for legacy global stores." }),
+    created_at: IsoTimestamp,
+    updated_at: IsoTimestamp,
+  }),
+);
+
+export const CreateMemoryStoreRequestSchema = registry.register(
+  "CreateMemoryStoreRequest",
+  z.object({
+    name: z.string().min(1),
+    description: z.string().optional(),
+    agent_id: z.string().min(1).openapi({ description: "Agent to attach this store to." }),
+  }),
+);
+
+export const MemoryStoreListResponseSchema = registry.register(
+  "MemoryStoreListResponse",
+  z.object({ data: z.array(MemoryStoreSchema) }),
+);
+
+export const MemoryStoreDeletedResponseSchema = registry.register(
+  "MemoryStoreDeletedResponse",
+  z.object({ id: UlidId, type: z.literal("memory_store_deleted") }),
+);
+
+export const MemorySchema = registry.register(
+  "Memory",
+  z.object({
+    id: UlidId,
+    store_id: UlidId,
+    path: z.string(),
+    content: z.string(),
+    content_sha256: z.string().openapi({ description: "SHA-256 hash of the content. Used for optimistic concurrency in PATCH." }),
+    created_at: IsoTimestamp,
+    updated_at: IsoTimestamp,
+  }),
+);
+
+export const CreateMemoryRequestSchema = registry.register(
+  "CreateMemoryRequest",
+  z.object({
+    path: z.string().min(1),
+    content: z.string(),
+  }),
+);
+
+export const UpdateMemoryRequestSchema = registry.register(
+  "UpdateMemoryRequest",
+  z.object({
+    content: z.string(),
+    content_sha256: z.string().optional().openapi({
+      description: "Optimistic concurrency check. If provided and does not match the current hash, returns 409.",
+    }),
+  }),
+);
+
+export const MemoryListResponseSchema = registry.register(
+  "MemoryListResponse",
+  z.object({ data: z.array(MemorySchema) }),
+);
+
+export const MemoryDeletedResponseSchema = registry.register(
+  "MemoryDeletedResponse",
+  z.object({ id: UlidId, type: z.literal("memory_deleted") }),
+);
+
+// ---------------------------------------------------------------------------
+// Session Resources
+// ---------------------------------------------------------------------------
+
+export const SessionResourceSchema = registry.register(
+  "SessionResource",
+  z.object({
+    id: z.string().openapi({ description: "Resource index id, e.g. 'res_0'." }),
+    type: z.enum(["uri", "text", "file", "github_repository"]),
+    uri: z.string().optional(),
+    content: z.string().optional(),
+    file_id: z.string().optional(),
+    mount_path: z.string().optional(),
+    repository_url: z.string().optional(),
+    branch: z.string().optional(),
+    commit: z.string().optional(),
+    session_id: UlidId,
+    created_at: IsoTimestamp.optional(),
+  }),
+);
+
+export const AddResourceRequestSchema = registry.register(
+  "AddResourceRequest",
+  z.object({
+    type: z.enum(["uri", "text", "file", "github_repository"]),
+    uri: z.string().optional(),
+    content: z.string().optional(),
+    file_id: z.string().optional(),
+    mount_path: z.string().optional(),
+    repository_url: z.string().optional(),
+    branch: z.string().optional(),
+    commit: z.string().optional(),
+  }),
+);
+
+export const ResourceListResponseSchema = registry.register(
+  "ResourceListResponse",
+  z.object({ data: z.array(SessionResourceSchema) }),
+);
+
+export const ResourceDeletedResponseSchema = registry.register(
+  "ResourceDeletedResponse",
+  z.object({ id: z.string(), type: z.literal("session_resource_deleted") }),
+);
+
+// ---------------------------------------------------------------------------
+// API Keys
+// ---------------------------------------------------------------------------
+
+const KeyScopeSchema = z.object({
+  agents: z.array(z.string()),
+  environments: z.array(z.string()),
+  vaults: z.array(z.string()),
+});
+
+const KeyPermissionsSchema = z.object({
+  admin: z.boolean().openapi({ description: "Whether this key has admin privileges." }),
+  scope: KeyScopeSchema.nullable().openapi({ description: "Resource scope restrictions. Null = unrestricted within tenancy." }),
+});
+
+export const ApiKeySchema = registry.register(
+  "ApiKey",
+  z.object({
+    id: UlidId,
+    name: z.string(),
+    prefix: z.string().openapi({ description: "First characters of the key, for identification." }),
+    permissions: KeyPermissionsSchema,
+    tenant_id: z.string().nullable(),
+    created_at: z.number().openapi({ description: "Unix timestamp in milliseconds." }),
+  }),
+);
+
+export const ApiKeyCreatedSchema = registry.register(
+  "ApiKeyCreated",
+  z.object({
+    id: UlidId,
+    name: z.string(),
+    key: z.string().openapi({ description: "The full API key. Returned ONCE at creation time — store it securely." }),
+    permissions: KeyPermissionsSchema,
+    tenant_id: z.string().nullable(),
+  }),
+);
+
+export const CreateApiKeyRequestSchema = registry.register(
+  "CreateApiKeyRequest",
+  z.object({
+    name: z.string().min(1).max(200),
+    permissions: KeyPermissionsSchema.optional(),
+    tenant_id: z.string().optional(),
+  }),
+);
+
+export const PatchApiKeyRequestSchema = registry.register(
+  "PatchApiKeyRequest",
+  z.object({
+    permissions: KeyPermissionsSchema,
+  }),
+);
+
+export const ApiKeyListResponseSchema = registry.register(
+  "ApiKeyListResponse",
+  z.object({ data: z.array(ApiKeySchema) }),
+);
+
+export const ApiKeyRevokedResponseSchema = registry.register(
+  "ApiKeyRevokedResponse",
+  z.object({ ok: z.literal(true), id: UlidId }),
+);
+
+export const ApiKeyActivityResponseSchema = registry.register(
+  "ApiKeyActivityResponse",
+  z.object({
+    id: UlidId,
+    name: z.string(),
+    sessions: z.array(SessionSchema),
+    totals: z.object({
+      session_count: z.number().int().nonnegative(),
+      cost_usd: z.number().nonnegative(),
+      turn_count: z.number().int().nonnegative(),
+      error_count: z.number().int().nonnegative(),
+    }),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Upstream Keys
+// ---------------------------------------------------------------------------
+
+export const UpstreamKeySchema = registry.register(
+  "UpstreamKey",
+  z.object({
+    id: UlidId,
+    provider: z.string().openapi({ description: "Provider name, e.g. 'anthropic', 'openai', 'gemini'." }),
+    prefix: z.string().openapi({ description: "First 10 characters of the key, for identification." }),
+    weight: z.number().int().positive(),
+    disabled_at: z.number().nullable().openapi({ description: "Unix ms timestamp when key was disabled, or null if active." }),
+    last_used_at: z.number().nullable().openapi({ description: "Unix ms timestamp of last use." }),
+    created_at: z.number().openapi({ description: "Unix ms timestamp." }),
+  }),
+);
+
+export const AddUpstreamKeyRequestSchema = registry.register(
+  "AddUpstreamKeyRequest",
+  z.object({
+    provider: z.enum(["anthropic", "openai", "gemini"]),
+    value: z.string().min(20).max(500).openapi({ description: "The raw API key value. Stored encrypted; never returned." }),
+    weight: z.number().int().positive().optional(),
+  }),
+);
+
+export const PatchUpstreamKeyRequestSchema = registry.register(
+  "PatchUpstreamKeyRequest",
+  z.object({
+    disabled: z.boolean().openapi({ description: "Set to true to disable, false to re-enable." }),
+  }),
+);
+
+export const UpstreamKeyListResponseSchema = registry.register(
+  "UpstreamKeyListResponse",
+  z.object({ data: z.array(UpstreamKeySchema) }),
+);
+
+export const UpstreamKeyDeletedResponseSchema = registry.register(
+  "UpstreamKeyDeletedResponse",
+  z.object({ ok: z.literal(true), id: UlidId }),
+);
+
+// ---------------------------------------------------------------------------
+// Tenants
+// ---------------------------------------------------------------------------
+
+export const TenantSchema = registry.register(
+  "Tenant",
+  z.object({
+    id: z.string().openapi({ example: "tenant_default" }),
+    name: z.string(),
+    created_at: IsoTimestamp,
+    archived_at: IsoTimestamp.nullable(),
+  }),
+);
+
+export const CreateTenantRequestSchema = registry.register(
+  "CreateTenantRequest",
+  z.object({
+    name: z.string().min(1).max(200),
+    id: z.string().regex(/^tenant_[a-z0-9_-]+$/i).optional().openapi({
+      description: "Custom tenant ID. Must start with 'tenant_'. Auto-generated if omitted.",
+    }),
+  }),
+);
+
+export const PatchTenantRequestSchema = registry.register(
+  "PatchTenantRequest",
+  z.object({
+    name: z.string().min(1).max(200).optional(),
+  }),
+);
+
+export const TenantListResponseSchema = registry.register(
+  "TenantListResponse",
+  z.object({ data: z.array(TenantSchema) }),
+);
+
+export const TenantArchivedResponseSchema = registry.register(
+  "TenantArchivedResponse",
+  z.object({ ok: z.literal(true), id: z.string() }),
+);
+
+// ---------------------------------------------------------------------------
+// Audit Log
+// ---------------------------------------------------------------------------
+
+export const AuditEntrySchema = registry.register(
+  "AuditEntry",
+  z.object({
+    id: UlidId,
+    created_at: IsoTimestamp,
+    actor_key_id: z.string().nullable().openapi({ description: "API key ID of the actor, or null for system-initiated." }),
+    actor_name: z.string().nullable().openapi({ description: "Friendly name of the actor at log time." }),
+    tenant_id: z.string().nullable(),
+    action: z.string().openapi({ description: "Dotted verb, e.g. 'tenants.create', 'api_keys.revoke'." }),
+    resource_type: z.string().nullable().openapi({ description: "Resource type: 'agent', 'tenant', 'api_key', 'upstream_key', etc." }),
+    resource_id: z.string().nullable(),
+    outcome: z.enum(["success", "denied", "failure"]),
+    metadata: z.record(z.unknown()).nullable().openapi({ description: "Action-specific context." }),
+  }),
+);
+
+export const AuditListResponseSchema = registry.register(
+  "AuditListResponse",
+  z.object({
+    data: z.array(AuditEntrySchema),
+    next_page: z.string().nullable(),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Traces
+// ---------------------------------------------------------------------------
+
+export const TraceListItemSchema = registry.register(
+  "TraceListItem",
+  z.object({
+    trace_id: z.string(),
+    start_ms: z.number(),
+    end_ms: z.number(),
+    duration_ms: z.number().nonnegative(),
+    event_count: z.number().int().nonnegative(),
+    session_count: z.number().int().nonnegative(),
+    first_session_id: z.string(),
+  }),
+);
+
+export const TraceListResponseSchema = registry.register(
+  "TraceListResponse",
+  z.object({ data: z.array(TraceListItemSchema) }),
+);
+
+const SpanNodeSchema: z.ZodType<unknown> = z.lazy(() =>
+  z.object({
+    span_id: z.string(),
+    parent_span_id: z.string().nullable(),
+    session_id: z.string(),
+    name: z.string(),
+    start_ms: z.number(),
+    end_ms: z.number().nullable(),
+    duration_ms: z.number().nullable(),
+    status: z.enum(["ok", "error", "interrupted", "unclosed"]),
+    attributes: z.record(z.unknown()),
+    children: z.array(SpanNodeSchema),
+  }),
+);
+
+export const TraceDetailSchema = registry.register(
+  "TraceDetail",
+  z.object({
+    trace_id: z.string(),
+    span_count: z.number().int().nonnegative(),
+    session_ids: z.array(z.string()),
+    start_ms: z.number(),
+    end_ms: z.number(),
+    duration_ms: z.number().nonnegative(),
+    turn_count: z.number().int().nonnegative(),
+    tool_call_count: z.number().int().nonnegative(),
+    error_count: z.number().int().nonnegative(),
+    input_tokens: z.number().int().nonnegative(),
+    output_tokens: z.number().int().nonnegative(),
+    cache_read_input_tokens: z.number().int().nonnegative(),
+    cache_creation_input_tokens: z.number().int().nonnegative(),
+    cost_usd: z.number().nonnegative(),
+    spans: z.array(z.record(z.unknown())).openapi({ description: "Span tree with nested children." }),
+    events: z.array(ManagedEventSchema),
+  }),
+);
+
+export const TraceExportResponseSchema = registry.register(
+  "TraceExportResponse",
+  z.object({
+    ok: z.boolean(),
+  }).catchall(z.unknown()),
+);
+
+// ---------------------------------------------------------------------------
+// Skills
+// ---------------------------------------------------------------------------
+
+export const SkillsCatalogResponseSchema = registry.register(
+  "SkillsCatalogResponse",
+  z.object({
+    skills: z.array(z.record(z.unknown())),
+    total: z.number().int().nonnegative(),
+  }),
+);
+
+export const SkillsSearchResponseSchema = registry.register(
+  "SkillsSearchResponse",
+  z.object({
+    skills: z.array(z.record(z.unknown())),
+    total: z.number().int().nonnegative(),
+    limit: z.number().int().nonnegative(),
+    offset: z.number().int().nonnegative(),
+  }),
+);
+
+export const SkillsStatsResponseSchema = registry.register(
+  "SkillsStatsResponse",
+  z.record(z.unknown()).openapi({ description: "Aggregated skill statistics." }),
+);
+
+export const SkillsSourcesResponseSchema = registry.register(
+  "SkillsSourcesResponse",
+  z.object({
+    data: z.array(z.record(z.unknown())),
+    total: z.number().int().nonnegative(),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Metrics
+// ---------------------------------------------------------------------------
+
+const MetricsTotalsSchema = z.object({
+  session_count: z.number().int().nonnegative(),
+  turn_count: z.number().int().nonnegative(),
+  tool_call_count: z.number().int().nonnegative(),
+  error_count: z.number().int().nonnegative(),
+  active_seconds: z.number().nonnegative(),
+  input_tokens: z.number().int().nonnegative(),
+  output_tokens: z.number().int().nonnegative(),
+  cache_read_input_tokens: z.number().int().nonnegative(),
+  cache_creation_input_tokens: z.number().int().nonnegative(),
+  cost_usd: z.number().nonnegative(),
+});
+
+export const MetricsResponseSchema = registry.register(
+  "MetricsResponse",
+  z.object({
+    window: z.object({ from: z.number(), to: z.number() }),
+    group_by: z.string(),
+    totals: MetricsTotalsSchema,
+    groups: z.array(MetricsTotalsSchema.extend({ key: z.string() })),
+    stop_reasons: z.record(z.number()),
+    tool_latency_p50_ms: z.number().nullable(),
+    tool_latency_p95_ms: z.number().nullable(),
+    tool_latency_p99_ms: z.number().nullable(),
+    tool_call_sample_count: z.number().int().nonnegative(),
+  }),
+);
+
+export const ApiMetricsResponseSchema = registry.register(
+  "ApiMetricsResponse",
+  z.object({
+    window_ms: z.number(),
+    window_minutes: z.number(),
+    now_ms: z.number(),
+    totals: z.object({
+      count: z.number().int().nonnegative(),
+      rps: z.number().nonnegative(),
+      p50_ms: z.number().nullable(),
+      p95_ms: z.number().nullable(),
+      p99_ms: z.number().nullable(),
+      status_2xx: z.number().int().nonnegative(),
+      status_3xx: z.number().int().nonnegative(),
+      status_4xx: z.number().int().nonnegative(),
+      status_5xx: z.number().int().nonnegative(),
+      error_rate: z.number().nonnegative(),
+    }),
+    routes: z.array(z.record(z.unknown())),
+    timeline: z.array(z.record(z.unknown())),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Settings
+// ---------------------------------------------------------------------------
+
+export const PutSettingRequestSchema = registry.register(
+  "PutSettingRequest",
+  z.object({
+    key: z.string().openapi({ description: "Setting key to update." }),
+    value: z.string().openapi({ description: "New value for the setting." }),
+  }),
+);
+
+export const SettingResponseSchema = registry.register(
+  "SettingResponse",
+  z.object({
+    key: z.string(),
+    value: z.string().nullable(),
+    configured: z.boolean(),
+    masked: z.boolean().optional().openapi({ description: "True when the value is a masked secret." }),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Providers
+// ---------------------------------------------------------------------------
+
+export const ProviderStatusResponseSchema = registry.register(
+  "ProviderStatusResponse",
+  z.object({
+    data: z.record(z.object({
+      available: z.boolean(),
+      message: z.string().optional(),
+    })).openapi({ description: "Per-provider availability status." }),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Auth (Whoami + License)
+// ---------------------------------------------------------------------------
+
+export const WhoamiResponseSchema = registry.register(
+  "WhoamiResponse",
+  z.object({
+    name: z.string(),
+    tenant_id: z.string().nullable(),
+    is_global_admin: z.boolean(),
+    permissions: KeyPermissionsSchema,
+  }),
+);
+
+export const LicenseResponseSchema = registry.register(
+  "LicenseResponse",
+  z.object({
+    plan: z.enum(["community", "enterprise"]),
+    features: z.array(z.string()),
+    limits: z.object({
+      maxKeys: z.number().int(),
+      auditRetentionMs: z.number().int(),
+    }).nullable().openapi({ description: "Community-tier limits. Null for enterprise." }),
+  }),
 );
