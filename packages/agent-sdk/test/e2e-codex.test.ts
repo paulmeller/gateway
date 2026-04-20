@@ -44,12 +44,14 @@ function freshDbEnv(): void {
   process.env.OPENAI_API_KEY = "sk-fake-for-test";
   const g = globalThis as typeof globalThis & {
     __caDb?: unknown;
+    __caDrizzle?: unknown;
     __caInitialized?: unknown;
     __caBusEmitters?: unknown;
     __caConfigCache?: unknown;
     __caRuntime?: unknown;
   };
   delete g.__caDb;
+  delete g.__caDrizzle;
   delete g.__caInitialized;
   delete g.__caBusEmitters;
   delete g.__caConfigCache;
@@ -139,7 +141,7 @@ describe("e2e codex round-trip (fake exec)", () => {
     expect(msgPayload.content[0].text).toBe("4");
 
     const idle = events.filter((e) => e.type === "session.status_idle").at(-1);
-    expect(JSON.parse(idle!.payload_json)).toMatchObject({ stop_reason: "end_turn" });
+    expect(JSON.parse(idle!.payload_json)).toMatchObject({ stop_reason: { type: "end_turn" } });
 
     // Usage propagated from turn.completed
     const spanEnd = events.find((e) => e.type === "span.model_request_end");

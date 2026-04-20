@@ -9,11 +9,13 @@ function freshDbEnv() {
   // Force re-import of singleton client
   const g = globalThis as typeof globalThis & {
     __caDb?: unknown;
+    __caDrizzle?: unknown;
     __caInitialized?: unknown;
     __caBusEmitters?: unknown;
     __caConfigCache?: unknown;
   };
   delete g.__caDb;
+  delete g.__caDrizzle;
   delete g.__caInitialized;
   delete g.__caBusEmitters;
   delete g.__caConfigCache;

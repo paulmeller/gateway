@@ -14,11 +14,13 @@ function makeAgent(mcpServers: Record<string, { type?: string; url?: string; hea
     mcp_servers: mcpServers as Agent["mcp_servers"],
     webhook_url: null,
     webhook_events: [],
+    webhook_signing_enabled: false,
     threads_enabled: false,
     confirmation_mode: false,
     callable_agents: [],
     skills: [],
     model_config: {},
+    fallback_json: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   } as Agent;

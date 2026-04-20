@@ -25,6 +25,7 @@ function freshDbEnv(): void {
   process.env.DATABASE_PATH = path.join(dir, "test.db");
   const g = globalThis as typeof globalThis & {
     __caDb?: unknown;
+    __caDrizzle?: unknown;
     __caInitialized?: unknown;
     __caInitPromise?: unknown;
     __caBusEmitters?: unknown;
@@ -34,6 +35,7 @@ function freshDbEnv(): void {
     __caActors?: unknown;
   };
   delete g.__caDb;
+  delete g.__caDrizzle;
   delete g.__caInitialized;
   delete g.__caInitPromise;
   delete g.__caBusEmitters;
@@ -157,7 +159,7 @@ async function createEnv(overrides: Record<string, unknown> = {}): Promise<Recor
   const config = overrides.config ?? { type: "cloud", provider: "sprites" };
 
   db.prepare(
-    `INSERT INTO environments (id, name, config_json, state, created_at) VALUES (?, ?, ?, 'ready', ?)`,
+    `INSERT INTO environments (id, name, config_json, state, tenant_id, created_at) VALUES (?, ?, ?, 'ready', 'tenant_default', ?)`,
   ).run(id, name, JSON.stringify(config), now);
 
   return {
@@ -190,9 +192,15 @@ async function createVault(agentId: string, name: string): Promise<Record<string
   return callHandler(handleCreateVault, "POST", "/v1/vaults", { agent_id: agentId, name });
 }
 
-async function createMemoryStore(name: string, description?: string): Promise<Record<string, unknown>> {
+async function createMemoryStore(name: string, description?: string, agentId?: string): Promise<Record<string, unknown>> {
+  // v0.5: memory stores require an agent_id. Create one if not provided.
+  let aid = agentId;
+  if (!aid) {
+    const agent = await createAgent(`mem-agent-${Date.now()}`);
+    aid = agent.id as string;
+  }
   const { handleCreateMemoryStore } = await import("../src/handlers/memory");
-  return callHandler(handleCreateMemoryStore, "POST", "/v1/memory_stores", { name, description });
+  return callHandler(handleCreateMemoryStore, "POST", "/v1/memory_stores", { name, description, agent_id: aid });
 }
 
 // ---------------------------------------------------------------------------
@@ -265,8 +273,8 @@ describe("Quickstart Flow", () => {
       { events: [{ type: "user.message", content: [{ type: "text", text: "Hello agent!" }] }] },
       session.id as string,
     );
-    expect(result.events.length).toBe(1);
-    expect(result.events[0].type).toBe("user.message");
+    expect(result.data.length).toBe(1);
+    expect(result.data[0].type).toBe("user.message");
   });
 
   it("quickstart with different engine (codex)", async () => {
@@ -346,16 +354,16 @@ describe("Quickstart Flow", () => {
     const session = await createSession(agent.id as string, env.id as string);
 
     const { handlePostEvents } = await import("../src/handlers/events");
-    const result = await callHandler<{ events: Array<{ type: string; content?: unknown }> }>(
+    const result = await callHandler<{ data: Array<{ type: string; content?: unknown }> }>(
       handlePostEvents,
       "POST",
       `/v1/sessions/${session.id}/events`,
       { events: [{ type: "user.message", content: [{ type: "text", text: "hi" }] }] },
       session.id as string,
     );
-    expect(result.events).toBeDefined();
-    expect(result.events.length).toBeGreaterThanOrEqual(1);
-    expect(result.events[0].type).toBe("user.message");
+    expect(result.data).toBeDefined();
+    expect(result.data.length).toBeGreaterThanOrEqual(1);
+    expect(result.data[0].type).toBe("user.message");
   });
 
   it("list events returns posted message", async () => {
@@ -772,15 +780,15 @@ describe("Event CLI Operations", () => {
     const env = await createEnv({ name: "SendEvtEnv" });
     const session = await createSession(agent.id as string, env.id as string);
     const { handlePostEvents } = await import("../src/handlers/events");
-    const result = await callHandler<{ events: Array<{ type: string }> }>(
+    const result = await callHandler<{ data: Array<{ type: string }> }>(
       handlePostEvents,
       "POST",
       `/v1/sessions/${session.id}/events`,
       { events: [{ type: "user.message", content: [{ type: "text", text: "hello CLI" }] }] },
       session.id as string,
     );
-    expect(result.events.length).toBe(1);
-    expect(result.events[0].type).toBe("user.message");
+    expect(result.data.length).toBe(1);
+    expect(result.data[0].type).toBe("user.message");
   });
 
   it("events list returns events with seq", async () => {
@@ -843,14 +851,14 @@ describe("Event CLI Operations", () => {
     const env = await createEnv({ name: "InterruptEnv" });
     const session = await createSession(agent.id as string, env.id as string);
     const { handlePostEvents } = await import("../src/handlers/events");
-    const result = await callHandler<{ events: Array<{ type: string }> }>(
+    const result = await callHandler<{ data: Array<{ type: string }> }>(
       handlePostEvents,
       "POST",
       `/v1/sessions/${session.id}/events`,
       { events: [{ type: "user.interrupt" }] },
       session.id as string,
     );
-    expect(result.events[0].type).toBe("user.interrupt");
+    expect(result.data[0].type).toBe("user.interrupt");
   });
 
   it("events send multiple events", async () => {
@@ -859,7 +867,7 @@ describe("Event CLI Operations", () => {
     const env = await createEnv({ name: "MultiEvtEnv" });
     const session = await createSession(agent.id as string, env.id as string);
     const { handlePostEvents } = await import("../src/handlers/events");
-    const result = await callHandler<{ events: unknown[] }>(
+    const result = await callHandler<{ data: unknown[] }>(
       handlePostEvents,
       "POST",
       `/v1/sessions/${session.id}/events`,
@@ -871,7 +879,7 @@ describe("Event CLI Operations", () => {
       },
       session.id as string,
     );
-    expect(result.events.length).toBe(2);
+    expect(result.data.length).toBe(2);
   });
 
   it("events idempotency deduplication", async () => {
@@ -1043,14 +1051,16 @@ describe("Memory CLI Operations", () => {
 
   it("memory stores create returns store", async () => {
     await bootDb();
+    const agent = await createAgent("mem-cli-agent");
     const { handleCreateMemoryStore } = await import("../src/handlers/memory");
     const res = await handleCreateMemoryStore(
-      req("/v1/memory_stores", { body: { name: "cli-store" } }),
+      req("/v1/memory_stores", { body: { name: "cli-store", agent_id: agent.id } }),
     );
     expect(res.status).toBe(201);
-    const body = await res.json() as { name: string; id: string };
+    const body = await res.json() as { name: string; id: string; agent_id: string };
     expect(body.name).toBe("cli-store");
     expect(body.id).toBeTruthy();
+    expect(body.agent_id).toBe(agent.id);
   });
 
   it("memory stores list returns data", async () => {

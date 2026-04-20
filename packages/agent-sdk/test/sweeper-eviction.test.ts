@@ -36,12 +36,14 @@ function freshDbEnv(): void {
   process.env.SESSION_MAX_AGE_MS = "60000"; // 60s for the tests
   const g = globalThis as typeof globalThis & {
     __caDb?: unknown;
+    __caDrizzle?: unknown;
     __caInitialized?: unknown;
     __caBusEmitters?: unknown;
     __caConfigCache?: unknown;
     __caRuntime?: unknown;
   };
   delete g.__caDb;
+  delete g.__caDrizzle;
   delete g.__caInitialized;
   delete g.__caBusEmitters;
   delete g.__caConfigCache;

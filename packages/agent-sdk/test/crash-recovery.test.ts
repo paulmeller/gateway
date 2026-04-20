@@ -18,12 +18,14 @@ function freshDbEnv(): void {
   process.env.DATABASE_PATH = path.join(dir, "test.db");
   const g = globalThis as typeof globalThis & {
     __caDb?: unknown;
+    __caDrizzle?: unknown;
     __caInitialized?: unknown;
     __caBusEmitters?: unknown;
     __caConfigCache?: unknown;
     __caRuntime?: unknown;
   };
   delete g.__caDb;
+  delete g.__caDrizzle;
   delete g.__caInitialized;
   delete g.__caBusEmitters;
   delete g.__caConfigCache;
@@ -90,8 +92,8 @@ describe("crash recovery", () => {
     };
     expect(errorPayload.error.type).toBe("server_restart");
 
-    const idlePayload = JSON.parse(events[1].payload_json) as { stop_reason: string };
-    expect(idlePayload.stop_reason).toBe("error");
+    const idlePayload = JSON.parse(events[1].payload_json) as { stop_reason: { type: string } };
+    expect(idlePayload.stop_reason).toEqual({ type: "error" });
   });
 
   it("no-op when there are no running sessions", async () => {

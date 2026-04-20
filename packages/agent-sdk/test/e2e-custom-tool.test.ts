@@ -60,12 +60,14 @@ function freshDbEnv(): void {
   process.env.ANTHROPIC_API_KEY = "sk-ant-fake-for-test";
   const g = globalThis as typeof globalThis & {
     __caDb?: unknown;
+    __caDrizzle?: unknown;
     __caInitialized?: unknown;
     __caBusEmitters?: unknown;
     __caConfigCache?: unknown;
     __caRuntime?: unknown;
   };
   delete g.__caDb;
+  delete g.__caDrizzle;
   delete g.__caInitialized;
   delete g.__caBusEmitters;
   delete g.__caConfigCache;
@@ -176,8 +178,9 @@ describe("e2e custom tool round-trip (fake exec)", () => {
     expect(toolPayload.tool_use_id).toBe("toolu_fixture_01");
 
     const idleEvent1 = events1.filter((e) => e.type === "session.status_idle").at(-1);
-    const idlePayload1 = JSON.parse(idleEvent1!.payload_json) as { stop_reason: string };
-    expect(idlePayload1.stop_reason).toBe("custom_tool_call");
+    const idlePayload1 = JSON.parse(idleEvent1!.payload_json) as { stop_reason: { type: string; event_ids?: string[] } };
+    expect(idlePayload1.stop_reason.type).toBe("requires_action");
+    expect(idlePayload1.stop_reason.event_ids).toBeDefined();
 
     // Turn 1 stdin should be plain text (env-block + blank line + prompt),
     // NOT a stream-json user frame.
@@ -250,7 +253,7 @@ describe("e2e custom tool round-trip (fake exec)", () => {
 
     const idleEvents = events2.filter((e) => e.type === "session.status_idle");
     const finalIdle = idleEvents.at(-1)!;
-    const finalIdlePayload = JSON.parse(finalIdle.payload_json) as { stop_reason: string };
-    expect(finalIdlePayload.stop_reason).toBe("end_turn");
+    const finalIdlePayload = JSON.parse(finalIdle.payload_json) as { stop_reason: { type: string } };
+    expect(finalIdlePayload.stop_reason).toEqual({ type: "end_turn" });
   });
 });
