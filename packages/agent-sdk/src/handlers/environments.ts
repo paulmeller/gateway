@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { routeWrap, jsonOk } from "../http";
+import { getDb } from "../db/client";
 import {
   createEnvironment,
   getEnvironment,
@@ -11,9 +12,37 @@ import {
 } from "../db/environments";
 import { kickoffEnvironmentSetup } from "../containers/setup";
 import { resolveContainerProvider as resolveProvider } from "../providers/registry";
-import { isProxied, markProxied, unmarkProxied } from "../db/proxy";
+import { isProxied, markProxied, unmarkProxied, getProxiedTenantId } from "../db/proxy";
 import { forwardToAnthropic } from "../proxy/forward";
 import { badRequest, conflict, notFound } from "../errors";
+import { assertResourceTenant, resolveCreateTenant, tenantFilter } from "../auth/scope";
+import type { AuthContext } from "../types";
+
+function getEnvironmentTenantId(id: string): string | null | undefined {
+  const row = getDb()
+    .prepare(`SELECT tenant_id FROM environments WHERE id = ?`)
+    .get(id) as { tenant_id: string | null } | undefined;
+  return row?.tenant_id;
+}
+
+function loadEnvForCaller(auth: AuthContext, id: string) {
+  const tenantId = getEnvironmentTenantId(id);
+  if (tenantId === undefined) throw notFound(`environment ${id} not found`);
+  assertResourceTenant(auth, tenantId, `environment ${id} not found`);
+  const env = getEnvironment(id);
+  if (!env) throw notFound(`environment ${id} not found`);
+  return env;
+}
+
+/**
+ * Tenant guard for proxied environments. Same rationale as
+ * assertProxiedAgentTenant in agents.ts.
+ */
+function assertProxiedEnvTenant(auth: AuthContext, id: string): void {
+  const proxied = getProxiedTenantId(id);
+  if (proxied === undefined) return;
+  assertResourceTenant(auth, proxied, `environment ${id} not found`);
+}
 
 const PackagesSchema = z
   .object({
@@ -49,6 +78,8 @@ const CreateSchema = z.object({
   description: z.string().optional().nullable(),
   metadata: z.record(z.string()).optional(),
   backend: z.enum(["anthropic"]).optional(),
+  /** v0.5: required for global admin, ignored for tenant users. */
+  tenant_id: z.string().optional(),
 });
 
 const UpdateSchema = z.object({
@@ -59,11 +90,15 @@ const UpdateSchema = z.object({
 });
 
 export function handleCreateEnvironment(request: Request): Promise<Response> {
-  return routeWrap(request, async () => {
+  return routeWrap(request, async ({ auth }) => {
     const rawBody = await request.text();
     const body = rawBody ? JSON.parse(rawBody) : null;
     const parsed = CreateSchema.safeParse(body);
     if (!parsed.success) throw badRequest(parsed.error.message);
+
+    // Resolve tenant up-front so both the proxy and local paths can
+    // stamp it on any created resources.
+    const createTenantId = resolveCreateTenant(auth, parsed.data.tenant_id);
 
     if (parsed.data.backend === "anthropic") {
       const { backend: _, ...rest } = body as Record<string, unknown>;
@@ -72,14 +107,14 @@ export function handleCreateEnvironment(request: Request): Promise<Response> {
       if (proxyRes.ok) {
         try {
           const data = (await proxyRes.clone().json()) as { id: string };
-          markProxied(data.id, "environment");
+          markProxied(data.id, "environment", createTenantId);
         } catch { /* best-effort */ }
       }
       return proxyRes;
     }
 
-    // Check for duplicate name
-    const existingEnvs = listEnvironments({ limit: 1000 });
+    // Check for duplicate name within the caller's tenant scope.
+    const existingEnvs = listEnvironments({ limit: 1000, tenantFilter: tenantFilter(auth) });
     if (existingEnvs.some(e => e.name === parsed.data.name)) {
       throw conflict(`Environment with name "${parsed.data.name}" already exists`);
     }
@@ -103,6 +138,7 @@ export function handleCreateEnvironment(request: Request): Promise<Response> {
       config: parsed.data.config,
       description: parsed.data.description ?? null,
       metadata: parsed.data.metadata,
+      tenant_id: createTenantId,
     });
 
     kickoffEnvironmentSetup(env.id);
@@ -111,7 +147,7 @@ export function handleCreateEnvironment(request: Request): Promise<Response> {
 }
 
 export function handleListEnvironments(request: Request): Promise<Response> {
-  return routeWrap(request, async ({ request: req }) => {
+  return routeWrap(request, async ({ auth, request: req }) => {
     const url = new URL(req.url);
     const limit = url.searchParams.get("limit");
     const order = url.searchParams.get("order") as "asc" | "desc" | null;
@@ -123,6 +159,7 @@ export function handleListEnvironments(request: Request): Promise<Response> {
       order: order ?? undefined,
       includeArchived,
       cursor,
+      tenantFilter: tenantFilter(auth),
     });
     return jsonOk({
       data,
@@ -132,23 +169,24 @@ export function handleListEnvironments(request: Request): Promise<Response> {
 }
 
 export function handleGetEnvironment(request: Request, id: string): Promise<Response> {
-  return routeWrap(request, async () => {
-    if (isProxied(id)) return forwardToAnthropic(request, `/v1/environments/${id}`);
-    const env = getEnvironment(id);
-    if (!env) throw notFound(`environment ${id} not found`);
-    return jsonOk(env);
+  return routeWrap(request, async ({ auth }) => {
+    if (isProxied(id)) {
+      assertProxiedEnvTenant(auth, id);
+      return forwardToAnthropic(request, `/v1/environments/${id}`);
+    }
+    return jsonOk(loadEnvForCaller(auth, id));
   });
 }
 
 export function handleDeleteEnvironment(request: Request, id: string): Promise<Response> {
-  return routeWrap(request, async () => {
+  return routeWrap(request, async ({ auth }) => {
     if (isProxied(id)) {
+      assertProxiedEnvTenant(auth, id);
       const res = await forwardToAnthropic(request, `/v1/environments/${id}`);
       if (res.ok) unmarkProxied(id);
       return res;
     }
-    const env = getEnvironment(id);
-    if (!env) throw notFound(`environment ${id} not found`);
+    loadEnvForCaller(auth, id); // tenant guard
     if (hasSessionsAttached(id)) {
       throw conflict(`Cannot delete: environment has active sessions. Archive or delete sessions first.`);
     }
@@ -158,14 +196,14 @@ export function handleDeleteEnvironment(request: Request, id: string): Promise<R
 }
 
 export function handleArchiveEnvironment(request: Request, id: string): Promise<Response> {
-  return routeWrap(request, async () => {
+  return routeWrap(request, async ({ auth }) => {
     if (isProxied(id)) {
+      assertProxiedEnvTenant(auth, id);
       const res = await forwardToAnthropic(request, `/v1/environments/${id}/archive`);
       if (res.ok) unmarkProxied(id);
       return res;
     }
-    const existed = getEnvironment(id);
-    if (!existed) throw notFound(`environment ${id} not found`);
+    loadEnvForCaller(auth, id); // tenant guard
     if (hasSessionsAttached(id)) {
       throw conflict(`environment ${id} still has active sessions attached`);
     }
@@ -176,14 +214,14 @@ export function handleArchiveEnvironment(request: Request, id: string): Promise<
 }
 
 export function handleUpdateEnvironment(request: Request, id: string): Promise<Response> {
-  return routeWrap(request, async () => {
+  return routeWrap(request, async ({ auth }) => {
     if (isProxied(id)) {
+      assertProxiedEnvTenant(auth, id);
       return forwardToAnthropic(request, `/v1/environments/${id}`, {
         body: await request.text(),
       });
     }
-    const existing = getEnvironment(id);
-    if (!existing) throw notFound(`environment ${id} not found`);
+    loadEnvForCaller(auth, id); // tenant guard
 
     const rawBody = await request.text();
     const body = rawBody ? JSON.parse(rawBody) : null;

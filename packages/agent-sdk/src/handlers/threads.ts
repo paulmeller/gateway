@@ -1,9 +1,16 @@
 import { routeWrap, jsonOk } from "../http";
+import { getDb } from "../db/client";
 import { getSession, listSessions } from "../db/sessions";
 import { notFound } from "../errors";
+import { assertResourceTenant, tenantFilter } from "../auth/scope";
 
 export function handleListThreads(request: Request, sessionId: string): Promise<Response> {
-  return routeWrap(request, async () => {
+  return routeWrap(request, async ({ auth }) => {
+    const row = getDb()
+      .prepare(`SELECT tenant_id FROM sessions WHERE id = ?`)
+      .get(sessionId) as { tenant_id: string | null } | undefined;
+    if (!row) throw notFound(`session ${sessionId} not found`);
+    assertResourceTenant(auth, row.tenant_id, `session ${sessionId} not found`);
     const session = getSession(sessionId);
     if (!session) throw notFound(`session ${sessionId} not found`);
 
@@ -16,6 +23,7 @@ export function handleListThreads(request: Request, sessionId: string): Promise<
       limit: limit ? Number(limit) : undefined,
       order: order ?? undefined,
       includeArchived: true, // show all threads including completed ones
+      tenantFilter: tenantFilter(auth),
     });
 
     return jsonOk({

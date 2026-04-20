@@ -1,9 +1,6 @@
 /**
  * Global mutable runtime state — HMR-safe via globalThis so Next.js dev
  * reloads don't duplicate maps.
- *
- * Pattern from
- * 
  */
 
 export interface InFlightRun {

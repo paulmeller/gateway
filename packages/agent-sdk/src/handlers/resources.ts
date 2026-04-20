@@ -7,12 +7,30 @@
  */
 import { z } from "zod";
 import { routeWrap, jsonOk } from "../http";
-import { getSession } from "../db/sessions";
 import { getDb } from "../db/client";
+import { getSession, updateSessionResources } from "../db/sessions";
 import { newId } from "../util/ids";
 import { nowMs, toIso } from "../util/clock";
 import { badRequest, notFound } from "../errors";
-import type { SessionResource } from "../types";
+import { assertResourceTenant } from "../auth/scope";
+import { getProxiedTenantId } from "../db/proxy";
+import type { AuthContext, SessionResource } from "../types";
+
+function assertSessionTenant(auth: AuthContext, sessionId: string): void {
+  const row = getDb()
+    .prepare(`SELECT tenant_id FROM sessions WHERE id = ?`)
+    .get(sessionId) as { tenant_id: string | null } | undefined;
+  if (row) {
+    assertResourceTenant(auth, row.tenant_id, `session not found: ${sessionId}`);
+    return;
+  }
+  const proxyTenant = getProxiedTenantId(sessionId);
+  if (proxyTenant !== undefined) {
+    assertResourceTenant(auth, proxyTenant, `session not found: ${sessionId}`);
+    return;
+  }
+  throw notFound(`session not found: ${sessionId}`);
+}
 
 const AddResourceSchema = z.object({
   type: z.enum(["uri", "text", "file", "github_repository"]),
@@ -26,7 +44,8 @@ const AddResourceSchema = z.object({
 });
 
 export function handleAddResource(request: Request, sessionId: string): Promise<Response> {
-  return routeWrap(request, async () => {
+  return routeWrap(request, async ({ auth }) => {
+    assertSessionTenant(auth, sessionId);
     const session = getSession(sessionId);
     if (!session) throw notFound(`session not found: ${sessionId}`);
 
@@ -39,9 +58,7 @@ export function handleAddResource(request: Request, sessionId: string): Promise<
     resources.push(resource);
 
     // Update session resources
-    const db = getDb();
-    db.prepare("UPDATE sessions SET resources_json = ? WHERE id = ?")
-      .run(JSON.stringify(resources), sessionId);
+    updateSessionResources(sessionId, JSON.stringify(resources));
 
     return jsonOk({
       id: `res_${resources.length - 1}`,
@@ -53,7 +70,8 @@ export function handleAddResource(request: Request, sessionId: string): Promise<
 }
 
 export function handleListResources(request: Request, sessionId: string): Promise<Response> {
-  return routeWrap(request, async () => {
+  return routeWrap(request, async ({ auth }) => {
+    assertSessionTenant(auth, sessionId);
     const session = getSession(sessionId);
     if (!session) throw notFound(`session not found: ${sessionId}`);
 
@@ -68,7 +86,8 @@ export function handleListResources(request: Request, sessionId: string): Promis
 }
 
 export function handleDeleteResource(request: Request, sessionId: string, resourceIndex: string): Promise<Response> {
-  return routeWrap(request, async () => {
+  return routeWrap(request, async ({ auth }) => {
+    assertSessionTenant(auth, sessionId);
     const session = getSession(sessionId);
     if (!session) throw notFound(`session not found: ${sessionId}`);
 
@@ -79,9 +98,7 @@ export function handleDeleteResource(request: Request, sessionId: string, resour
     }
 
     resources.splice(idx, 1);
-    const db = getDb();
-    db.prepare("UPDATE sessions SET resources_json = ? WHERE id = ?")
-      .run(JSON.stringify(resources), sessionId);
+    updateSessionResources(sessionId, JSON.stringify(resources));
 
     return jsonOk({ id: resourceIndex, type: "session_resource_deleted" });
   });

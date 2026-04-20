@@ -13,6 +13,7 @@
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
+import { readEnvValue, ensureEnvLine } from "../util/env";
 
 const ALGO = "aes-256-gcm";
 const KEY_LEN = 32;
@@ -38,6 +39,7 @@ function findEnvPath(): string {
 function loadOrGenerateKey(): Buffer {
   if (cachedKey) return cachedKey;
 
+  // 1. Check process.env (set by dotenv, Cloud Run Secret Manager, etc.)
   const fromEnv = process.env.VAULT_ENCRYPTION_KEY;
   if (fromEnv) {
     const key = Buffer.from(fromEnv, "hex");
@@ -48,9 +50,29 @@ function loadOrGenerateKey(): Buffer {
     return key;
   }
 
-  // VAULT_ENCRYPTION_KEY_FILE: an on-disk path to the hex key. Preferred
-  // for container deployments where .env lives outside the persistent
-  // volume. If the file exists, read it. If not, generate and write it.
+  // 2. Read .env directly — dotenv may not have loaded yet. This is the
+  //    fix for the duplicate-line footgun: if .env already has the key,
+  //    use it instead of generating a new one that would shadow the old.
+  const envPath = findEnvPath();
+  try {
+    // readEnvValue imported at top of file
+    const fromFile = readEnvValue(envPath, "VAULT_ENCRYPTION_KEY");
+    if (fromFile) {
+      const key = Buffer.from(fromFile, "hex");
+      if (key.length !== KEY_LEN) {
+        throw new Error(`VAULT_ENCRYPTION_KEY in ${envPath} must be ${KEY_LEN * 2} hex chars`);
+      }
+      process.env.VAULT_ENCRYPTION_KEY = fromFile;
+      cachedKey = key;
+      return key;
+    }
+  } catch {
+    // readEnvValue failure is non-fatal — fall through to generate
+  }
+
+  // 3. VAULT_ENCRYPTION_KEY_FILE: an on-disk path to the hex key. Preferred
+  //    for container deployments where .env lives outside the persistent
+  //    volume. If the file exists, read it. If not, generate and write it.
   const keyFile = process.env.VAULT_ENCRYPTION_KEY_FILE;
   if (keyFile) {
     try {
@@ -80,29 +102,23 @@ function loadOrGenerateKey(): Buffer {
     }
   }
 
-  // Auto-generate and persist to .env so it survives restarts.
-  // Walk up from CWD to find an existing .env (monorepo root), or fall
-  // back to CWD for single-package setups.
+  // 4. Auto-generate and persist to .env. Use ensureEnvLine so we NEVER
+  //    overwrite an existing key — that would make vault entries permanently
+  //    unrecoverable.
   const newKey = crypto.randomBytes(KEY_LEN);
   const hex = newKey.toString("hex");
-  const envPath = findEnvPath();
   try {
-    if (!fs.existsSync(envPath)) {
-      fs.writeFileSync(envPath, `VAULT_ENCRYPTION_KEY=${hex}\n`, "utf-8");
-    } else {
-      fs.appendFileSync(envPath, `\nVAULT_ENCRYPTION_KEY=${hex}\n`, "utf-8");
-    }
+    // ensureEnvLine imported at top of file
+    ensureEnvLine(envPath, "VAULT_ENCRYPTION_KEY", hex);
     console.log(`[vault] generated VAULT_ENCRYPTION_KEY and wrote to ${envPath}`);
     console.warn(`[vault] BACK UP YOUR .env — losing this key will make all vault entries unrecoverable`);
   } catch (err) {
-    // Can't write .env — refuse to encrypt rather than silently using an
-    // ephemeral key that would make vault entries unrecoverable on restart.
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(
       `[vault] Cannot write VAULT_ENCRYPTION_KEY to ${envPath}: ${msg}\n` +
-      `Set VAULT_ENCRYPTION_KEY manually in your environment, or use\n` +
-      `VAULT_ENCRYPTION_KEY_FILE=<path> to point at a persistent on-disk key file.\n` +
-      `  VAULT_ENCRYPTION_KEY=${hex}\n` +
+      `Set VAULT_ENCRYPTION_KEY manually in your environment:\n` +
+      `  VAULT_ENCRYPTION_KEY=$(openssl rand -hex 32)\n` +
+      `Or use VAULT_ENCRYPTION_KEY_FILE=<path> for a persistent on-disk key file.\n` +
       `Without a persistent key, vault entries would be unrecoverable on restart.`,
     );
   }

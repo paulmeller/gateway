@@ -15,7 +15,7 @@ For each CLI command, if telemetry is enabled, one POST is made to
   "backend_type": "local",
   "provider": "docker",
   "success": true,
-  "cli_version": "0.3.4",
+  "cli_version": "0.4.0",
   "os": "darwin",
   "arch": "arm64",
   "node_version": "v22.11.0",

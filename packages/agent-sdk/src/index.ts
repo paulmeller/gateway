@@ -45,7 +45,19 @@ export { pushPendingUserInput, type TurnInput } from "./state";
 
 // DB
 export { getDb, closeDb } from "./db/client";
+export { getDrizzle } from "./db/drizzle";
 export { createApiKey, listApiKeys } from "./db/api_keys";
+export {
+  DEFAULT_TENANT_ID,
+  seedDefaultTenant,
+  createTenant,
+  getTenant,
+  listTenants,
+  archiveTenant,
+  renameTenant,
+  assignNullRowsToTenant,
+  countNullTenantRows,
+} from "./db/tenants";
 export { createAgent, getAgent, updateAgent, archiveAgent, listAgents } from "./db/agents";
 export {
   createSession,
@@ -79,6 +91,7 @@ export { getActor, dropActor } from "./sessions/actor";
 export { interruptSession } from "./sessions/interrupt";
 export { runTurn, writePermissionResponse } from "./sessions/driver";
 export { injectMcpAuthHeaders } from "./sessions/mcp-auth";
+export { loadSessionSecrets } from "./sessions/secrets";
 
 // Queue
 export { enqueueTurn } from "./queue";
@@ -95,6 +108,31 @@ export { forwardToAnthropic, validateAnthropicProxy } from "./proxy/forward";
 // Container lifecycle
 export { releaseSession } from "./containers/lifecycle";
 export { kickoffEnvironmentSetup } from "./containers/setup";
+
+// Webhook signing (v0.5)
+export {
+  computeSignature,
+  verifyWebhookSignature,
+  SIGNATURE_HEADER,
+  TIMESTAMP_HEADER,
+  type VerifyInput,
+  type VerifyResult,
+} from "./webhooks/signing";
+
+// Audit log (v0.5)
+export { recordAudit, listAudit } from "./db/audit";
+export type { AuditLogEntry, AuditOutcome } from "./types";
+
+// License (v0.5)
+export {
+  validateLicense,
+  isEnterprise,
+  hasFeature,
+  requireFeature,
+  getLicenseInfo,
+  COMMUNITY_LIMITS,
+  type Feature,
+} from "./license";
 
 // OpenAPI
 export { buildOpenApiDocument } from "./openapi/spec";

@@ -5,8 +5,6 @@
  * `session.status_idle{stop_reason:"interrupted"}` via the driver's normal
  * abort path, then exits. Sessions that don't finish in time will be picked
  * up by the next startup's stale-recovery path.
- *
- * Pattern from
  */
 import { getRuntime } from "./state";
 import { markStopping } from "./sessions/sweeper";

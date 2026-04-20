@@ -7,10 +7,31 @@
  *
  * Both use stale-while-error: if a refresh fails, the stale data is kept.
  * ETag conditional requests avoid re-downloading unchanged data.
+ *
+ * URL sourcing, highest precedence first:
+ *   1. SKILLS_FEED_URL / SKILLS_INDEX_URL env vars
+ *   2. `skills_feed_url` / `skills_index_url` settings table entries
+ *   3. Compiled defaults (agentstep.com)
+ *
+ * This lets operators point at their own mirror (e.g. for air-gapped
+ * deployments) without editing code or rebuilding.
  */
+import { readSetting } from "../config";
 
-const FEED_URL = "https://www.agentstep.com/v1/skills/feed";
-const INDEX_URL = "https://raw.githubusercontent.com/NeverSight/learn-skills.dev/main/data/skills_index.json";
+const DEFAULT_FEED_URL = "https://www.agentstep.com/v1/skills/feed";
+const DEFAULT_INDEX_URL = "https://www.agentstep.com/v1/skills/index";
+
+function resolveFeedUrl(): string {
+  return process.env.SKILLS_FEED_URL
+    || readSetting("skills_feed_url")
+    || DEFAULT_FEED_URL;
+}
+
+function resolveIndexUrl(): string {
+  return process.env.SKILLS_INDEX_URL
+    || readSetting("skills_index_url")
+    || DEFAULT_INDEX_URL;
+}
 
 const FEED_TTL_MS = 60 * 60 * 1000;    // 1 hour
 const INDEX_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
@@ -92,7 +113,7 @@ async function fetchFeed(): Promise<FeedData> {
   const headers: Record<string, string> = {};
   if (feedCache.etag) headers["If-None-Match"] = feedCache.etag;
 
-  const res = await fetch(FEED_URL, { headers });
+  const res = await fetch(resolveFeedUrl(), { headers });
   if (res.status === 304 && feedCache.data) {
     feedCache.fetchedAt = Date.now();
     return feedCache.data;
@@ -126,6 +147,23 @@ export function getFeed(): Promise<FeedData> {
 
 // --- Full index ---
 
+/**
+ * Normalize the index response into the IndexData shape. The agentstep.com
+ * endpoint currently returns `{updatedAt, totalSkills, skills}` while the
+ * historical static JSON uses `{updatedAt, count, items}`. Accept either
+ * so the default URL can move without a code change.
+ */
+function normalizeIndex(raw: unknown): IndexData {
+  const r = raw as Record<string, unknown>;
+  const items = (r.items ?? r.skills) as IndexSkill[] | undefined;
+  const count = (r.count ?? r.totalSkills) as number | undefined;
+  return {
+    updatedAt: typeof r.updatedAt === "string" ? r.updatedAt : new Date(0).toISOString(),
+    count: typeof count === "number" ? count : items?.length ?? 0,
+    items: Array.isArray(items) ? items : [],
+  };
+}
+
 async function fetchIndex(): Promise<IndexData> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), INDEX_FETCH_TIMEOUT_MS);
@@ -134,13 +172,13 @@ async function fetchIndex(): Promise<IndexData> {
     const headers: Record<string, string> = {};
     if (indexCache.etag) headers["If-None-Match"] = indexCache.etag;
 
-    const res = await fetch(INDEX_URL, { headers, signal: controller.signal });
+    const res = await fetch(resolveIndexUrl(), { headers, signal: controller.signal });
     if (res.status === 304 && indexCache.data) {
       indexCache.fetchedAt = Date.now();
       return indexCache.data;
     }
     const etag = res.headers.get("etag");
-    const data = (await res.json()) as IndexData;
+    const data = normalizeIndex(await res.json());
     indexCache.data = data;
     indexCache.fetchedAt = Date.now();
     indexCache.etag = etag;
@@ -190,7 +228,27 @@ export interface SearchResult {
 
 export async function searchSkills(opts: SearchOptions): Promise<SearchResult> {
   const index = await getIndex();
-  let items = index.items;
+  let items: IndexSkill[] = index.items;
+
+  // Fallback: if the index is empty, build searchable items from the feed
+  if (items.length === 0) {
+    const feed = await getFeed();
+    const seen = new Set<string>();
+    const fromFeed: IndexSkill[] = [];
+    for (const list of [feed.topAllTime, feed.topTrending, feed.topHot]) {
+      for (const s of list) {
+        if (seen.has(s.id)) continue;
+        seen.add(s.id);
+        fromFeed.push({
+          id: s.id, providerId: s.providerId, source: s.source,
+          skillId: s.id, title: s.title, link: s.link,
+          installsAllTime: s.installs, installsTrending: s.installs, installsHot: s.installs,
+          firstSeenAt: "", description: s.description,
+        });
+      }
+    }
+    items = fromFeed;
+  }
 
   // Filter
   if (opts.q) {
@@ -214,7 +272,7 @@ export async function searchSkills(opts: SearchOptions): Promise<SearchResult> {
   // Sort — use pre-sorted views when no filters applied (fast path)
   const sort = opts.sort ?? "allTime";
   const hasFilters = opts.q || opts.owner || opts.source || opts.repo;
-  if (!hasFilters && sortedViews) {
+  if (!hasFilters && sortedViews && index.items.length > 0) {
     items = sortedViews[sort];
   } else {
     if (sort === "trending") items = [...items].sort((a, b) => b.installsTrending - a.installsTrending);

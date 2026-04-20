@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { routeWrap, jsonOk } from "../http";
+import { getDb } from "../db/client";
 import { getSession, getSessionRow, setOutcomeCriteria } from "../db/sessions";
 import { listEvents, rowToManagedEvent } from "../db/events";
 import { appendEvent } from "../sessions/bus";
@@ -11,36 +12,56 @@ import { pushPendingUserInput, type TurnInput } from "../state";
 import { isProxied } from "../db/proxy";
 import { resolveRemoteSessionId } from "../db/sync";
 import { forwardToAnthropic } from "../proxy/forward";
-import { getConfig } from "../config";
-import { listEntries as listVaultEntries } from "../db/vaults";
 import { badRequest, notFound } from "../errors";
 import { getAgent } from "../db/agents";
+import { resolveAnthropicKey as resolveAnthropicKeyShared, reportUpstreamFailure, reportUpstreamSuccess } from "../providers/upstream-keys";
+import { assertResourceTenant } from "../auth/scope";
+import { getProxiedTenantId } from "../db/proxy";
+import type { AuthContext } from "../types";
 
 /**
- * Resolve the Anthropic API key for a session: prefer vault, fall back to config.
+ * Tenant guard for session-scoped endpoints (events, resources).
+ * Checks the local `sessions` row first; falls through to
+ * `proxy_resources` for pure-proxy sessions (Anthropic engine, no
+ * local mirror). This two-source check must stay in sync with the
+ * pattern in stream.ts and sessions.ts.
  */
-function resolveAnthropicKey(sessionId: string): string | null {
-  const session = getSession(sessionId);
-  if (session?.vault_ids?.length) {
-    for (const vid of session.vault_ids) {
-      const entries = listVaultEntries(vid);
-      const found = entries.find(e => e.key === "ANTHROPIC_API_KEY");
-      if (found) return found.value;
-    }
+function assertSessionTenant(auth: AuthContext, sessionId: string): void {
+  const row = getDb()
+    .prepare(`SELECT tenant_id FROM sessions WHERE id = ?`)
+    .get(sessionId) as { tenant_id: string | null } | undefined;
+  if (row) {
+    assertResourceTenant(auth, row.tenant_id, `session ${sessionId} not found`);
+    return;
   }
-  const cfg = getConfig();
-  return cfg.anthropicApiKey ?? null;
+  // No local row — check proxy_resources for pure-proxy sessions.
+  const proxyTenant = getProxiedTenantId(sessionId);
+  if (proxyTenant !== undefined) {
+    assertResourceTenant(auth, proxyTenant, `session ${sessionId} not found`);
+    return;
+  }
+  // Neither table has this id — let the downstream handler 404.
+  throw notFound(`session ${sessionId} not found`);
 }
 
 /**
  * Background-stream the remote Anthropic session and tee events into the
  * local event bus. This powers the local SSE stream for the UI.
+ *
+ * Logging is gated behind DEBUG_SYNC=1. Without the flag the tee is
+ * silent on success paths — a busy gateway would otherwise emit one
+ * [tee] line per SSE event.
  */
-async function teeRemoteStream(localSessionId: string, remoteSessionId: string): Promise<void> {
-  const apiKey = resolveAnthropicKey(localSessionId);
-  if (!apiKey) { console.log("[tee] no API key"); return; }
+const teeLog = (...args: unknown[]): void => {
+  if (process.env.DEBUG_SYNC === "1") console.log(...args);
+};
 
-  console.log(`[tee] connecting to Anthropic stream for ${remoteSessionId}`);
+async function teeRemoteStream(localSessionId: string, remoteSessionId: string): Promise<void> {
+  const resolved = resolveAnthropicKeyShared({ sessionId: localSessionId });
+  if (!resolved) { teeLog("[tee] no API key"); return; }
+  const { value: apiKey, poolId } = resolved;
+
+  teeLog(`[tee] connecting to Anthropic stream for ${remoteSessionId}`);
   const res = await fetch(`https://api.anthropic.com/v1/sessions/${remoteSessionId}/stream`, {
     headers: {
       "x-api-key": apiKey,
@@ -49,8 +70,17 @@ async function teeRemoteStream(localSessionId: string, remoteSessionId: string):
       "accept": "text/event-stream",
     },
   });
-  if (!res.ok || !res.body) { console.log(`[tee] stream failed: ${res.status}`); return; }
-  console.log(`[tee] stream connected`);
+  if (!res.ok || !res.body) {
+    teeLog(`[tee] stream failed: ${res.status}`);
+    // Any upstream failure counts against the pool key (if that's where
+    // it came from). 3 consecutive failures → disabled_at set.
+    if (res.status >= 500 || res.status === 429 || res.status === 401) {
+      reportUpstreamFailure(poolId);
+    }
+    return;
+  }
+  reportUpstreamSuccess(poolId);
+  teeLog(`[tee] stream connected`);
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -89,7 +119,7 @@ async function teeRemoteStream(localSessionId: string, remoteSessionId: string):
               "model_request_end": "span.model_request_end",
             };
             const localType = typeMap[evt.type] ?? evt.type;
-            console.log(`[tee] event: ${localType}`);
+            teeLog(`[tee] event: ${localType}`);
             appendEvent(localSessionId, {
               type: localType,
               payload: evt,
@@ -101,7 +131,7 @@ async function teeRemoteStream(localSessionId: string, remoteSessionId: string):
         }
       }
     }
-  } catch (err) { console.log(`[tee] stream ended:`, err); }
+  } catch (err) { teeLog(`[tee] stream ended:`, err); }
 }
 import { nowMs } from "../util/clock";
 import type { EventRow } from "../types";
@@ -148,7 +178,8 @@ const BatchSchema = z.object({
 });
 
 export function handlePostEvents(request: Request, sessionId: string): Promise<Response> {
-  return routeWrap(request, async () => {
+  return routeWrap(request, async ({ auth }) => {
+    assertSessionTenant(auth, sessionId);
     if (isProxied(sessionId)) {
       const remoteId = resolveRemoteSessionId(sessionId);
       const localSession = getSession(sessionId);
@@ -170,9 +201,19 @@ export function handlePostEvents(request: Request, sessionId: string): Promise<R
           }
         } catch { /* best-effort */ }
 
-        // Forward to Anthropic (use vault key if available), then tee the response into local bus
-        const apiKey = resolveAnthropicKey(sessionId);
-        const proxyRes = await forwardToAnthropic(request, `/v1/sessions/${remoteId}/events`, { body: rawBody, apiKey: apiKey ?? undefined });
+        // Forward to Anthropic (use vault / pool / config key), then tee the response into local bus
+        const resolvedKey = resolveAnthropicKeyShared({ sessionId });
+        const proxyRes = await forwardToAnthropic(
+          request,
+          `/v1/sessions/${remoteId}/events`,
+          { body: rawBody, apiKey: resolvedKey?.value },
+        );
+        // Pool-source failure tracking for the forward leg.
+        if (!proxyRes.ok && (proxyRes.status >= 500 || proxyRes.status === 429 || proxyRes.status === 401)) {
+          reportUpstreamFailure(resolvedKey?.poolId ?? null);
+        } else if (proxyRes.ok) {
+          reportUpstreamSuccess(resolvedKey?.poolId ?? null);
+        }
 
         // Background: stream remote session to capture agent responses
         teeRemoteStream(sessionId, remoteId).catch(() => {});
@@ -333,12 +374,13 @@ export function handlePostEvents(request: Request, sessionId: string): Promise<R
       }
     }
 
-    return jsonOk({ events: appended.rows.map(rowToManagedEvent) });
+    return jsonOk({ data: appended.rows.map(rowToManagedEvent) });
   });
 }
 
 export function handleListEvents(request: Request, sessionId: string): Promise<Response> {
-  return routeWrap(request, async () => {
+  return routeWrap(request, async ({ auth }) => {
+    assertSessionTenant(auth, sessionId);
     if (isProxied(sessionId)) {
       // Sync-and-proxy sessions have local events — serve from local DB
       const localSession = getSession(sessionId);
@@ -354,7 +396,7 @@ export function handleListEvents(request: Request, sessionId: string): Promise<R
     const url = new URL(request.url);
     const limit = Number(url.searchParams.get("limit") ?? "50");
     const order = (url.searchParams.get("order") === "desc" ? "desc" : "asc") as "asc" | "desc";
-    const afterSeq = Number(url.searchParams.get("after_seq") ?? "0");
+    const afterSeq = Number(url.searchParams.get("after_seq") ?? url.searchParams.get("page") ?? "0");
 
     const rows = listEvents(sessionId, { limit, order, afterSeq });
     return jsonOk({

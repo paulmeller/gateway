@@ -5,14 +5,28 @@ import { badRequest, notFound } from "../errors";
 /** Non-secret settings — plain JSON-like values the UI can read verbatim. */
 const NON_SECRET_KEYS = new Set([
   "saved_repositories",
+  // Provider identifiers (not credentials) — safe to surface in the API
+  // so the UI can show "configured as team XYZ, project ABC".
+  "vercel_team_id",
+  "vercel_project_id",
+  "fly_app_name",
+  // Skills catalog URL overrides — URLs, not secrets.
+  "skills_feed_url",
+  "skills_index_url",
 ]);
 
 /** All writable/readable setting keys. Anything not in NON_SECRET_KEYS is a secret. */
 const ALLOWED_KEYS = [
+  // Engine + cloud provider credentials
   "sprite_token", "anthropic_api_key", "openai_api_key",
   "gemini_api_key", "factory_api_key", "claude_token",
   "e2b_api_key", "vercel_token", "daytona_api_key",
-  "fly_api_token", "modal_token_id",
+  "fly_api_token", "modal_token_id", "modal_token_secret",
+  // Provider identifiers (not secrets but pair with credentials)
+  "vercel_team_id", "vercel_project_id", "fly_app_name",
+  // Skills catalog URL overrides (operator override; default is agentstep.com)
+  "skills_feed_url", "skills_index_url",
+  // UI state
   "saved_repositories",
 ];
 

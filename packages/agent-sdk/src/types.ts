@@ -64,6 +64,14 @@ export interface AgentRow {
   id: string;
   current_version: number;
   name: string;
+  /**
+   * v0.4+: JSON array of FallbackTuple {agent_id, environment_id} tuples
+   * tried when the primary session-creation fails with a classifiable
+   * (retryable or 5xx) error. Null when no fallbacks configured.
+   */
+  fallback_json: string | null;
+  /** v0.5: tenant ownership. Null = legacy/global (pre-migration). */
+  tenant_id: string | null;
   created_at: number;
   updated_at: number;
   archived_at: number | null;
@@ -79,6 +87,12 @@ export interface AgentVersionRow {
   backend: BackendName;
   webhook_url: string | null;
   webhook_events_json: string;
+  /**
+   * v0.5: shared secret used to HMAC-sign webhook payloads. When set,
+   * deliveries include `X-AgentStep-Signature: sha256=<hex>`. Null for
+   * agents created pre-0.5 or intentionally unsigned webhooks.
+   */
+  webhook_secret: string | null;
   threads_enabled: number;
   confirmation_mode: number;
   callable_agents_json: string | null;
@@ -109,11 +123,18 @@ export interface Agent {
   engine: EngineName;
   webhook_url: string | null;
   webhook_events: string[];
+  /**
+   * Indicates whether a webhook shared secret is configured. The
+   * secret itself is never returned over the API — only this boolean.
+   */
+  webhook_signing_enabled: boolean;
   threads_enabled: boolean;
   confirmation_mode: boolean;
   callable_agents: Array<{ type: "agent"; id: string; version?: number }>;
   skills: AgentSkill[];
   model_config: ModelConfig;
+  /** Raw JSON — parse with parseFallbackJson in handlers. Null when unset. */
+  fallback_json: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -155,6 +176,8 @@ export interface EnvironmentRow {
   state_message: string | null;
   template_sprite: string | null;
   checkpoint_id: string | null;
+  /** v0.5: tenant ownership. Null = legacy/global (pre-migration). */
+  tenant_id: string | null;
   created_at: number;
   archived_at: number | null;
 }
@@ -207,6 +230,10 @@ export interface SessionRow {
   vault_ids_json: string | null;
   parent_session_id: string | null;
   thread_depth: number;
+  /** v0.4+: API key that authenticated the session creation. Null for pre-0.4 rows. */
+  api_key_id: string | null;
+  /** v0.5: tenant ownership. Null = legacy/global (pre-migration). */
+  tenant_id: string | null;
   created_at: number;
   updated_at: number;
   archived_at: number | null;
@@ -225,7 +252,8 @@ export interface SessionResource {
 
 export interface Session {
   id: string;
-  agent: { id: string; version: number };
+  type: "session";
+  agent: { type: "agent"; id: string; version: number };
   environment_id: string;
   status: SessionStatus;
   stop_reason: string | null;
@@ -233,8 +261,8 @@ export interface Session {
   metadata: Record<string, unknown>;
   max_budget_usd: number | null;
   outcome: Record<string, unknown> | null;
-  resources: SessionResource[] | null;
-  vault_ids: string[] | null;
+  resources: SessionResource[];
+  vault_ids: string[];
   parent_session_id: string | null;
   thread_depth: number;
   stats: {
@@ -263,6 +291,8 @@ export interface VaultRow {
   id: string;
   agent_id: string;
   name: string;
+  /** v0.5: tenant ownership. Null = legacy/global (pre-migration). */
+  tenant_id: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -271,6 +301,8 @@ export interface Vault {
   id: string;
   agent_id: string;
   name: string;
+  /** Anthropic-compatible alias for `name`. */
+  display_name: string;
   created_at: string;
   updated_at: string;
 }
@@ -288,6 +320,33 @@ export interface VaultEntry {
 }
 
 // ---------------------------------------------------------------------------
+// Vault Credentials (Anthropic-compatible)
+// ---------------------------------------------------------------------------
+
+export interface VaultCredentialRow {
+  id: string;
+  vault_id: string;
+  display_name: string;
+  auth_type: string;
+  auth_token_encrypted: string;
+  mcp_server_url: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface VaultCredential {
+  id: string;
+  vault_id: string;
+  display_name: string;
+  auth: {
+    type: string;
+    mcp_server_url: string | null;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+// ---------------------------------------------------------------------------
 // Memory Stores
 // ---------------------------------------------------------------------------
 
@@ -295,6 +354,8 @@ export interface MemoryStoreRow {
   id: string;
   name: string;
   description: string | null;
+  /** v0.5: owning agent. Null for legacy (pre-v0.5) global stores. */
+  agent_id: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -303,6 +364,7 @@ export interface MemoryStore {
   id: string;
   name: string;
   description: string | null;
+  agent_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -364,11 +426,101 @@ export interface ManagedEvent {
 }
 
 // ---------------------------------------------------------------------------
-// Auth
+// Auth — virtual keys with scope + admin
 // ---------------------------------------------------------------------------
+
+/**
+ * A scope restricts which resources an API key can reach. The `"*"` sentinel
+ * in any array means "all resources of this type". A field missing or `null`
+ * at the top level (`scope: null`) means unrestricted — equivalent to having
+ * every resource type set to `["*"]`.
+ */
+export interface KeyScope {
+  agents: string[];
+  environments: string[];
+  vaults: string[];
+}
+
+export interface KeyPermissions {
+  /** Admin keys can CRUD /v1/api-keys (and in v0.5, /v1/tenants and /v1/upstream-keys). */
+  admin: boolean;
+  /** null = unrestricted within whatever tenancy applies (v0.4: none). */
+  scope: KeyScope | null;
+}
 
 export interface AuthContext {
   keyId: string;
   name: string;
-  permissions: string[];
+  permissions: KeyPermissions;
+  /**
+   * The tenant this key belongs to. Null = global admin (cross-tenant visibility).
+   * All non-global-admin operations filter by this tenant.
+   */
+  tenantId: string | null;
+  /** Convenience: tenantId === null && permissions.admin. */
+  isGlobalAdmin: boolean;
+  /** Null = unlimited. In USD. Enforced in the driver pre-turn. */
+  budgetUsd: number | null;
+  /** Null = unlimited. Fixed 60-second window enforced in routeWrap. */
+  rateLimitRpm: number | null;
+  /** Running total of USD spent by this key. Updated transactionally alongside session usage. */
+  spentUsd: number;
+}
+
+// ---------------------------------------------------------------------------
+// Tenants (v0.5)
+// ---------------------------------------------------------------------------
+
+export interface TenantRow {
+  id: string;
+  name: string;
+  created_at: number;
+  archived_at: number | null;
+}
+
+export interface Tenant {
+  id: string;
+  name: string;
+  created_at: string;
+  archived_at: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Audit log (v0.5 PR4c)
+// ---------------------------------------------------------------------------
+
+/** "success" for a committed action, "denied" for auth/403, "failure" for unexpected errors. */
+export type AuditOutcome = "success" | "denied" | "failure";
+
+export interface AuditLogRow {
+  id: string;
+  created_at: number;
+  /** Key id of the caller, or null for system-initiated events. */
+  actor_key_id: string | null;
+  /** Friendly actor name captured at log time (keys can be renamed later). */
+  actor_name: string | null;
+  /** Tenant the action was scoped to. Null for global-scope ops. */
+  tenant_id: string | null;
+  /** Dotted verb: `tenants.create`, `api_keys.revoke`, `upstream_keys.add`, ... */
+  action: string;
+  /** "agent" | "tenant" | "api_key" | "upstream_key" | "session" | null. */
+  resource_type: string | null;
+  /** Resource id, when applicable. */
+  resource_id: string | null;
+  outcome: AuditOutcome;
+  /** Arbitrary action-specific context, JSON-encoded. */
+  metadata_json: string | null;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  created_at: string;
+  actor_key_id: string | null;
+  actor_name: string | null;
+  tenant_id: string | null;
+  action: string;
+  resource_type: string | null;
+  resource_id: string | null;
+  outcome: AuditOutcome;
+  metadata: Record<string, unknown> | null;
 }

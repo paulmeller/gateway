@@ -9,11 +9,10 @@
  *      plan §I8.)
  *   3. Sprite orphan reconciler: best-effort pruning of old sprites whose
  *      sessions no longer exist.
- *
- * Pattern from 
  */
 import fs from "node:fs";
 import path from "node:path";
+import { readEnvValue, upsertEnvLine } from "./util/env";
 import { getDb } from "./db/client";
 import { createApiKey, listApiKeys } from "./db/api_keys";
 import { getConfig } from "./config";
@@ -54,6 +53,25 @@ async function doInit(): Promise<void> {
   // 1. Bootstrap DB + migrations
   getDb();
 
+  // 1a. Seed the `default` tenant row (v0.5+). Idempotent — does nothing
+  // if the row is already there.
+  const { seedDefaultTenant } = await import("./db/tenants");
+  seedDefaultTenant();
+
+  // 1a½. Boot-time .env health check — warn about duplicate keys.
+  try {
+    const { findDuplicateKeys } = await import("./util/env");
+    const envPath = path.resolve(process.cwd(), ".env");
+    const dupes = findDuplicateKeys(envPath);
+    if (dupes.length > 0) {
+      console.warn(
+        `[init] WARNING: duplicate keys in .env: ${dupes.join(", ")}. ` +
+        `dotenv uses the LAST value — earlier entries are silently ignored. ` +
+        `Remove duplicates to prevent confusion.`,
+      );
+    }
+  } catch { /* non-fatal */ }
+
   // 1b. Auto-seed a default API key if none exist
   seedDefaultApiKey();
 
@@ -64,7 +82,23 @@ async function doInit(): Promise<void> {
   installPayloadRedactor(redactAppendInput);
   installOtlpExporter();
 
-  // 1d. Shutdown handlers
+  // 1c½. Anthropic file sync: when a proxied turn completes, fetch
+  // the file list from Anthropic and cache metadata locally.
+  const { installFileSyncHook } = await import("./sync/file-sync");
+  installFileSyncHook();
+
+  // 1d. Validate license key (community vs enterprise).
+  const { validateLicense } = await import("./license");
+  validateLicense();
+
+  // 1e. Validate Redis rate-limit backend at boot. When
+  // RATE_LIMIT_BACKEND=redis and ioredis/REDIS_URL aren't available,
+  // we fail here so the process never starts serving — instead of the
+  // previous behavior where /api/health stayed green and every /v1
+  // request returned 500.
+  await validateRateLimitBackend();
+
+  // 1e. Shutdown handlers
   installShutdownHandlers();
 
   // 2. Stale-session recovery
@@ -117,36 +151,59 @@ function seedDefaultApiKey(): void {
     const keys = listApiKeys();
     if (keys.length > 0) return;
 
-    // If SEED_API_KEY is set (e.g. via Secret Manager in Cloud Run),
-    // use it instead of generating a random key.
-    const seedKey = process.env.SEED_API_KEY;
+    const envPath = path.resolve(process.cwd(), ".env");
+
+    // Check process.env first, then read .env directly (dotenv may
+    // not have loaded yet). This prevents generating a new key when
+    // .env already has one — the root cause of the duplicate-line bug.
+    let seedKey = process.env.SEED_API_KEY;
+    if (!seedKey) {
+      // readEnvValue imported at top of file
+      seedKey = readEnvValue(envPath, "SEED_API_KEY");
+      if (seedKey) process.env.SEED_API_KEY = seedKey;
+    }
+
     if (seedKey) {
       const { id } = createApiKey({ name: "default", permissions: ["*"], rawKey: seedKey });
       console.log(`[init] created API key from SEED_API_KEY (id: ${id})`);
       return;
     }
 
+    // Neither process.env nor .env has a seed key — generate one.
     const { key, id } = createApiKey({ name: "default", permissions: ["*"] });
 
-    // Write the key to .env so it survives restarts and isn't lost
-    const envPath = path.resolve(process.cwd(), ".env");
-    if (!fs.existsSync(envPath)) {
-      fs.writeFileSync(envPath, `SEED_API_KEY=${key}\n`, "utf-8");
-      console.log(`[init] created default API key and wrote to ${envPath}`);
-    } else {
-      // .env exists but had no SEED_API_KEY — append it
-      fs.appendFileSync(envPath, `\nSEED_API_KEY=${key}\n`, "utf-8");
-      console.log(`[init] created default API key and appended to ${envPath}`);
-    }
-    // Also set in process.env so CLI can pick it up immediately
+    // Write to .env via upsert (safe: replaces if exists, appends if not,
+    // never creates duplicates).
+    // upsertEnvLine imported at top of file
+    upsertEnvLine(envPath, "SEED_API_KEY", key);
+    console.log(`[init] created default API key and wrote to ${envPath}`);
+
     process.env.SEED_API_KEY = key;
     console.log(`  id:  ${id}`);
-    // Don't log the raw key — it's now persisted to .env. Logging it here
-    // writes it into docker/journalctl/pm2 output unnecessarily.
     console.log(`  key: (written to .env — see SEED_API_KEY)`);
   } catch (err) {
     console.error("[init] failed to seed default API key:", err);
   }
+}
+
+/**
+ * Pre-flight: when RATE_LIMIT_BACKEND=redis, verify that ioredis is
+ * importable AND REDIS_URL is set *before* the first request arrives.
+ * Without this, the gateway boots green (health check passes) while
+ * every authenticated request 500s — the exact "looks healthy, isn't"
+ * pattern ops hates.
+ *
+ * On success, warm-connects the Redis client. On failure: either
+ * throws (boot fails) or degrades to memory when
+ * RATE_LIMIT_BACKEND_ALLOW_FALLBACK=true.
+ */
+async function validateRateLimitBackend(): Promise<void> {
+  const { validateBackend } = await import("./auth/rate_limit");
+  // Throws when RATE_LIMIT_BACKEND=redis but ioredis or REDIS_URL
+  // aren't available (strict default). The throw propagates out of
+  // doInit → ensureInitialized, which makes the first routeWrap call
+  // reject with a clear message. The server never serves a 200.
+  await validateBackend();
 }
 
 export async function recoverStaleSessions(): Promise<void> {
@@ -241,7 +298,7 @@ export async function recoverStaleSessions(): Promise<void> {
       });
       appendEvent(row.id, {
         type: "session.status_idle",
-        payload: { stop_reason: "error" },
+        payload: { stop_reason: { type: "error" } },
         origin: "server",
         processedAt: nowMs(),
       });

@@ -11,9 +11,10 @@
  */
 import { ensureInitialized } from "./init";
 import { authenticate } from "./auth/middleware";
-import { toResponse, ApiError } from "./errors";
+import { toResponse, ApiError, tooManyRequests } from "./errors";
 import { captureException } from "./sentry";
 import { recordApiRequest, normalizeRoute } from "./observability/api-metrics";
+import { checkAndBump } from "./auth/rate_limit";
 import type { AuthContext } from "./types";
 
 export interface RouteContext {
@@ -30,6 +31,26 @@ export async function routeWrap(
   try {
     await ensureInitialized();
     const auth = await authenticate(request);
+
+    // Per-key RPM rate limit. Fixed 60s window; backend is memory by
+    // default, Redis when RATE_LIMIT_BACKEND=redis. null rateLimitRpm
+    // short-circuits the check. On refusal we return 429 with a
+    // Retry-After header (seconds).
+    const retryAfter = await checkAndBump(auth.keyId, auth.rateLimitRpm);
+    if (retryAfter != null) {
+      const err = tooManyRequests(
+        `rate limit exceeded (${auth.rateLimitRpm}/min for this key); retry after ${retryAfter}s`,
+      );
+      const res = toResponse(err);
+      // Augment the response with Retry-After so well-behaved clients can
+      // back off automatically. toResponse returns an immutable Response
+      // so we copy it.
+      const headers = new Headers(res.headers);
+      headers.set("Retry-After", String(retryAfter));
+      status = 429;
+      return new Response(res.body, { status: 429, headers });
+    }
+
     const res = await handler({ auth, request });
     status = res.status;
     return res;
