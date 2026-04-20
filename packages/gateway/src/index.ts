@@ -18,6 +18,9 @@ import { registerVersionCommand } from "./commands/version.js";
 import { registerSkillsCommands } from "./commands/skills.js";
 import { registerProviderCommands } from "./commands/providers.js";
 import { registerDbCommands } from "./commands/db.js";
+import { registerTenantCommands } from "./commands/tenants.js";
+import { registerUpstreamKeyCommands } from "./commands/upstream_keys.js";
+import { registerAuditCommands } from "./commands/audit.js";
 import { ensureTelemetryConsent, trackCommand } from "./telemetry/index.js";
 
 const program = new Command("gateway")
@@ -37,7 +40,11 @@ const program = new Command("gateway")
     // Skip telemetry consent for non-network / admin commands so they can
     // run offline and don't trigger any surrounding init that might open
     // the DB (important for `db reset`, which needs the file free).
-    if (name === "config" || name === "version" || name === "reset") return;
+    // Skip network-triggering telemetry for pure local-DB admin commands.
+    // Check parent.name() to disambiguate "create" (agents vs tenants etc.).
+    const parentName = actionCommand.parent?.name();
+    if (name === "config" || name === "version" || name === "reset" || name === "audit") return;
+    if (parentName === "tenants" || parentName === "upstream-keys") return;
     await ensureTelemetryConsent();
   })
   .hook("postAction", (_thisCmd, actionCommand) => {
@@ -111,6 +118,9 @@ registerProviderCommands(program);
 registerConfigCommands(program);
 registerVersionCommand(program);
 registerDbCommands(program);
+registerTenantCommands(program);
+registerUpstreamKeyCommands(program);
+registerAuditCommands(program);
 
 // Parse and run
 program.parseAsync(process.argv).then(() => {

@@ -356,18 +356,18 @@ async function ensureEngineSecretsNonInteractive(b: any, backend: string, agentI
 
 interface TokenField {
   envVar: string;
-  settingKey?: string; // undefined for fields the quickstart can't persist to config
+  settingKey: string;
   label: string;
 }
 
 /**
  * Per-provider auth requirements. Most providers need one env var; a few
  * (vercel, modal, fly) need multiple. The quickstart walks through each
- * field one-by-one and persists what it can to settings.
- *
- * Fields without a `settingKey` are printed as "also export this env var"
- * hints — the gateway settings table doesn't store them, but the user
- * needs them in their shell environment.
+ * field one-by-one and persists every field to the settings table so the
+ * next `gateway` invocation (or server restart) picks them up without
+ * re-prompting. Previously non-token fields (team_id, project_id,
+ * app_name, modal_token_secret) were only set on process.env for the
+ * quickstart's lifetime, which broke the provider on the very next run.
  */
 const PROVIDER_TOKENS: Record<string, TokenField[]> = {
   anthropic: [{ envVar: "ANTHROPIC_API_KEY", settingKey: "anthropic_api_key", label: "Anthropic API Key" }],
@@ -376,23 +376,22 @@ const PROVIDER_TOKENS: Record<string, TokenField[]> = {
   daytona: [{ envVar: "DAYTONA_API_KEY", settingKey: "daytona_api_key", label: "Daytona API Key" }],
   vercel: [
     { envVar: "VERCEL_TOKEN", settingKey: "vercel_token", label: "Vercel Token" },
-    { envVar: "VERCEL_TEAM_ID", label: "Vercel Team ID" },
-    { envVar: "VERCEL_PROJECT_ID", label: "Vercel Project ID" },
+    { envVar: "VERCEL_TEAM_ID", settingKey: "vercel_team_id", label: "Vercel Team ID" },
+    { envVar: "VERCEL_PROJECT_ID", settingKey: "vercel_project_id", label: "Vercel Project ID" },
   ],
   fly: [
     { envVar: "FLY_API_TOKEN", settingKey: "fly_api_token", label: "Fly.io API Token" },
-    { envVar: "FLY_APP_NAME", label: "Fly App Name" },
+    { envVar: "FLY_APP_NAME", settingKey: "fly_app_name", label: "Fly App Name" },
   ],
   modal: [
     { envVar: "MODAL_TOKEN_ID", settingKey: "modal_token_id", label: "Modal Token ID" },
-    { envVar: "MODAL_TOKEN_SECRET", label: "Modal Token Secret" },
+    { envVar: "MODAL_TOKEN_SECRET", settingKey: "modal_token_secret", label: "Modal Token Secret" },
   ],
 };
 
 /** Is the field populated from env or settings? */
 async function fieldPresent(field: TokenField): Promise<boolean> {
   if (process.env[field.envVar]) return true;
-  if (!field.settingKey) return false;
   try {
     const { getConfig } = await import("@agentstep/agent-sdk/config");
     const cfg = getConfig() as Record<string, unknown>;
@@ -433,18 +432,11 @@ async function ensureProviderTokenInteractive(provider: string): Promise<void> {
       process.exit(1);
     }
 
-    if (field.settingKey) {
-      const s = p.spinner();
-      s.start(`Saving ${field.label}...`);
-      const { writeSetting } = await import("@agentstep/agent-sdk/config");
-      writeSetting(field.settingKey, trimmed);
-      s.stop(`Saved ${field.label}.`);
-    } else {
-      // Field can't be persisted to settings — set in-process for this run
-      // and remind the user to export it in their shell.
-      process.env[field.envVar] = trimmed;
-      p.log.info(`Set ${field.envVar} for this session. Export it in your shell to persist.`);
-    }
+    const s = p.spinner();
+    s.start(`Saving ${field.label}...`);
+    const { writeSetting } = await import("@agentstep/agent-sdk/config");
+    writeSetting(field.settingKey, trimmed);
+    s.stop(`Saved ${field.label}.`);
   }
 }
 

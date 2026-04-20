@@ -331,7 +331,7 @@ export class LocalBackend implements Backend {
         headers["Last-Event-ID"] = String(afterSeq);
       }
       const req = new Request(
-        url(`/v1/sessions/${sessionId}/stream`, afterSeq != null ? { after_seq: afterSeq } : undefined),
+        url(`/v1/sessions/${sessionId}/events/stream`, afterSeq != null ? { after_seq: afterSeq } : undefined),
         { headers },
       );
       const res = await handleSessionStream(req, sessionId);

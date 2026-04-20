@@ -144,7 +144,7 @@ export class RemoteBackend implements Backend {
 
   private async *streamSSEOnce(sessionId: string, afterSeq?: number): AsyncGenerator<any> {
     const params = afterSeq != null ? `?after_seq=${afterSeq}` : "";
-    const url = `${this.baseURL}/v1/sessions/${sessionId}/stream${params}`;
+    const url = `${this.baseURL}/v1/sessions/${sessionId}/events/stream${params}`;
     const headers: Record<string, string> = {
       "x-api-key": this.apiKey,
       Accept: "text/event-stream",

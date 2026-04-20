@@ -9,6 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write   # required for npm provenance
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -16,23 +17,73 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
           cache: npm
+
+      - name: Preflight — NPM_TOKEN must be set
+        # Fail loudly if the secret is missing so a silent ENEEDAUTH
+        # doesn't masquerade as a successful release (like it did on the
+        # first post-squash run). This is cheaper than debugging a
+        # silently-skipped publish hours after the fact.
+        run: |
+          if [ -z "${{ secrets.NPM_TOKEN }}" ]; then
+            echo "::error::NPM_TOKEN secret is not set on this repository."
+            echo "Add it at Settings → Secrets and variables → Actions → New repository secret."
+            exit 1
+          fi
+
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+
+      - name: Build SDK (must precede gateway bundle — exports point to dist/)
+        run: npm run build -w @agentstep/agent-sdk
+
       - name: Build UI (Vite → ui.ts → gateway bundle)
         run: |
           cd packages/gateway-ui && npx vite build
           cd ../.. && npx tsx scripts/build-ui.ts
           cd packages/gateway && node build.js
+
       - name: Publish @agentstep/agent-sdk
-        run: cd packages/agent-sdk && npm publish --access public || echo "Version already published, skipping"
+        # No `|| echo` mask — real publish failures must be visible.
+        # If the version is already published npm returns E409 which is
+        # handled explicitly below so re-runs are idempotent.
+        run: |
+          cd packages/agent-sdk
+          if npm publish --access public --provenance 2>&1 | tee /tmp/publish.log; then
+            echo "Published."
+          else
+            if grep -q "cannot publish over" /tmp/publish.log || grep -q "E409" /tmp/publish.log; then
+              echo "::notice::@agentstep/agent-sdk already published at this version, skipping."
+            else
+              exit 1
+            fi
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Publish @agentstep/gateway
-        run: cd packages/gateway && npm publish --access public || echo "Version already published, skipping"
+        run: |
+          cd packages/gateway
+          if npm publish --access public --provenance 2>&1 | tee /tmp/publish.log; then
+            echo "Published."
+          else
+            if grep -q "cannot publish over" /tmp/publish.log || grep -q "E409" /tmp/publish.log; then
+              echo "::notice::@agentstep/gateway already published at this version, skipping."
+            else
+              exit 1
+            fi
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: GitHub Release
-        run: gh release create ${{ github.ref_name }} --generate-notes || echo "Release already exists, skipping"
+        # Don't silently swallow this either — a release that's already
+        # there is fine, but any other failure should surface.
+        run: |
+          if gh release view ${{ github.ref_name }} >/dev/null 2>&1; then
+            echo "Release ${{ github.ref_name }} already exists, skipping."
+          else
+            gh release create ${{ github.ref_name }} --generate-notes
+          fi
         env:
           GH_TOKEN: ${{ github.token }}

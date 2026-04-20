@@ -93,9 +93,12 @@ libsql (SQLite) with WAL mode. Schema is idempotent (`CREATE TABLE IF NOT EXISTS
 
 ### Tests
 
-340 tests across 19 test files:
-- `test/api-comprehensive.test.ts` (150) — full API surface + createApiKey + writeSetting
-- `test/cli-local-backend.test.ts` (63) — CLI handler-based flow
-- `test/translator-*.test.ts` (64) — all 5 backend translators + error handling
-- `test/sdk-exports.test.ts` (13) — SDK exports + provider registry
-- Plus existing unit tests for bus, actor, tools, sweeper, ndjson
+518 tests across 32 test files (480 agent-sdk + 38 gateway):
+- `packages/agent-sdk/test/api-comprehensive.test.ts` (~200) — full API surface + settings masking
+- `packages/agent-sdk/test/cli-local-backend.test.ts` — CLI handler-based flow
+- `packages/agent-sdk/test/translator-*.test.ts` — all backend translators + error handling
+- `packages/agent-sdk/test/anthropic-sync.test.ts` — sync-and-proxy flow + headers
+- `packages/agent-sdk/test/vault-crypto.test.ts` — AES-GCM round-trip, bad key handling
+- `packages/agent-sdk/test/api-metrics.test.ts` — 5xx-only error rate
+- `packages/gateway/test/db-reset.test.ts` (38) — planReset/performReset + IO
+- Plus unit tests for bus, actor, tools, sweeper, ndjson, mcp-auth

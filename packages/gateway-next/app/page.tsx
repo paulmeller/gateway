@@ -11,15 +11,19 @@ export const runtime = "nodejs";
 async function isLoopbackRequest(): Promise<boolean> {
   // Next.js 15: headers() is async
   const h = await headers();
-  // When deployed behind a proxy, trust the leftmost X-Forwarded-For only
-  // if you explicitly set TRUST_PROXY=1. Otherwise rely on the direct
-  // remote address exposed by Next.
+  // Both x-forwarded-for AND x-real-ip are trivially spoofable by any
+  // client — they must only be trusted when the operator has explicitly
+  // said "I put a proxy in front that sanitizes these headers" via
+  // TRUST_PROXY=1. Without that flag, fail closed (no key injection).
+  // This matches the safer default of the Hono adapter, which reads the
+  // raw socket address only.
   const trustProxy = process.env.TRUST_PROXY === "1";
-  const forwardedFor = trustProxy ? h.get("x-forwarded-for")?.split(",")[0]?.trim() : undefined;
-  const remote = forwardedFor ?? h.get("x-real-ip") ?? "";
+  if (!trustProxy) return false;
+
+  const forwardedFor = h.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const realIp = h.get("x-real-ip") ?? undefined;
+  const remote = forwardedFor ?? realIp ?? "";
   const addr = remote.replace(/^::ffff:/, "");
-  // If no address is available (some Node adapters don't expose it to
-  // Next), default to *not* injecting the key — safer.
   if (!addr) return false;
   return addr === "127.0.0.1" || addr === "::1" || addr === "localhost";
 }

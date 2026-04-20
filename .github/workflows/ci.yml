@@ -8,9 +8,11 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest]
         node-version: [22]
     steps:
       - uses: actions/checkout@v4
@@ -33,3 +35,19 @@ jobs:
       - run: npm ci
       - run: cd packages/gateway && node build.js
       - run: node packages/gateway/dist/gateway.js version
+      # Smoke: db reset help works end-to-end from the bundled CLI.
+      - run: node packages/gateway/dist/gateway.js db reset --help
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      # Build-only — don't push or run, just prove the Dockerfile compiles.
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: agentstep-gateway:ci

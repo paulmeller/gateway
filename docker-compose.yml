@@ -7,8 +7,19 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - SPRITE_TOKEN=${SPRITE_TOKEN:-}
+      - E2B_API_KEY=${E2B_API_KEY:-}
+      - DAYTONA_API_KEY=${DAYTONA_API_KEY:-}
+      # Fix the seed key across restarts so the web UI stays logged in.
+      # If unset on first boot, the image will auto-generate one and
+      # persist it to the mounted volume.
+      - SEED_API_KEY=${SEED_API_KEY:-}
     volumes:
-      - gateway-data:/app/data
+      # Must match the Dockerfile's WORKDIR+VOLUME. The vault encryption
+      # key (VAULT_ENCRYPTION_KEY_FILE) lives inside this path so it
+      # survives `docker compose down` — otherwise every restart would
+      # orphan previously-encrypted vault entries.
+      - gateway-data:/home/node/app/data
 
 volumes:
   gateway-data:

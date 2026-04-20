@@ -1,30 +1,73 @@
 {
   "license": "Apache-2.0",
   "name": "@agentstep/agent-sdk",
-  "version": "0.3.5",
+  "version": "0.4.3",
+  "description": "Core engine for AgentStep Gateway \u2014 backends, sandbox providers, session orchestration, and vault encryption.",
+  "keywords": [
+    "anthropic",
+    "managed-agents",
+    "claude-code",
+    "codex",
+    "opencode",
+    "gemini",
+    "sandbox",
+    "agent",
+    "llm",
+    "sdk"
+  ],
   "private": false,
   "type": "module",
-  "main": "src/index.ts",
-  "types": "src/index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./queue": "./src/queue/index.ts",
-    "./config": "./src/config/index.ts",
-    "./backends/claude": "./src/backends/claude/index.ts",
-    "./backends/codex": "./src/backends/codex/index.ts",
-    "./backends/opencode": "./src/backends/opencode/index.ts",
-    "./handlers": "./src/handlers/index.ts",
-    "./*": "./src/*.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./queue": {
+      "types": "./dist/queue/index.d.ts",
+      "import": "./dist/queue/index.js"
+    },
+    "./config": {
+      "types": "./dist/config/index.d.ts",
+      "import": "./dist/config/index.js"
+    },
+    "./backends/claude": {
+      "types": "./dist/backends/claude/index.d.ts",
+      "import": "./dist/backends/claude/index.js"
+    },
+    "./backends/codex": {
+      "types": "./dist/backends/codex/index.d.ts",
+      "import": "./dist/backends/codex/index.js"
+    },
+    "./backends/opencode": {
+      "types": "./dist/backends/opencode/index.d.ts",
+      "import": "./dist/backends/opencode/index.js"
+    },
+    "./handlers": {
+      "types": "./dist/handlers/index.d.ts",
+      "import": "./dist/handlers/index.js"
+    },
+    "./*": "./dist/*.js"
   },
+  "homepage": "https://www.agentstep.com",
+  "bugs": {
+    "url": "https://github.com/agentstep/gateway/issues"
+  },
+  "author": "AgentStep",
   "repository": {
     "type": "git",
     "url": "https://github.com/agentstep/gateway.git",
     "directory": "packages/agent-sdk"
   },
   "files": [
+    "dist",
     "src"
   ],
   "scripts": {
+    "build": "tsup && tsc -p tsconfig.build.json --emitDeclarationOnly --declarationDir dist",
+    "prepublishOnly": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
@@ -32,6 +75,7 @@
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^7.3.4",
     "@sentry/node": "^10.48.0",
+    "drizzle-orm": "~0.45.2",
     "libsql": "^0.5.29",
     "ulid": "^2.3.0",
     "ws": "^8.18.0",
@@ -40,7 +84,11 @@
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@types/ws": "^8.5.13",
+    "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
