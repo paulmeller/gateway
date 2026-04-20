@@ -13,8 +13,8 @@
  *                                 bypassing the auto-export hook.
  */
 import { routeWrap, jsonOk } from "../http";
-import { getDb } from "../db/client";
 import { listEventsByTrace, rowToManagedEvent } from "../db/events";
+import { listTraces } from "../db/traces";
 import { exportTrace } from "../observability/otlp";
 import { badRequest, notFound } from "../errors";
 import type { EventRow } from "../types";
@@ -256,50 +256,10 @@ export function handleGetTrace(
 export function handleListTraces(request: Request): Promise<Response> {
   return routeWrap(request, async () => {
     const url = new URL(request.url);
-    const sessionId = url.searchParams.get("session_id");
+    const sessionId = url.searchParams.get("session_id") ?? undefined;
     const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? "20"), 1), 100);
-    const db = getDb();
 
-    interface TraceRow {
-      trace_id: string;
-      start_ms: number;
-      end_ms: number;
-      event_count: number;
-      session_count: number;
-      first_session_id: string;
-    }
-
-    const rows = sessionId
-      ? (db
-          .prepare(
-            `SELECT trace_id,
-                    MIN(received_at)  AS start_ms,
-                    MAX(received_at)  AS end_ms,
-                    COUNT(*)          AS event_count,
-                    COUNT(DISTINCT session_id) AS session_count,
-                    MIN(session_id)   AS first_session_id
-             FROM events
-             WHERE trace_id IS NOT NULL AND session_id = ?
-             GROUP BY trace_id
-             ORDER BY end_ms DESC
-             LIMIT ?`,
-          )
-          .all(sessionId, limit) as TraceRow[])
-      : (db
-          .prepare(
-            `SELECT trace_id,
-                    MIN(received_at)  AS start_ms,
-                    MAX(received_at)  AS end_ms,
-                    COUNT(*)          AS event_count,
-                    COUNT(DISTINCT session_id) AS session_count,
-                    MIN(session_id)   AS first_session_id
-             FROM events
-             WHERE trace_id IS NOT NULL
-             GROUP BY trace_id
-             ORDER BY end_ms DESC
-             LIMIT ?`,
-          )
-          .all(limit) as TraceRow[]);
+    const rows = listTraces({ sessionId, limit });
 
     return jsonOk({
       data: rows.map((r) => ({
