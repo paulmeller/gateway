@@ -128,7 +128,7 @@ export function OverviewPage() {
   // Empty-state onboarding logic
   const allLoaded = !agentsQ.isPending && !sessionsQ.isPending && !envsQ.isPending;
   const anyError = agentsQ.isError || sessionsQ.isError || envsQ.isError;
-  const isEmpty = allLoaded && !anyError && agentCount === 0 && envCount === 0 && totalSessions === 0;
+  const isEmpty = allLoaded && !anyError && totalSessions === 0;
 
   // Metrics for pulse row — only fetch after initial resource load (avoid wasted
   // calls during empty state and WelcomeHero)
