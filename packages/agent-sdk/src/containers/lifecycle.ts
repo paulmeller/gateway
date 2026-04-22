@@ -243,10 +243,33 @@ export async function acquireForFirstTurn(sessionId: string): Promise<string> {
     });
   }
 
-  // Provision resources into the container if the session has any
-  const session = getSession(sessionId);
-  if (session?.resources && session.resources.length > 0) {
-    await provisionResources(name, session.resources, sp);
+  // Provision resources into the container if the session has any.
+  // Prefer the session_resources table; fall back to resources_json for backward compat.
+  const { listResources: listSessionResources } = await import("../db/session-resources");
+  const tableResources = listSessionResources(sessionId);
+  if (tableResources.length > 0) {
+    // Convert session_resources rows to SessionResource shape for provisioning
+    const mapped: SessionResource[] = tableResources.map((r) => {
+      if (r.type === "file") return { type: "file", file_id: r.file_id, mount_path: r.mount_path };
+      if (r.type === "github_repository") {
+        const checkout = r.checkout;
+        return {
+          type: "github_repository" as const,
+          repository_url: r.url,
+          mount_path: r.mount_path,
+          branch: checkout?.type === "branch" ? checkout.name : undefined,
+          commit: checkout?.type === "commit" ? checkout.name : undefined,
+        };
+      }
+      return { type: "uri" as const, uri: r.url, mount_path: r.mount_path };
+    });
+    await provisionResources(name, mapped, sp);
+  } else {
+    // Backward compat: fall back to session's resources_json
+    const session = getSession(sessionId);
+    if (session?.resources && session.resources.length > 0) {
+      await provisionResources(name, session.resources, sp);
+    }
   }
 
   pool.register({
@@ -278,7 +301,7 @@ export async function provisionResources(
   resources: SessionResource[],
   provider: import("../providers/types").ContainerProvider,
 ): Promise<void> {
-  await provider.exec(spriteName, ["mkdir", "-p", "/tmp/resources", "/uploads"]);
+  await provider.exec(spriteName, ["mkdir", "-p", "/mnt/session/resources", "/mnt/session/uploads", "/mnt/session/outputs"]);
   const MAX_RESOURCE_BYTES = 50 * 1024 * 1024; // 50 MB
   // Sanitize mount_path — only safe path characters, no traversal
   const SAFE_PATH_RE = /^[a-zA-Z0-9_./\-]+$/;
@@ -294,20 +317,32 @@ export async function provisionResources(
   for (let i = 0; i < resources.length; i++) {
     const r = resources[i];
     const safeMountPath = sanitizeMountPath(r.mount_path);
-    const mountTarget = safeMountPath
-      ? `/uploads/${safeMountPath}`
-      : `/tmp/resources/resource_${i}`;
+    let mountTarget: string;
+    if (safeMountPath) {
+      // If mount_path starts with / it's an absolute path, use it as-is
+      mountTarget = safeMountPath.startsWith("/") ? safeMountPath : `/mnt/session/uploads/${safeMountPath}`;
+    } else if (r.type === "file" && r.file_id) {
+      // Default for file resources: /mnt/session/uploads/<file_id>/<filename>
+      const { getFile: getFileRow } = await import("../db/files");
+      const fileRow = getFileRow(r.file_id);
+      const fname = fileRow?.filename ?? `file_${i}`;
+      mountTarget = `/mnt/session/uploads/${r.file_id}/${fname}`;
+    } else {
+      mountTarget = `/mnt/session/resources/resource_${i}`;
+    }
 
     // Ensure parent directory exists — use argv form (no shell)
-    if (safeMountPath) {
-      const dir = mountTarget.substring(0, mountTarget.lastIndexOf("/"));
+    const dir = mountTarget.substring(0, mountTarget.lastIndexOf("/"));
+    if (dir) {
       await provider.exec(spriteName, ["mkdir", "-p", dir]);
     }
 
     // Write content using "sh -c 'cat > \"$1\"' sh <path>" pattern —
     // the path is passed as a positional arg, never shell-interpolated.
+    // After writing, chmod a-w to make the mount read-only.
     const writeTo = async (target: string, content: string) => {
       await provider.exec(spriteName, ["sh", "-c", "cat > \"$1\"", "sh", target], { stdin: content });
+      await provider.exec(spriteName, ["chmod", "a-w", target]);
     };
 
     if (r.type === "uri" && r.uri) {
@@ -357,7 +392,9 @@ export async function provisionResources(
       }
     } else if (r.type === "github_repository" && r.repository_url) {
       try {
-        const repoDir = safeMountPath ? `/uploads/${safeMountPath}` : `/tmp/resources/repo_${i}`;
+        const repoDir = safeMountPath
+          ? (safeMountPath.startsWith("/") ? safeMountPath : `/mnt/session/uploads/${safeMountPath}`)
+          : `/mnt/session/resources/repo_${i}`;
         // Validate branch/commit — alphanumeric + hyphen/dot/slash only
         const SAFE_REF_RE = /^[a-zA-Z0-9_./\-]+$/;
         const safeBranch = r.branch && SAFE_REF_RE.test(r.branch) ? r.branch : undefined;

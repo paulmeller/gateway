@@ -225,6 +225,20 @@ export const files = sqliteTable("files", {
   created_at: integer("created_at").notNull(),
 });
 
+// ── session_resources ────────────────────────────────────────────────
+
+export const sessionResources = sqliteTable("session_resources", {
+  id: text("id").primaryKey(),
+  session_id: text("session_id").notNull(),
+  type: text("type").notNull(), // "file" | "github_repository" | "uri" | "text"
+  file_id: text("file_id"),
+  mount_path: text("mount_path"),
+  url: text("url"),
+  checkout_json: text("checkout_json"),
+  created_at: integer("created_at").notNull(),
+  updated_at: integer("updated_at").notNull(),
+});
+
 // ── anthropic_sync ────────────────────────────────────────────────────
 
 export const anthropicSync = sqliteTable("anthropic_sync", {

@@ -77,6 +77,15 @@ import {
   handleGetCredential,
   handleUpdateCredential,
   handleDeleteCredential,
+  handleUploadFile,
+  handleListFiles,
+  handleGetFile,
+  handleGetFileContent,
+  handleDeleteFile,
+  handleAddResource,
+  handleListResources,
+  handleGetResource,
+  handleDeleteResource,
 } from "@agentstep/agent-sdk/handlers";
 
 /**
@@ -278,6 +287,25 @@ export function buildApp() {
 
   // ── Threads ──────────────────────────────────────────────────────────
   route(app, "get", "/v1/sessions/:id/threads", handleListThreads, "id");
+
+  // ── Session Resources ───────────────────────────────────────────────
+  route(app, "post", "/v1/sessions/:id/resources", handleAddResource, "id");
+  route(app, "get", "/v1/sessions/:id/resources", handleListResources, "id");
+  app.get("/v1/sessions/:id/resources/:rid", async (req, reply) => {
+    const { id, rid } = req.params as { id: string; rid: string };
+    await sendWebResponse(reply, await handleGetResource(toWebRequest(req), id, rid));
+  });
+  app.delete("/v1/sessions/:id/resources/:rid", async (req, reply) => {
+    const { id, rid } = req.params as { id: string; rid: string };
+    await sendWebResponse(reply, await handleDeleteResource(toWebRequest(req), id, rid));
+  });
+
+  // ── Files ───────────────────────────────────────────────────────────
+  route(app, "post", "/v1/files", handleUploadFile);
+  route(app, "get", "/v1/files", handleListFiles);
+  route(app, "get", "/v1/files/:id", handleGetFile, "id");
+  route(app, "get", "/v1/files/:id/content", handleGetFileContent, "id");
+  route(app, "delete", "/v1/files/:id", handleDeleteFile, "id");
 
   // ── Vaults ───────────────────────────────────────────────────────────
   route(app, "post", "/v1/vaults", handleCreateVault);

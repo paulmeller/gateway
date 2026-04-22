@@ -664,6 +664,22 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: "get",
+  path: "/v1/sessions/{id}/resources/{rid}",
+  tags: ["Resources"],
+  summary: "Get a single session resource",
+  security: [{ ApiKey: [] }],
+  request: { params: z.object({ id: z.string(), rid: z.string() }) },
+  responses: {
+    200: {
+      description: "Resource retrieved",
+      content: { "application/json": { schema: SessionResourceSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
   method: "delete",
   path: "/v1/sessions/{id}/resources/{rid}",
   tags: ["Resources"],
@@ -717,11 +733,13 @@ registry.registerPath({
     query: z.object({
       limit: z.coerce.number().int().min(1).max(500).optional(),
       scope_id: z.string().optional().describe("Session ID to filter by scope."),
+      after_id: z.string().optional().describe("Cursor: return files after this ID (for forward pagination)."),
+      before_id: z.string().optional().describe("Cursor: return files before this ID (for backward pagination)."),
     }),
   },
   responses: {
     200: {
-      description: "List of file records",
+      description: "List of file records with pagination",
       content: { "application/json": { schema: FileListResponseSchema } },
     },
     ...ErrorResponses,

@@ -6,6 +6,47 @@ import { nowMs, toIso } from "../util/clock";
 import type { Session, SessionResource, SessionRow, SessionStatus } from "../types";
 
 export function hydrateSession(row: SessionRow): Session {
+  // Populate resources from session_resources table if available,
+  // falling back to resources_json for backward compat.
+  let resources: SessionResource[];
+  try {
+    const { listResources } = require("./session-resources") as {
+      listResources: (sessionId: string) => Array<{
+        id: string;
+        type: string;
+        file_id?: string;
+        mount_path?: string;
+        url?: string;
+        checkout_json?: string | null;
+      }>;
+    };
+    const tableResources = listResources(row.id);
+    if (tableResources.length > 0) {
+      resources = tableResources.map((r) => {
+        const base: SessionResource = { type: r.type as SessionResource["type"] };
+        if (r.file_id) base.file_id = r.file_id;
+        if (r.mount_path) base.mount_path = r.mount_path;
+        if (r.url) {
+          if (r.type === "github_repository") base.repository_url = r.url;
+          else base.uri = r.url;
+        }
+        if (r.checkout_json) {
+          try {
+            const checkout = JSON.parse(r.checkout_json) as { type: string; name: string };
+            if (checkout.type === "branch") base.branch = checkout.name;
+            else if (checkout.type === "commit") base.commit = checkout.name;
+          } catch { /* ignore */ }
+        }
+        return base;
+      });
+    } else {
+      resources = row.resources_json ? (JSON.parse(row.resources_json) as SessionResource[]) : [];
+    }
+  } catch {
+    // Fallback if session-resources module not available (e.g. table not migrated yet)
+    resources = row.resources_json ? (JSON.parse(row.resources_json) as SessionResource[]) : [];
+  }
+
   return {
     id: row.id,
     type: "session" as const,
@@ -17,7 +58,7 @@ export function hydrateSession(row: SessionRow): Session {
     metadata: JSON.parse(row.metadata_json) as Record<string, unknown>,
     max_budget_usd: row.max_budget_usd ?? null,
     outcome: row.outcome_criteria_json ? (JSON.parse(row.outcome_criteria_json) as Record<string, unknown>) : null,
-    resources: row.resources_json ? (JSON.parse(row.resources_json) as SessionResource[]) : [],
+    resources,
     vault_ids: row.vault_ids_json ? (JSON.parse(row.vault_ids_json) as string[]) : [],
     parent_session_id: row.parent_session_id ?? null,
     thread_depth: row.thread_depth ?? 0,

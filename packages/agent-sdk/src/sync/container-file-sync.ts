@@ -25,7 +25,7 @@ const BINARY_EXTENSIONS = new Set([
 ]);
 
 /** Allowed path prefixes inside the container. */
-const ALLOWED_PREFIXES = ["/home/", "/root/", "/tmp/", "/workspace/", "/mnt/"];
+const ALLOWED_PREFIXES = ["/home/", "/root/", "/tmp/", "/workspace/", "/mnt/", "/mnt/session/"];
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 const MAX_FILES_PER_SYNC = 20;

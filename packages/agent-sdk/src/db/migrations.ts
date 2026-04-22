@@ -578,6 +578,23 @@ export function runMigrations(db: InstanceType<typeof Database>): void {
     `CREATE INDEX IF NOT EXISTS idx_files_dedup ON files(scope_id, container_path, content_hash)`,
   );
 
+  // Session resources table (replaces resources_json on sessions for proper CRUD)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS session_resources (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      file_id TEXT,
+      mount_path TEXT,
+      url TEXT,
+      checkout_json TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_session_resources_session ON session_resources(session_id)`);
+
   // Vault credentials (Anthropic-compatible structured auth)
   db.exec(`
     CREATE TABLE IF NOT EXISTS vault_credentials (

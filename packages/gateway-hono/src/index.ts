@@ -69,6 +69,7 @@ import {
   handleDeleteFile,
   handleAddResource,
   handleListResources,
+  handleGetResource,
   handleDeleteResource,
   handleCreateApiKey,
   handleListApiKeys,
@@ -243,6 +244,7 @@ app.get("/v1/sessions/:id/events/stream", async (c) => {
 // ── Session Resources ───────────────────────────────────────────────────
 app.post("/v1/sessions/:id/resources", (c) => handleAddResource(c.req.raw, c.req.param("id")));
 app.get("/v1/sessions/:id/resources", (c) => handleListResources(c.req.raw, c.req.param("id")));
+app.get("/v1/sessions/:id/resources/:rid", (c) => handleGetResource(c.req.raw, c.req.param("id"), c.req.param("rid")));
 app.delete("/v1/sessions/:id/resources/:rid", (c) => handleDeleteResource(c.req.raw, c.req.param("id"), c.req.param("rid")));
 
 // ── Files ────────────────────────────────────────────────────────────────

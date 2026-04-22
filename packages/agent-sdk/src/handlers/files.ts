@@ -104,6 +104,8 @@ export function handleListFiles(request: Request): Promise<Response> {
     const url = new URL(req.url);
     const limit = Number(url.searchParams.get("limit") || "100");
     const scope_id = url.searchParams.get("scope_id") || undefined;
+    const after_id = url.searchParams.get("after_id") || undefined;
+    const before_id = url.searchParams.get("before_id") || undefined;
     if (scope_id) {
       // Tenant-scoped listing — caller must own the session the files
       // are attached to. Unknown scope_id → 404 (matches the pattern
@@ -119,8 +121,8 @@ export function handleListFiles(request: Request): Promise<Response> {
       // Tenant users can't fetch an unscoped file list. Force scope_id.
       throw badRequest("scope_id is required for tenant-scoped listings");
     }
-    const files = listFiles({ limit, scope_id });
-    return jsonOk({ data: files });
+    const result = listFiles({ limit, scope_id, after_id, before_id });
+    return jsonOk(result);
   });
 }
 

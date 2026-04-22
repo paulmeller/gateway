@@ -1,6 +1,6 @@
 import { ulid } from "ulid";
 
-type Prefix = "agent" | "ver" | "env" | "sess" | "evt" | "key" | "ukey" | "ckpt" | "span" | "trace" | "vault" | "vcrd" | "ms" | "mem" | "file" | "tenant" | "audit";
+type Prefix = "agent" | "ver" | "env" | "sess" | "evt" | "key" | "ukey" | "ckpt" | "span" | "trace" | "vault" | "vcrd" | "ms" | "mem" | "file" | "sesrsc" | "tenant" | "audit";
 
 export function newId(prefix: Prefix): string {
   return `${prefix}_${ulid()}`;

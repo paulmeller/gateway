@@ -714,9 +714,11 @@ export const FileRecordSchema = registry.register(
   "FileRecord",
   z.object({
     id: UlidId,
+    type: z.literal("file").openapi({ description: "Object type discriminator." }),
     filename: z.string(),
-    size: z.number().int().nonnegative(),
-    content_type: z.string(),
+    mime_type: z.string().openapi({ description: "MIME type of the file." }),
+    size_bytes: z.number().int().nonnegative().openapi({ description: "File size in bytes." }),
+    downloadable: z.boolean().openapi({ description: "Whether the file content can be downloaded." }),
     scope: FileScopeSchema.nullable().openapi({
       description: "Scope the file is attached to. Null for legacy unscoped files (global-admin only).",
     }),
@@ -726,7 +728,12 @@ export const FileRecordSchema = registry.register(
 
 export const FileListResponseSchema = registry.register(
   "FileListResponse",
-  z.object({ data: z.array(FileRecordSchema) }),
+  z.object({
+    data: z.array(FileRecordSchema),
+    has_more: z.boolean().openapi({ description: "Whether there are more results beyond this page." }),
+    first_id: z.string().nullable().openapi({ description: "ID of the first item in this page." }),
+    last_id: z.string().nullable().openapi({ description: "ID of the last item in this page." }),
+  }),
 );
 
 export const FileDeletedResponseSchema = registry.register(
@@ -870,17 +877,18 @@ export const MemoryDeletedResponseSchema = registry.register(
 export const SessionResourceSchema = registry.register(
   "SessionResource",
   z.object({
-    id: z.string().openapi({ description: "Resource index id, e.g. 'res_0'." }),
+    id: z.string().openapi({ description: "Resource ID with sesrsc_ prefix." }),
     type: z.enum(["uri", "text", "file", "github_repository"]),
-    uri: z.string().optional(),
-    content: z.string().optional(),
-    file_id: z.string().optional(),
-    mount_path: z.string().optional(),
-    repository_url: z.string().optional(),
-    branch: z.string().optional(),
-    commit: z.string().optional(),
+    file_id: z.string().optional().openapi({ description: "File ID for file-type resources." }),
+    mount_path: z.string().optional().openapi({ description: "Mount path inside the container." }),
+    url: z.string().optional().openapi({ description: "URL for URI/github_repository resources." }),
+    checkout: z.object({
+      type: z.string().openapi({ description: "Checkout type, e.g. 'branch' or 'commit'." }),
+      name: z.string().openapi({ description: "Branch name or commit hash." }),
+    }).optional().openapi({ description: "Checkout configuration for github_repository resources." }),
     session_id: UlidId,
-    created_at: IsoTimestamp.optional(),
+    created_at: IsoTimestamp,
+    updated_at: IsoTimestamp,
   }),
 );
 
@@ -892,9 +900,14 @@ export const AddResourceRequestSchema = registry.register(
     content: z.string().optional(),
     file_id: z.string().optional(),
     mount_path: z.string().optional(),
+    url: z.string().optional(),
     repository_url: z.string().optional(),
     branch: z.string().optional(),
     commit: z.string().optional(),
+    checkout: z.object({
+      type: z.string(),
+      name: z.string(),
+    }).optional(),
   }),
 );
 

@@ -59,16 +59,16 @@ describe("file sync — local DB operations", () => {
     });
 
     expect(file.filename).toBe("output.txt");
-    expect(file.size).toBe(42);
+    expect(file.size_bytes).toBe(42);
 
     const row = getFile(file.id);
     expect(row).toBeTruthy();
     expect(row!.storage_path).toBe("remote:file_anthropic_abc123");
     expect(row!.scope_id).toBe("sess_test");
 
-    const listed = listFiles({ scope_id: "sess_test" });
-    expect(listed.length).toBe(1);
-    expect(listed[0].id).toBe(file.id);
+    const result = listFiles({ scope_id: "sess_test" });
+    expect(result.data.length).toBe(1);
+    expect(result.data[0].id).toBe(file.id);
   });
 
   it("dedup via storage_path prevents duplicate file rows", async () => {
@@ -93,8 +93,8 @@ describe("file sync — local DB operations", () => {
     expect(existing).toBeTruthy();
 
     // No duplicate
-    const all = listFiles({ scope_id: "sess_1" });
-    expect(all.length).toBe(1);
+    const result = listFiles({ scope_id: "sess_1" });
+    expect(result.data.length).toBe(1);
   });
 });
 
