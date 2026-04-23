@@ -595,6 +595,27 @@ export function runMigrations(db: InstanceType<typeof Database>): void {
   `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_session_resources_session ON session_resources(session_id)`);
 
+  // Widen anthropic_sync CHECK constraint to include 'file' resource type.
+  // SQLite doesn't support ALTER CHECK, so recreate the table.
+  const syncCheckRow = db.prepare(
+    "SELECT sql FROM sqlite_master WHERE type='table' AND name='anthropic_sync'",
+  ).get() as { sql: string } | undefined;
+  if (syncCheckRow && !syncCheckRow.sql.includes("'file'")) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS anthropic_sync_new (
+        local_id TEXT NOT NULL,
+        resource_type TEXT NOT NULL CHECK(resource_type IN ('agent','environment','vault','session','file')),
+        remote_id TEXT NOT NULL,
+        synced_at INTEGER NOT NULL,
+        config_hash TEXT,
+        PRIMARY KEY (local_id, resource_type)
+      );
+      INSERT OR IGNORE INTO anthropic_sync_new SELECT * FROM anthropic_sync;
+      DROP TABLE anthropic_sync;
+      ALTER TABLE anthropic_sync_new RENAME TO anthropic_sync;
+    `);
+  }
+
   // Vault credentials (Anthropic-compatible structured auth)
   db.exec(`
     CREATE TABLE IF NOT EXISTS vault_credentials (

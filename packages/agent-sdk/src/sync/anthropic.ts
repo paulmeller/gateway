@@ -171,8 +171,53 @@ export async function syncEnvironment(
 }
 
 /**
- * Full sync flow for session creation. Syncs agent, vault(s), and
- * environment, then creates a session on Anthropic.
+ * Upload a local file to Anthropic's Files API.
+ * Returns the remote file ID.
+ */
+async function syncFile(
+  localFileId: string,
+  apiKey: string,
+): Promise<string> {
+  // Check if already synced
+  const existing = getSyncedRemoteId(localFileId, "file");
+  if (existing) return existing;
+
+  const { getFile } = await import("../db/files");
+  const { readFile: readStoredFile } = await import("../files/storage");
+
+  const fileRow = getFile(localFileId);
+  if (!fileRow) throw new Error(`File ${localFileId} not found`);
+
+  const data = readStoredFile(fileRow.storage_path);
+
+  // Anthropic Files API uses multipart upload
+  const formData = new FormData();
+  formData.append("file", new Blob([data], { type: fileRow.content_type }), fileRow.filename);
+
+  const res = await fetch(`${ANTHROPIC_BASE}/v1/files`, {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-beta": BETA_HEADER,
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = await res.text().catch(() => "unknown error");
+    throw new Error(`Anthropic Files API upload failed (${res.status}): ${err}`);
+  }
+
+  const remote = (await res.json()) as { id: string };
+  upsertSync(localFileId, "file", remote.id);
+  console.log(`[sync] file ${localFileId} → ${remote.id}`);
+  return remote.id;
+}
+
+/**
+ * Full sync flow for session creation. Syncs agent, vault(s),
+ * environment, and files, then creates a session on Anthropic.
  * Returns the remote session ID.
  */
 export async function syncAndCreateSession(opts: {
@@ -180,10 +225,11 @@ export async function syncAndCreateSession(opts: {
   agentVersion?: number;
   environmentId: string;
   vaultIds?: string[];
+  sessionId?: string;
   title?: string | null;
   apiKey: string;
 }): Promise<{ remoteSessionId: string }> {
-  const { agentId, environmentId, vaultIds, title, apiKey } = opts;
+  const { agentId, environmentId, vaultIds, sessionId, title, apiKey } = opts;
 
   // Load all vault entries for MCP auth injection
   const allVaultEntries: Array<{ key: string; value: string }> = [];
@@ -208,12 +254,34 @@ export async function syncAndCreateSession(opts: {
   // Sync environment
   const remoteEnvId = await syncEnvironment(environmentId, apiKey);
 
+  // Sync file resources — upload local files to Anthropic's Files API
+  const remoteResources: Array<{ type: string; file_id: string; mount_path?: string }> = [];
+  if (sessionId) {
+    try {
+      const { listResources } = await import("../db/session-resources");
+      const resources = listResources(sessionId);
+      for (const r of resources) {
+        if (r.type === "file" && r.file_id) {
+          const remoteFileId = await syncFile(r.file_id, apiKey);
+          remoteResources.push({
+            type: "file",
+            file_id: remoteFileId,
+            mount_path: r.mount_path ?? undefined,
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("[sync] file sync failed:", err);
+    }
+  }
+
   // Create session on Anthropic
   const sessionBody: Record<string, unknown> = {
     agent: remoteAgentId,
     environment_id: remoteEnvId,
   };
   if (remoteVaultIds.length > 0) sessionBody.vault_ids = remoteVaultIds;
+  if (remoteResources.length > 0) sessionBody.resources = remoteResources;
   if (title) sessionBody.title = title;
 
   const remoteSession = await anthropicPost<{ id: string }>("/v1/sessions", sessionBody, apiKey);

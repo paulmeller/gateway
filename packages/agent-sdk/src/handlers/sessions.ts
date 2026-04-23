@@ -306,21 +306,14 @@ export function handleCreateSession(request: Request): Promise<Response> {
           );
         }
 
-        const { remoteSessionId } = await syncAndCreateSession({
-          agentId: agent.id,
-          agentVersion: agent.version,
-          environmentId: env.id,
-          vaultIds: data.vault_ids ?? undefined,
-          title: data.title ?? undefined,
-          apiKey: resolved.value,
-        });
-
+        // Create local session + resources FIRST so syncAndCreateSession
+        // can look up file resources from the table to upload to Anthropic.
         const session = createSession({
           agent_id: agent.id,
           agent_version: agent.version,
           environment_id: env.id,
           title: data.title ?? null,
-          metadata: { ...data.metadata, _anthropic_session_id: remoteSessionId },
+          metadata: data.metadata ?? {},
           max_budget_usd: data.max_budget_usd ?? null,
           resources: data.resources?.length ? data.resources : null,
           vault_ids: data.vault_ids?.length ? data.vault_ids : null,
@@ -328,13 +321,7 @@ export function handleCreateSession(request: Request): Promise<Response> {
           tenant_id: agentTenantId,
         });
 
-        upsertSync(session.id, "session", remoteSessionId);
-        // Sync-and-proxy sessions have a local row AND a proxy entry;
-        // stamp both with the same tenant so cross-tenant access
-        // attempts are rejected identically by either code path.
-        markProxied(session.id, "session", agentTenantId);
-
-        // Insert into session_resources table for consistency
+        // Insert into session_resources table before sync
         if (data.resources?.length) {
           const { createResource } = await import("../db/session-resources");
           for (const r of data.resources) {
@@ -349,6 +336,25 @@ export function handleCreateSession(request: Request): Promise<Response> {
             });
           }
         }
+
+        // Now sync to Anthropic — files will be uploaded from session_resources
+        const { remoteSessionId } = await syncAndCreateSession({
+          agentId: agent.id,
+          agentVersion: agent.version,
+          environmentId: env.id,
+          vaultIds: data.vault_ids ?? undefined,
+          sessionId: session.id,
+          title: data.title ?? undefined,
+          apiKey: resolved.value,
+        });
+
+        // Stamp the remote session ID on the local session
+        updateSessionMutable(session.id, {
+          metadata: { ...data.metadata, _anthropic_session_id: remoteSessionId },
+        });
+
+        upsertSync(session.id, "session", remoteSessionId);
+        markProxied(session.id, "session", agentTenantId);
 
         getActor(session.id);
         return jsonOk(session, 201);
