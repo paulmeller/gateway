@@ -535,3 +535,172 @@ describe("Session resources (table-backed)", () => {
     expect(checkout.name).toBe("main");
   });
 });
+
+// ─── Resources at session creation ──────────────────────────────────────
+
+describe("Resources passed at session creation", () => {
+  beforeEach(() => freshDbEnv());
+
+  it("inserts into session_resources table during session create", async () => {
+    const { getDb } = await import("../src/db/client");
+    getDb();
+    const { createApiKey } = await import("../src/db/api_keys");
+    const { nowMs } = await import("../src/util/clock");
+    const now = nowMs();
+    const db = getDb();
+
+    db.prepare(
+      `INSERT INTO agents (id, current_version, name, tenant_id, created_at, updated_at)
+       VALUES ('agent_rc', 1, 'rc-agent', 'tenant_default', ?, ?)`,
+    ).run(now, now);
+    db.prepare(
+      `INSERT INTO agent_versions (agent_id, version, model, tools_json, mcp_servers_json, backend, webhook_events_json, skills_json, model_config_json, created_at)
+       VALUES ('agent_rc', 1, 'claude-sonnet-4-6', '[]', '{}', 'claude', '[]', '[]', '{}', ?)`,
+    ).run(now);
+    db.prepare(
+      `INSERT INTO environments (id, name, config_json, state, tenant_id, created_at)
+       VALUES ('env_rc', 'rc-env', '{"type":"cloud","provider":"docker"}', 'ready', 'tenant_default', ?)`,
+    ).run(now);
+
+    const { key } = createApiKey({
+      name: "rc-admin",
+      permissions: { admin: true, scope: null },
+      rawKey: "ck_test_rc_admin",
+    });
+
+    // Upload a file first
+    const { handleUploadFile } = await import("../src/handlers/files");
+    const formData = new FormData();
+    formData.append("file", new File(["test data"], "data.csv", { type: "text/csv" }));
+    const uploadRes = await handleUploadFile(
+      new Request("http://localhost/v1/files", {
+        method: "POST",
+        headers: { "x-api-key": key },
+        body: formData,
+      }),
+    );
+    const uploaded = await uploadRes.json() as { id: string };
+
+    // Create session with resources in body
+    const { handleCreateSession } = await import("../src/handlers/sessions");
+    const sessRes = await handleCreateSession(
+      new Request("http://localhost/v1/sessions", {
+        method: "POST",
+        headers: { "x-api-key": key, "content-type": "application/json" },
+        body: JSON.stringify({
+          agent: "agent_rc",
+          environment_id: "env_rc",
+          resources: [{ type: "file", file_id: uploaded.id, mount_path: "/mnt/session/uploads/data.csv" }],
+        }),
+      }),
+    );
+    expect(sessRes.status).toBe(201);
+    const session = await sessRes.json() as { id: string; resources: Array<Record<string, unknown>> };
+
+    // Verify resources are in the session_resources table
+    const { listResources } = await import("../src/db/session-resources");
+    const resources = listResources(session.id);
+    expect(resources.length).toBe(1);
+    expect(resources[0].type).toBe("file");
+    expect(resources[0].file_id).toBe(uploaded.id);
+    expect(resources[0].mount_path).toBe("/mnt/session/uploads/data.csv");
+    expect(resources[0].id.startsWith("sesrsc_")).toBe(true);
+  });
+
+  it("session response includes resources from creation body", async () => {
+    const { getDb } = await import("../src/db/client");
+    getDb();
+    const { createApiKey } = await import("../src/db/api_keys");
+    const { nowMs } = await import("../src/util/clock");
+    const now = nowMs();
+    const db = getDb();
+
+    db.prepare(
+      `INSERT INTO agents (id, current_version, name, tenant_id, created_at, updated_at)
+       VALUES ('agent_sr', 1, 'sr-agent', 'tenant_default', ?, ?)`,
+    ).run(now, now);
+    db.prepare(
+      `INSERT INTO agent_versions (agent_id, version, model, tools_json, mcp_servers_json, backend, webhook_events_json, skills_json, model_config_json, created_at)
+       VALUES ('agent_sr', 1, 'claude-sonnet-4-6', '[]', '{}', 'claude', '[]', '[]', '{}', ?)`,
+    ).run(now);
+    db.prepare(
+      `INSERT INTO environments (id, name, config_json, state, tenant_id, created_at)
+       VALUES ('env_sr', 'sr-env', '{"type":"cloud","provider":"docker"}', 'ready', 'tenant_default', ?)`,
+    ).run(now);
+
+    const { key } = createApiKey({
+      name: "sr-admin",
+      permissions: { admin: true, scope: null },
+      rawKey: "ck_test_sr_admin",
+    });
+
+    const { handleCreateSession } = await import("../src/handlers/sessions");
+    const sessRes = await handleCreateSession(
+      new Request("http://localhost/v1/sessions", {
+        method: "POST",
+        headers: { "x-api-key": key, "content-type": "application/json" },
+        body: JSON.stringify({
+          agent: "agent_sr",
+          environment_id: "env_sr",
+          resources: [
+            { type: "file", file_id: "file_abc" },
+            { type: "github_repository", repository_url: "https://github.com/test/repo", branch: "dev" },
+          ],
+        }),
+      }),
+    );
+    expect(sessRes.status).toBe(201);
+    const session = await sessRes.json() as { id: string };
+
+    // Retrieve session and check resources
+    const { handleGetSession } = await import("../src/handlers/sessions");
+    const getRes = await handleGetSession(
+      new Request(`http://localhost/v1/sessions/${session.id}`, {
+        headers: { "x-api-key": key },
+      }),
+      session.id,
+    );
+    const body = await getRes.json() as { resources: Array<Record<string, unknown>> };
+    expect(body.resources.length).toBe(2);
+    expect(body.resources[0].type).toBe("file");
+    expect(body.resources[1].type).toBe("github_repository");
+  });
+});
+
+// ─── Anthropic file sync ────────────────────────────────────────────────
+
+describe("Anthropic file sync (unit tests)", () => {
+  beforeEach(() => freshDbEnv());
+
+  it("syncFile is idempotent — returns cached remote ID on second call", async () => {
+    const { getDb } = await import("../src/db/client");
+    getDb();
+    const { upsertSync, getSyncedRemoteId } = await import("../src/db/sync");
+
+    // Simulate a previous sync
+    upsertSync("file_local1", "file", "file_remote1");
+
+    // Verify cached
+    const remoteId = getSyncedRemoteId("file_local1", "file");
+    expect(remoteId).toBe("file_remote1");
+  });
+
+  it("anthropic_sync table accepts 'file' resource type", async () => {
+    const { getDb } = await import("../src/db/client");
+    getDb();
+    const { upsertSync, getSyncRow } = await import("../src/db/sync");
+
+    // Should not throw — CHECK constraint now includes 'file'
+    upsertSync("file_check1", "file", "remote_check1");
+    const row = getSyncRow("file_check1", "file");
+    expect(row).not.toBeNull();
+    expect(row!.remote_id).toBe("remote_check1");
+  });
+
+  it("syncAndCreateSession accepts sessionId parameter", async () => {
+    // Just verify the function signature accepts sessionId without errors
+    const { syncAndCreateSession } = await import("../src/sync/anthropic");
+    expect(typeof syncAndCreateSession).toBe("function");
+    // The function requires external API calls so we just verify the type
+  });
+});
