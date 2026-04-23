@@ -194,6 +194,7 @@ async function teeRemoteStreamInner(localSessionId: string, remoteSessionId: str
     const decoder = new TextDecoder();
     let buffer = "";
     let sawRequiresAction = false;
+    let lastToolUseEvt: Record<string, unknown> | null = null;
 
     try {
       while (true) {
@@ -235,47 +236,57 @@ async function teeRemoteStreamInner(localSessionId: string, remoteSessionId: str
                 processedAt: Date.now(),
               });
 
-              // Detect requires_action stop reason
-              if (localType === "session.status_idle") {
-                const stopReason = evt.stop_reason;
-                if (
-                  stopReason?.type === "requires_action" ||
-                  stopReason === "requires_action"
-                ) {
-                  sawRequiresAction = true;
-                }
+              // Track tool_use events (Anthropic sends type "tool_use", not "agent.custom_tool_use")
+              if (localType === "tool_use" || localType === "agent.custom_tool_use") {
+                lastToolUseEvt = evt;
+              }
+
+              // When the stream goes idle and we saw a tool_use event,
+              // break out of the reader loop to trigger re-entry.
+              // Can't wait for stream end — Anthropic keeps the SSE
+              // connection open indefinitely.
+              if (localType === "session.status_idle" && lastToolUseEvt) {
+                sawRequiresAction = true;
+                teeLog(`[tee] idle with pending tool_use — breaking for re-entry`);
+                reader.cancel().catch(() => {});
               }
             } catch { /* skip unparseable */ }
             eventData = "";
           }
         }
       }
-    } catch (err) { teeLog(`[tee] stream ended:`, err); }
+    } catch (err) { teeLog(`[tee] stream read error:`, err); }
+
+    teeLog(`[tee] stream loop exited. sawRequiresAction=${sawRequiresAction} lastToolUseEvt=${!!lastToolUseEvt}`);
 
     // If the session stopped with requires_action, try to handle the tool server-side
     if (!sawRequiresAction) return;
 
     teeLog(`[tee] detected requires_action — checking for server-side tool`);
 
-    // Find the most recent agent.custom_tool_use event
-    const recentEvents = listEvents(localSessionId, { limit: 20, order: "desc" });
-    const toolEvt = recentEvents.find((e) => e.type === "agent.custom_tool_use");
-    if (!toolEvt) {
-      teeLog(`[tee] no agent.custom_tool_use found`);
-      return;
+    // Use the tool_use event we tracked during streaming, or fall back to DB
+    let toolPayload: Record<string, unknown> | null = lastToolUseEvt;
+    if (!toolPayload) {
+      const recentEvents = listEvents(localSessionId, { limit: 20, order: "desc" });
+      const toolEvt = recentEvents.find((e) =>
+        e.type === "tool_use" || e.type === "agent.custom_tool_use" || e.type === "agent.tool_use",
+      );
+      if (!toolEvt) {
+        teeLog(`[tee] no tool_use event found`);
+        return;
+      }
+      try {
+        toolPayload = JSON.parse(toolEvt.payload_json) as Record<string, unknown>;
+      } catch {
+        teeLog(`[tee] failed to parse tool event payload`);
+        return;
+      }
     }
 
-    let payload: { name?: string; tool_use_id?: string; input?: Record<string, unknown> };
-    try {
-      payload = JSON.parse(toolEvt.payload_json) as typeof payload;
-    } catch {
-      teeLog(`[tee] failed to parse tool event payload`);
-      return;
-    }
-
-    const toolName = payload.name ?? "";
-    const toolUseId = payload.tool_use_id ?? toolEvt.id;
-    const toolInput = payload.input ?? {};
+    // Anthropic uses "tool_name" and "tool_use_id"; our internal format uses "name" and "tool_use_id"
+    const toolName = (toolPayload.tool_name ?? toolPayload.name ?? "") as string;
+    const toolUseId = (toolPayload.tool_use_id ?? toolPayload.id ?? "") as string;
+    const toolInput = (toolPayload.input ?? {}) as Record<string, unknown>;
 
     const result = await executeServerSideTool(toolName, toolInput, localSessionId);
     if (!result) {
