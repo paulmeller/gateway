@@ -24,11 +24,15 @@ export function ChatThread() {
 
   const messages = events?.filter((e) => MESSAGE_TYPES.has(e.type)) ?? [];
   const isRunning = session?.status === "running";
-  // Show typing indicator during environment setup (before status flips to running)
+  // Show typing indicator when:
+  // 1. Session status is "running"
+  // 2. Environment is being set up
+  // 3. Last event is user.message (sent but agent hasn't responded yet)
   const lastEvent = events?.[events.length - 1];
-  const isSettingUp = lastEvent?.type === "span.environment_setup_start"
-    || (lastEvent?.type === "user.message" && session?.status !== "idle");
-  const showTyping = (isRunning || isSettingUp) && messages.length > 0;
+  const lastMessageEvent = messages.length > 0 ? messages[messages.length - 1] : null;
+  const waitingForAgent = lastMessageEvent?.type === "user.message";
+  const isSettingUp = lastEvent?.type === "span.environment_setup_start";
+  const showTyping = (isRunning || isSettingUp || waitingForAgent) && messages.length > 0;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
