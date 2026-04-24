@@ -2,18 +2,29 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
 import { useAppStore } from "@/stores/app-store";
 
-interface FileRecord {
+export interface FileRecord {
   id: string;
+  type: "file";
   filename: string;
-  size: number;
-  content_type: string;
+  mime_type: string;
+  size_bytes: number;
+  downloadable: boolean;
+  scope: { type: string; id: string } | null;
   created_at: string;
 }
 
-export function useFiles() {
+interface FileListResponse {
+  data: FileRecord[];
+  has_more: boolean;
+  first_id: string | null;
+  last_id: string | null;
+}
+
+export function useFiles(scopeId?: string) {
+  const path = scopeId ? `/files?scope_id=${scopeId}&limit=100` : "/files?limit=100";
   return useQuery({
-    queryKey: ["files"],
-    queryFn: () => api<{ data: FileRecord[] }>("/files"),
+    queryKey: ["files", scopeId ?? "all"],
+    queryFn: () => api<FileListResponse>(path),
     select: (d) => d.data,
   });
 }

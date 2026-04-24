@@ -17,7 +17,7 @@ import { AgentsTab } from "@/components/settings/AgentsTab";
 import { AgentDetailPage } from "@/components/settings/AgentDetailPage";
 import { EnvironmentsTab } from "@/components/settings/EnvironmentsTab";
 import { VaultsTab } from "@/components/settings/VaultsTab";
-import { ResourcesTab } from "@/components/settings/ResourcesTab";
+import { FilesPanel, RepositoriesSection } from "@/components/settings/ResourcesTab";
 import { MemoryStoresTab } from "@/components/settings/MemoryStoresTab";
 import { TenantsTab } from "@/components/settings/TenantsTab";
 import { DashboardPage } from "@/components/dashboard/DashboardPage";
@@ -115,8 +115,9 @@ function PageBreadcrumb() {
 function NavbarCenter() {
   const routerState = useRouterState();
   const path = routerState.location.pathname;
-  if (path !== "/dashboard") return null;
-  return <DashboardNavTabs />;
+  if (path === "/dashboard") return <DashboardNavTabs />;
+  if (path === "/files") return <FilesNavTabs />;
+  return null;
 }
 
 const DASHBOARD_TABS = [
@@ -136,6 +137,37 @@ function DashboardNavTabs() {
           <button
             key={t.value}
             onClick={() => nav({ to: "/dashboard", search: { tab: t.value } as never, replace: true })}
+            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+              activeTab === t.value
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const FILES_TABS = [
+  { value: "files", label: "Files" },
+  { value: "repos", label: "Repositories" },
+] as const;
+
+function FilesNavTabs() {
+  const routerState = useRouterState();
+  const params = new URLSearchParams(routerState.location.searchStr);
+  const activeTab = params.get("tab") === "repos" ? "repos" : "files";
+  const nav = useNavigate();
+  return (
+    <div className="absolute inset-x-0 flex justify-center pointer-events-none">
+      <div className="inline-flex items-center gap-0.5 rounded-lg bg-muted p-0.5 pointer-events-auto">
+        {FILES_TABS.map((t) => (
+          <button
+            key={t.value}
+            onClick={() => nav({ to: "/files", search: { tab: t.value } as never, replace: true })}
             className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
               activeTab === t.value
                 ? "bg-background text-foreground shadow-sm"
@@ -289,9 +321,12 @@ const filesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/files",
   component: function FilesPage() {
+    const routerState = useRouterState();
+    const params = new URLSearchParams(routerState.location.searchStr);
+    const tab = params.get("tab") === "repos" ? "repos" : "files";
     return (
       <Page>
-        <ResourcesTab />
+        {tab === "files" ? <FilesPanel /> : <RepositoriesSection />}
       </Page>
     );
   },
