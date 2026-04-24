@@ -17,7 +17,13 @@ Run AI coding agents in sandboxed environments — any engine, any sandbox, one 
 
 ## Quick Start
 
-### npm
+### Try it now (zero install)
+
+```bash
+npx @agentstep/gateway quickstart
+```
+
+### Install globally
 
 ```bash
 npm install -g @agentstep/gateway

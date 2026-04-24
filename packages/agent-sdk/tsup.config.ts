@@ -25,9 +25,9 @@ export default defineConfig({
   format: ["esm"],
   target: "node22",
   dts: false,
-  sourcemap: true,
+  sourcemap: false,
   clean: true,
-  splitting: false,
+  splitting: true,
   // Don't bundle dependencies — they're in package.json dependencies
   external: [
     "libsql",

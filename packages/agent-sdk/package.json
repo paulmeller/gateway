@@ -62,8 +62,7 @@
     "directory": "packages/agent-sdk"
   },
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "scripts": {
     "build": "tsup && tsc -p tsconfig.build.json --emitDeclarationOnly --declarationDir dist",

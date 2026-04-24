@@ -4,6 +4,46 @@ All notable changes to AgentStep Gateway are documented here. Dates are UTC.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this
 project uses [SemVer](https://semver.org/).
 
+## [0.4.12] — 2026-04-25
+
+### Added
+
+- **Ollama integration** — run local models (qwen3, gemma4, llama3.3,
+  etc.) via the Codex and OpenCode engines. No API keys needed. The
+  gateway auto-detects local models and injects the correct env vars
+  (`CODEX_OSS_BASE_URL`, `OPENCODE_CONFIG_CONTENT`) for each backend.
+  Container networking (Docker, Apple Container) is handled automatically.
+- **Dynamic model registry** — live model lists fetched from Anthropic,
+  OpenAI, Google, Ollama, and OpenRouter APIs with 4-hour TTL cache.
+  Falls back to a curated LiteLLM catalog (35 models) when APIs are
+  unreachable. Searchable model combobox in the UI.
+- **Daily model catalog curation** — GitHub Action fetches the LiteLLM
+  catalog, pre-filters to ~119 chat models, then Sonnet curates to ~35
+  top models. Opens a PR if the catalog changed.
+- **Proxied session stats** — sessions using the Anthropic sync-and-proxy
+  provider now report turns, tool calls, and token usage from the remote
+  SSE stream.
+- **Pi engine** — new backend for Pi-based agents.
+
+### Changed
+
+- **npm package size reduced 98.5%** — agent-sdk dist went from 528 MB
+  to ~8 MB by enabling tsup code splitting and removing sourcemaps from
+  the published tarball.
+- **Repository URLs** fixed to match GitHub provenance (`paulmeller/gateway`),
+  resolving npm `--provenance` E422 failures.
+
+### Fixed
+
+- Codex inside containers couldn't reach Ollama — was setting `OLLAMA_HOST`
+  (which Codex ignores) instead of `CODEX_OSS_BASE_URL`.
+- OpenCode's `OPENCODE_CONFIG_CONTENT` was built with `localhost` baseURL
+  before the container host was resolved.
+- Container file sync `find` fallback only runs when file tools were used.
+- SDK wildcard export restored for deep imports.
+- UI: sessions table row click navigates to playground, typing indicator
+  while waiting for agent response, model combobox height fix.
+
 ## [0.4.3] — 2026-04-20
 
 ### Added

@@ -1,5 +1,6 @@
 {
   "name": "managed-agents",
+  "description": "AgentStep Gateway — self-hosted Anthropic Managed Agents-compatible API",
   "private": true,
   "workspaces": [
     "packages/agent-sdk",
