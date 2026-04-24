@@ -90,7 +90,12 @@ export function ModelCombobox({ engine, value, onChange }: Props) {
           "hover:bg-muted dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
         )}
       >
-        <span className="truncate">{displayValue}</span>
+        <span className="truncate flex items-center gap-1.5">
+          {displayValue}
+          {selectedModel?.local && (
+            <Badge className="bg-lime-400/15 text-lime-400 border-lime-400/30 text-[10px] px-1.5 py-0 h-4">Local</Badge>
+          )}
+        </span>
         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="start">
@@ -122,7 +127,7 @@ export function ModelCombobox({ engine, value, onChange }: Props) {
                       <span className="truncate">{engineId}</span>
                       <span className="ml-auto flex items-center gap-1.5">
                         {model.local && (
-                          <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">
+                          <Badge className="bg-lime-400/15 text-lime-400 border-lime-400/30 text-[10px] px-1.5 py-0 h-4">
                             Local
                           </Badge>
                         )}
