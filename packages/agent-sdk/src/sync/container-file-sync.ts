@@ -24,8 +24,11 @@ const BINARY_EXTENSIONS = new Set([
   ".mp3", ".mp4", ".zip", ".tar", ".gz", ".pdf",
 ]);
 
-/** Allowed path prefixes inside the container. */
-const ALLOWED_PREFIXES = ["/home/", "/root/", "/tmp/", "/workspace/", "/mnt/", "/mnt/session/"];
+/** Blocked path prefixes — system directories that should never be synced. */
+const BLOCKED_PREFIXES = [
+  "/proc/", "/sys/", "/dev/", "/etc/", "/bin/", "/sbin/",
+  "/usr/bin/", "/usr/sbin/", "/usr/lib/", "/var/run/", "/var/log/",
+];
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 const MAX_FILES_PER_SYNC = 20;
@@ -64,7 +67,7 @@ function extractFilePaths(sessionId: string): ExtractResult {
     const FILE_TOOLS = new Set(["Write", "Edit", "write_file", "edit_file", "file_edit", "write", "edit"]);
     if (FILE_TOOLS.has(toolName ?? "") && payload.input) {
       sawFileTools = true;
-      filePath = (payload.input.file_path ?? payload.input.path) as string | undefined;
+      filePath = (payload.input.file_path ?? payload.input.filePath ?? payload.input.path) as string | undefined;
     } else if (toolName === "apply_patch" && payload.input) {
       sawFileTools = true;
       // OpenCode apply_patch: extract path from patchText "*** Add File: /path" or "*** Update File: /path"
@@ -74,8 +77,9 @@ function extractFilePaths(sessionId: string): ExtractResult {
     }
 
     if (!filePath || typeof filePath !== "string" || filePath === "") continue;
-    // Resolve relative paths against /root (common container workdir)
-    const resolved = filePath.startsWith("/") ? filePath : `/root/${filePath}`;
+    // Resolve relative paths: keep as-is with leading / (the container CWD
+    // varies by backend — Codex uses /, Claude uses /home/user, etc.)
+    const resolved = filePath.startsWith("/") ? filePath : `/${filePath}`;
     if (seen.has(resolved)) continue;
     seen.add(resolved);
     paths.push(resolved);
@@ -88,12 +92,12 @@ function extractFilePaths(sessionId: string): ExtractResult {
  * Validate a container file path for safety.
  *   - Must start with `/`
  *   - Must not contain `..`
- *   - Must be under an allowed prefix
+ *   - Must not be in a blocked system directory
  */
 function isPathSafe(p: string): boolean {
   if (!p.startsWith("/")) return false;
   if (p.includes("..")) return false;
-  return ALLOWED_PREFIXES.some((prefix) => p.startsWith(prefix));
+  return !BLOCKED_PREFIXES.some((prefix) => p.startsWith(prefix));
 }
 
 /**
