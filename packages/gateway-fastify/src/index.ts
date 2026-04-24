@@ -77,6 +77,7 @@ import {
   handleGetCredential,
   handleUpdateCredential,
   handleDeleteCredential,
+  handleListModels,
   handleUploadFile,
   handleListFiles,
   handleGetFile,
@@ -345,6 +346,9 @@ export function buildApp() {
   route(app, "get", "/v1/memory_stores/:id/memories/:memId", handleGetMemory, "id", "memId");
   route(app, "patch", "/v1/memory_stores/:id/memories/:memId", handleUpdateMemory, "id", "memId");
   route(app, "delete", "/v1/memory_stores/:id/memories/:memId", handleDeleteMemory, "id", "memId");
+
+  // ── Models ──────────────────────────────────────────────────────────
+  route(app, "get", "/v1/models", handleListModels);
 
   // ── Skills (stub endpoints) ────────────────────────────────────────────
   route(app, "post", "/v1/skills", handleCreateSkill);

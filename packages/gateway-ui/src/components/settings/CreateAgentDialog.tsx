@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateAgent } from "@/hooks/use-agents";
-import { MODELS, ENGINES } from "@/lib/constants";
+import { ENGINES, FALLBACK_MODELS } from "@/lib/constants";
+import { ModelCombobox } from "@/components/ModelCombobox";
 import { toast } from "sonner";
 
 interface Props {
@@ -17,7 +18,7 @@ export function CreateAgentDialog({ open, onOpenChange }: Props) {
   const create = useCreateAgent();
   const [name, setName] = useState("");
   const [engine, setEngine] = useState("claude");
-  const [model, setModel] = useState(MODELS.claude[0]);
+  const [model, setModel] = useState(FALLBACK_MODELS.claude[0]);
 
   async function handleCreate() {
     if (!name.trim()) return;
@@ -46,17 +47,14 @@ export function CreateAgentDialog({ open, onOpenChange }: Props) {
           </div>
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs text-muted-foreground">Engine</Label>
-            <Select value={engine} onValueChange={(v: string | null) => { if (v) { setEngine(v); setModel(MODELS[v][0]); } }}>
+            <Select value={engine} onValueChange={(v: string | null) => { if (v) { setEngine(v); setModel(FALLBACK_MODELS[v]?.[0] ?? ""); } }}>
               <SelectTrigger className="w-full text-foreground"><SelectValue /></SelectTrigger>
               <SelectContent>{ENGINES.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs text-muted-foreground">Model</Label>
-            <Select value={model} onValueChange={(v: string | null) => { if (v) setModel(v); }}>
-              <SelectTrigger className="w-full text-foreground"><SelectValue /></SelectTrigger>
-              <SelectContent>{(MODELS[engine] ?? []).map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
-            </Select>
+            <ModelCombobox engine={engine} value={model} onChange={setModel} />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>

@@ -1,4 +1,10 @@
-export const MODELS: Record<string, string[]> = {
+/**
+ * Static fallback models, used as default selections before the dynamic
+ * model registry (useModels hook / GET /v1/models) responds.
+ *
+ * For live model data, use the `useModels()` hook from `@/hooks/use-models`.
+ */
+export const FALLBACK_MODELS: Record<string, string[]> = {
   claude: ["claude-sonnet-4-6", "claude-opus-4-6", "claude-haiku-4-5"],
   opencode: ["anthropic/claude-sonnet-4-6", "anthropic/claude-opus-4-6", "openai/gpt-5.4", "openai/gpt-5.4-mini"],
   codex: ["gpt-5.4-mini", "gpt-5.4", "gpt-5.3-codex"],
@@ -7,7 +13,10 @@ export const MODELS: Record<string, string[]> = {
   pi: ["anthropic/claude-sonnet-4-6", "anthropic/claude-opus-4-6", "openai/gpt-5.4", "google/gemini-2.5-flash"],
 };
 
-export const ENGINES = Object.keys(MODELS);
+/** @deprecated Use FALLBACK_MODELS instead. Kept for backward compatibility. */
+export const MODELS = FALLBACK_MODELS;
+
+export const ENGINES = Object.keys(FALLBACK_MODELS);
 
 export const LOCAL_PROVIDERS = ["docker", "apple-container", "podman"] as const;
 export const CLOUD_PROVIDERS = ["anthropic", "sprites", "e2b", "vercel", "daytona", "fly", "modal"] as const;

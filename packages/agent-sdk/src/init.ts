@@ -133,6 +133,9 @@ async function doInit(): Promise<void> {
       console.warn("[init] orphan reconcile (docker) failed:", err);
     });
 
+  // 3c. Warm model registry cache (non-blocking)
+  import("./lib/model-registry").then((m) => m.getModels().catch(() => {}));
+
   // 4. Install the periodic sweeper (idle eviction + orphan reconcile).
   // HMR caveat: the globalThis guard prevents duplicate timers across dev
   // reloads, but when `next dev` hot-reloads the sweeper module the existing

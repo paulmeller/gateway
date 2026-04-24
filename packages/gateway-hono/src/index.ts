@@ -97,6 +97,7 @@ import {
   handleGetCredential,
   handleUpdateCredential,
   handleDeleteCredential,
+  handleListModels,
 } from "@agentstep/agent-sdk/handlers";
 
 import { cors } from "hono/cors";
@@ -293,6 +294,9 @@ app.get("/v1/settings/:key", (c) => handleGetSetting(c.req.raw, c.req.param("key
 
 // ── Providers ─────────────────────────────────────────────────────────────
 app.get("/v1/providers/status", (c) => handleGetProviderStatus(c.req.raw));
+
+// ── Models ───────────────────────────────────────────────────────────────
+app.get("/v1/models", (c) => handleListModels(c.req.raw));
 
 // ── Skills ────────────────────────────────────────────────────────────
 app.get("/v1/skills/catalog", (c) => handleGetSkillsCatalog(c.req.raw));

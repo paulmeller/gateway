@@ -25,3 +25,4 @@ export { handleCreateTenant, handleListTenants, handleGetTenant, handlePatchTena
 export { handleWhoami } from "./whoami";
 export { handleListAudit } from "./audit";
 export { handleGetLicense } from "./license";
+export { handleListModels } from "./models";

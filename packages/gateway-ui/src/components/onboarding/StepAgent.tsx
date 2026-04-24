@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MODELS, ENGINES } from "@/lib/constants";
+import { ENGINES, FALLBACK_MODELS } from "@/lib/constants";
+import { ModelCombobox } from "@/components/ModelCombobox";
 import { useAgents } from "@/hooks/use-agents";
 import { toast } from "sonner";
 import { ModeToggle } from "./ModeToggle";
@@ -21,7 +22,7 @@ export function StepAgent({ onNext }: Props) {
   const [selectedId, setSelectedId] = useState("");
   const [name, setName] = useState("my-agent");
   const [engine, setEngine] = useState("claude");
-  const [model, setModel] = useState(MODELS.claude[0]);
+  const [model, setModel] = useState(FALLBACK_MODELS.claude[0]);
 
   useEffect(() => {
     if (!isLoading) setMode(hasExisting ? "select" : "create");
@@ -91,17 +92,14 @@ export function StepAgent({ onNext }: Props) {
           </div>
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs text-muted-foreground">Engine</Label>
-            <Select value={engine} onValueChange={(v: string | null) => { if (v) { setEngine(v); setModel(MODELS[v][0]); } }}>
+            <Select value={engine} onValueChange={(v: string | null) => { if (v) { setEngine(v); setModel(FALLBACK_MODELS[v]?.[0] ?? ""); } }}>
               <SelectTrigger className="h-10 w-full text-foreground"><SelectValue /></SelectTrigger>
               <SelectContent>{ENGINES.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs text-muted-foreground">Model</Label>
-            <Select value={model} onValueChange={(v: string | null) => { if (v) setModel(v); }}>
-              <SelectTrigger className="h-10 w-full text-foreground"><SelectValue /></SelectTrigger>
-              <SelectContent>{(MODELS[engine] ?? []).map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
-            </Select>
+            <ModelCombobox engine={engine} value={model} onChange={setModel} />
           </div>
         </div>
       )}

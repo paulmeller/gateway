@@ -103,6 +103,8 @@ import {
   SettingResponseSchema,
   // Providers
   ProviderStatusResponseSchema,
+  // Models
+  ModelListResponseSchema,
   // Auth
   WhoamiResponseSchema,
   LicenseResponseSchema,
@@ -1440,6 +1442,34 @@ registry.registerPath({
 });
 
 // ---------------------------------------------------------------------------
+// /v1/models
+// ---------------------------------------------------------------------------
+
+registry.registerPath({
+  method: "get",
+  path: "/v1/models",
+  tags: ["Models"],
+  summary: "List available models",
+  description:
+    "Returns models available from configured provider APIs (Anthropic, OpenAI, Google, Ollama, OpenRouter). Results are cached for 4 hours. Supports filtering by engine, provider, and free-text search.",
+  security: [{ ApiKey: [] }],
+  request: {
+    query: z.object({
+      engine: z.string().optional().describe("Filter to models compatible with this engine (claude, opencode, codex, gemini, factory, pi)."),
+      provider: z.string().optional().describe("Filter by source provider (anthropic, openai, google, ollama, openrouter)."),
+      q: z.string().optional().describe("Free-text search on model ID."),
+    }),
+  },
+  responses: {
+    200: {
+      description: "List of available models",
+      content: { "application/json": { schema: ModelListResponseSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+// ---------------------------------------------------------------------------
 // /v1/traces + /v1/metrics
 // ---------------------------------------------------------------------------
 
@@ -2004,6 +2034,7 @@ export function buildOpenApiDocument(opts: { serverUrl: string }): unknown {
       { name: "Skills", description: "Skills catalog, search, and management" },
       { name: "Settings", description: "Gateway configuration settings" },
       { name: "Providers", description: "Container provider status" },
+      { name: "Models", description: "Dynamic model registry" },
       { name: "Traces", description: "Distributed tracing and span trees" },
       { name: "Metrics", description: "Session and API metrics" },
       { name: "API Keys", description: "Virtual API key management (admin-only)" },

@@ -174,11 +174,11 @@ export function handleCreateAgent(request: Request): Promise<Response> {
     const backend = resolveBackend(backendName);
 
     // Validate model is supported by this engine
-    const { isValidModelForEngine, MODELS } = await import("../backends/models");
+    const { isValidModelForEngine, FALLBACK_MODELS } = await import("../backends/models");
     if (!isValidModelForEngine(backendName, parsed.data.model)) {
       throw badRequest(
         `Model "${parsed.data.model}" is not supported by the ${backendName} engine. ` +
-        `Supported models: ${(MODELS[backendName] ?? []).join(", ")}`,
+        `Supported models: ${(FALLBACK_MODELS[backendName] ?? []).join(", ")}`,
       );
     }
 

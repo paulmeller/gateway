@@ -12,7 +12,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useUpdateAgent, type Agent } from "@/hooks/use-agents";
-import { MODELS, ENGINES } from "@/lib/constants";
+import { FALLBACK_MODELS, ENGINES } from "@/lib/constants";
+import { ModelCombobox } from "@/components/ModelCombobox";
 import { toast } from "sonner";
 
 interface Props {
@@ -77,7 +78,7 @@ export function AgentConfigTab({ agent }: Props) {
           <Select
             value={engine}
             onValueChange={(v) => {
-              if (v) { setEngine(v); setModel(MODELS[v]?.[0] ?? ""); }
+              if (v) { setEngine(v); setModel(FALLBACK_MODELS[v]?.[0] ?? ""); }
             }}
           >
             <SelectTrigger className="text-foreground">
@@ -95,18 +96,7 @@ export function AgentConfigTab({ agent }: Props) {
 
         <div className="flex flex-col gap-1.5">
           <Label className="text-sm text-foreground">Model</Label>
-          <Select value={model} onValueChange={(v) => v && setModel(v)}>
-            <SelectTrigger className="text-foreground">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {(MODELS[engine] ?? []).map((m) => (
-                <SelectItem key={m} value={m}>
-                  {m}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <ModelCombobox engine={engine} value={model} onChange={setModel} />
         </div>
       </div>
 

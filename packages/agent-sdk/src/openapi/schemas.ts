@@ -1305,6 +1305,31 @@ export const ProviderStatusResponseSchema = registry.register(
 );
 
 // ---------------------------------------------------------------------------
+// Models
+// ---------------------------------------------------------------------------
+
+export const ModelEntrySchema = registry.register(
+  "ModelEntry",
+  z.object({
+    id: z.string().openapi({ description: "Canonical model identifier.", example: "claude-sonnet-4-6" }),
+    provider: z.string().openapi({ description: "Source provider: anthropic, openai, google, ollama, openrouter." }),
+    engines: z.record(z.string()).openapi({
+      description: "Engine name to engine-specific model ID mapping.",
+      example: { claude: "claude-sonnet-4-6", opencode: "anthropic/claude-sonnet-4-6" },
+    }),
+    context_window: z.number().int().optional().openapi({ description: "Context window size in tokens, if known." }),
+    local: z.boolean().optional().openapi({ description: "True for locally-running models (e.g. Ollama)." }),
+  }),
+);
+
+export const ModelListResponseSchema = registry.register(
+  "ModelListResponse",
+  z.object({
+    data: z.array(ModelEntrySchema),
+  }),
+);
+
+// ---------------------------------------------------------------------------
 // Auth (Whoami + License)
 // ---------------------------------------------------------------------------
 

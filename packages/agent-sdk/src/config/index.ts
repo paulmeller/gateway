@@ -29,6 +29,8 @@ export interface Config {
   otlpAuthorization: string | undefined;
   /** Comma-separated env-var names whose values must be redacted from payloads. */
   redactEnvKeys: string[];
+  /** Base URL for Ollama API (e.g. http://localhost:11434). */
+  ollamaUrl: string;
 }
 
 type GlobalCache = typeof globalThis & {
@@ -98,6 +100,10 @@ function loadConfig(): Config {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean),
+    ollamaUrl:
+      process.env.OLLAMA_URL ||
+      readSetting("ollama_url") ||
+      "http://localhost:11434",
   };
 }
 
