@@ -77,7 +77,11 @@ export function StepSecrets({ engine, model, provider, agentId, agentName, hasEx
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-lime-400/60 mb-1">Step 3 of 4</p>
           <h2 className="text-lg font-semibold text-foreground">Secrets</h2>
-          <p className="text-sm text-muted-foreground mt-1">No API keys needed for this combination.</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {model && !model.includes("/") && !["claude-","gpt-","o1-","o3-","codex-","gemini-"].some(p => model.startsWith(p))
+              ? "No API key required — this model runs locally via Ollama."
+              : "No API keys needed for this combination."}
+          </p>
         </div>
         <div className="flex gap-2">
           {onBack && <Button variant="outline" className="h-10 px-4 text-sm" onClick={onBack}>Back</Button>}

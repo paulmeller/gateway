@@ -31,6 +31,7 @@ import { getRuntime, drainPendingUserInputs, type TurnInput } from "../state";
 import { getSession, setBackendSessionId, updateSessionStatus, updateSessionMutable, bumpSessionStats, setIdleSince, getSessionRow, getOutcomeCriteria, setOutcomeCriteria } from "../db/sessions";
 import { getAgent } from "../db/agents";
 import { getEnvironment } from "../db/environments";
+import { getConfig } from "../config";
 import { markUserEventProcessed, listEvents } from "../db/events";
 import { acquireForFirstTurn, installSkills, provisionResources } from "../containers/lifecycle";
 import * as pool from "../containers/pool";
@@ -314,6 +315,26 @@ export async function runTurn(
   // so Claude Code uses the OAuth token (it prefers ANTHROPIC_API_KEY when both set)
   if (turnBuild.env.CLAUDE_CODE_OAUTH_TOKEN && turnBuild.env.ANTHROPIC_API_KEY) {
     delete turnBuild.env.ANTHROPIC_API_KEY;
+  }
+  // Ollama: inject OLLAMA_HOST so Codex's --local-provider ollama can reach
+  // the host's Ollama server from inside the container.
+  const ollamaCloudPrefixes = ["claude-", "gpt-", "o1-", "o3-", "o4-", "codex-", "chatgpt-", "gemini-"];
+  const isOllamaModel = !agent.model.includes("/") && !ollamaCloudPrefixes.some(p => agent.model.startsWith(p));
+  if (isOllamaModel && !turnBuild.env.OLLAMA_HOST) {
+    const envRow = getEnvironment(session.environment_id);
+    const provName = envRow?.config?.provider ?? "sprites";
+    if (provName === "docker" || provName === "podman") {
+      turnBuild.env.OLLAMA_HOST = "http://host.docker.internal:11434";
+    } else if (provName === "apple-container" || provName === "apple-firecracker") {
+      turnBuild.env.OLLAMA_HOST = getConfig().ollamaUrl ?? "http://localhost:11434";
+    }
+    // Codex needs a dummy OPENAI_API_KEY to not error on startup
+    if (!turnBuild.env.OPENAI_API_KEY) {
+      turnBuild.env.OPENAI_API_KEY = "ollama";
+    }
+    if (!turnBuild.env.CODEX_API_KEY) {
+      turnBuild.env.CODEX_API_KEY = "ollama";
+    }
   }
 
   // Compose the wrapper stdin: env KEY=value lines, blank line, prompt body.

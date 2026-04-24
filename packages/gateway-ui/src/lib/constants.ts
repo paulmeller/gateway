@@ -40,8 +40,18 @@ export const ENGINE_KEYS: Record<string, { key: string; label: string }> = {
   pi: { key: "ANTHROPIC_API_KEY", label: "Anthropic API Key" },
 };
 
+/** Detect whether a model is a local Ollama model (no API key needed). */
+export function isLocalModel(model: string): boolean {
+  if (model.includes("/")) return false;
+  const cloudPrefixes = ["claude-", "gpt-", "o1-", "o3-", "o4-", "codex-", "chatgpt-", "gemini-"];
+  return !cloudPrefixes.some(p => model.startsWith(p));
+}
+
 /** OpenCode and pi support multiple providers — key depends on the model prefix */
 export function getEngineKey(engine: string, model: string): { key: string; label: string } | undefined {
+  // Local Ollama models don't need API keys
+  if (isLocalModel(model)) return undefined;
+
   if (engine === "opencode" || engine === "pi") {
     if (model.startsWith("openai/")) return { key: "OPENAI_API_KEY", label: "OpenAI API Key" };
     if (model.startsWith("google/") || model.startsWith("gemini/")) {

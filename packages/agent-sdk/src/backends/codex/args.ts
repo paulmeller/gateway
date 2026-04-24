@@ -29,9 +29,15 @@ export function buildCodexArgs(input: BuildCodexArgsInput): string[] {
   ];
 
   if (input.agent.model) {
-    // Codex expects bare model names (gpt-5.4, gpt-5.4-mini) — NOT the
-    // openai/gpt-5.4 format opencode uses.
     args.push("--model", input.agent.model);
+
+    // Ollama models: add --oss --local-provider ollama flags.
+    // Ollama model names don't start with known cloud prefixes.
+    const cloudPrefixes = ["claude-", "gpt-", "o1-", "o3-", "o4-", "codex-", "chatgpt-"];
+    const isOllama = !input.agent.model.includes("/") && !cloudPrefixes.some(p => input.agent.model.startsWith(p));
+    if (isOllama) {
+      args.push("--oss", "--local-provider", "ollama");
+    }
   }
 
   // MCP config via -c flags (/lib/oc/cli-providers.ts:219-235)

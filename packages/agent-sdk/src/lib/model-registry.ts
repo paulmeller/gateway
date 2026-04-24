@@ -149,7 +149,7 @@ async function fetchOllama(): Promise<ModelEntry[]> {
   return (body.models ?? []).map((m) => ({
     id: m.name,
     provider: "ollama",
-    engines: { opencode: m.name },
+    engines: { codex: m.name, opencode: m.name },
     local: true,
   }));
 }
