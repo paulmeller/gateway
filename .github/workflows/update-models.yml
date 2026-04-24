@@ -11,14 +11,71 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fetch LiteLLM model catalog
+      - name: Fetch and curate model catalog
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
+          # 1. Fetch full LiteLLM catalog
           curl -sL https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json \
-            -o packages/agent-sdk/src/lib/model-catalog.json
+            -o /tmp/full-catalog.json
+          FULL=$(python3 -c "import json; print(len(json.load(open('/tmp/full-catalog.json'))))")
+          echo "Full catalog: $FULL models"
 
-          # Count models
-          TOTAL=$(python3 -c "import json; print(len(json.load(open('packages/agent-sdk/src/lib/model-catalog.json'))))")
-          echo "Total models: $TOTAL"
+          # 2. Pre-filter: keep only chat models from Anthropic, OpenAI, Google
+          python3 -c "
+          import json
+          catalog = json.load(open('/tmp/full-catalog.json'))
+          providers = {'anthropic', 'openai', 'vertex_ai', 'vertex_ai-language-models', 'gemini'}
+          prefixes = ('claude-', 'gpt-', 'o1-', 'o3-', 'o4-', 'chatgpt-', 'codex-', 'gemini-')
+          skip = ('image', 'tts', 'audio', 'transcribe', 'realtime', 'embedding', 'search-api', 'diarize')
+          filtered = {}
+          for k, v in catalog.items():
+              p = v.get('litellm_provider', '')
+              if p not in providers: continue
+              if not any(k.startswith(x) for x in prefixes): continue
+              if any(s in k for s in skip): continue
+              filtered[k] = v
+          json.dump(filtered, open('/tmp/pre-filtered.json', 'w'), indent=2)
+          print(f'Pre-filtered: {len(filtered)} models')
+          "
+
+          # 3. Claude curates the final list
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            npx claude -p "You are curating a model catalog for a coding agent gateway.
+
+          Read the pre-filtered model list ($(python3 -c "import json; print(len(json.load(open('/tmp/pre-filtered.json'))))" ) models).
+
+          Keep only models that are:
+          - Current generation (not deprecated, not legacy snapshots with date suffixes)
+          - Suitable for coding/chat agent workloads
+          - The canonical version (not date-stamped variants of the same model)
+
+          Remove models that are:
+          - Old generations (gpt-3.5, gpt-4-turbo, etc. — keep gpt-4.1+ and gpt-5+)
+          - Preview/experimental builds unless they're the only version of that model
+          - Duplicates with different suffixes (-001, -latest) unless meaningfully different
+
+          Output ONLY a valid JSON object with the same structure as the input.
+          Do not include any explanation, just the JSON." \
+              --input /tmp/pre-filtered.json \
+              --output /tmp/curated.json 2>/dev/null
+
+            if [ -f /tmp/curated.json ] && python3 -c "import json; json.load(open('/tmp/curated.json'))" 2>/dev/null; then
+              cp /tmp/curated.json packages/agent-sdk/src/lib/model-catalog.json
+              TOTAL=$(python3 -c "import json; print(len(json.load(open('/tmp/curated.json'))))")
+              echo "Claude curated: $TOTAL models"
+            else
+              echo "Claude curation failed — using pre-filtered list"
+              cp /tmp/pre-filtered.json packages/agent-sdk/src/lib/model-catalog.json
+              TOTAL=$(python3 -c "import json; print(len(json.load(open('/tmp/pre-filtered.json'))))")
+            fi
+          else
+            echo "No ANTHROPIC_API_KEY — using pre-filtered list"
+            cp /tmp/pre-filtered.json packages/agent-sdk/src/lib/model-catalog.json
+            TOTAL=$(python3 -c "import json; print(len(json.load(open('/tmp/pre-filtered.json'))))")
+          fi
+
+          echo "Final catalog: $TOTAL models"
           echo "TOTAL=$TOTAL" >> $GITHUB_ENV
 
       - name: Check for changes
