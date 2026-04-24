@@ -12,7 +12,7 @@ work on each turn) and the **provider** (where the sandbox runs).
 | | Engine | Provider |
 |---|---|---|
 | What it is | The agent CLI/driver that runs a turn | The container runtime or hosted sandbox service |
-| Examples | `claude`, `codex`, `opencode`, `gemini`, `factory` | `docker`, `apple-container`, `e2b`, `sprites`, `anthropic` |
+| Examples | `claude`, `codex`, `opencode`, `gemini`, `factory`, `pi` | `docker`, `apple-container`, `e2b`, `sprites`, `anthropic` |
 | `anthropic` means | Not a valid engine (agents always run in a sandbox through a CLI) | **Sync-and-proxy to Anthropic's hosted Managed Agents** — see below |
 
 ## Local mode (default)
@@ -81,8 +81,24 @@ On `sessions create`, the gateway:
 All calls to Anthropic include:
 - `x-api-key: <resolved key>`
 - `anthropic-version: 2023-06-01`
-- `anthropic-beta: managed-agents-2026-04-01` (for REST)
-- `anthropic-beta: agent-api-2026-03-01` (for the SSE `/stream` endpoint — the two betas aren't compatible in one header)
+- `anthropic-beta: managed-agents-2026-04-01,files-api-2025-04-14`
+
+## Custom tool re-entry
+
+When an Anthropic-hosted agent calls a tool that requires local
+execution (e.g. the built-in `memory` tool), the gateway handles
+re-entry automatically:
+
+1. The SSE tee detects a `requires_action` stop reason with a
+   `custom_tool_call` event.
+2. The gateway executes the tool locally (reading/writing to the
+   session's tool state).
+3. The result is POSTed back to Anthropic as a `user.custom_tool_result`
+   event.
+4. The SSE stream resumes and the agent continues.
+
+This loop happens transparently — the client sees a single continuous
+SSE stream.
 
 ## Why use sync-and-proxy instead of direct Anthropic?
 
