@@ -355,7 +355,6 @@ function catalogToModels(catalog: Record<string, Record<string, unknown>>): Mode
   // Skip dated snapshots, previews, and legacy versions
   const SKIP_PATTERNS = [
     /\d{4}-?\d{2}-?\d{2}/, // date-stamped snapshots (20250101, 2025-01-01)
-    /-preview$/,            // preview builds (keep -preview- in name though)
     /-(0125|0613|1106|0314|0301|0501|0806|1120)$/, // OpenAI date suffixes
     /:/, // Ollama-style tags in catalog
   ];
@@ -374,7 +373,7 @@ function catalogToModels(catalog: Record<string, Record<string, unknown>>): Mode
       || modelId.includes("transcribe") || modelId.includes("diarize")
       || modelId.includes("realtime") || modelId.includes("search-api")
       || modelId.includes("embedding") || modelId.includes("exp-")
-      || modelId.includes("computer-use") || modelId.includes("lite-preview")
+      || modelId.includes("computer-use")
       || modelId.startsWith("gpt-3.5") || modelId.startsWith("gpt-4-")
       || (modelId.startsWith("gpt-4o") && !modelId.startsWith("gpt-4o-mini"))
     ) continue;
