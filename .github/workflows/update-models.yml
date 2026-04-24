@@ -1,0 +1,48 @@
+name: Update model catalog
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # Daily at 6am UTC
+  workflow_dispatch: # Manual trigger
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch LiteLLM model catalog
+        run: |
+          curl -sL https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json \
+            -o packages/agent-sdk/src/lib/model-catalog.json
+
+          # Count models
+          TOTAL=$(python3 -c "import json; print(len(json.load(open('packages/agent-sdk/src/lib/model-catalog.json'))))")
+          echo "Total models: $TOTAL"
+          echo "TOTAL=$TOTAL" >> $GITHUB_ENV
+
+      - name: Check for changes
+        id: diff
+        run: |
+          if git diff --quiet packages/agent-sdk/src/lib/model-catalog.json; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create PR
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          BRANCH="chore/update-model-catalog-$(date +%Y%m%d)"
+          git checkout -b "$BRANCH"
+          git add packages/agent-sdk/src/lib/model-catalog.json
+          git commit -m "chore: update model catalog (${{ env.TOTAL }} models)"
+          git push origin "$BRANCH"
+          gh pr create \
+            --title "chore: update model catalog (${{ env.TOTAL }} models)" \
+            --body "Auto-updated from [LiteLLM model_prices_and_context_window.json](https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json)." \
+            --base main
+        env:
+          GH_TOKEN: ${{ github.token }}

@@ -314,48 +314,110 @@ function getModelsFromCache(): Promise<ModelEntry[]> {
 }
 
 /**
- * Convert the static FALLBACK_MODELS map into ModelEntry[].
- * This is used when no live or stale data is available.
+ * Build fallback models from the bundled LiteLLM catalog (2,600+ models).
+ * Only includes chat/completion models from major providers that work
+ * with at least one gateway engine.
  */
 function buildFallbackModels(): ModelEntry[] {
-  // Build a set of all unique model IDs, mapped to their engines
-  const modelMap = new Map<string, ModelEntry>();
-
-  for (const [engine, models] of Object.entries(FALLBACK_MODELS)) {
-    for (const engineModelId of models) {
-      // Determine the canonical model ID (strip provider prefix for opencode/pi)
-      let canonicalId = engineModelId;
-      let provider = "unknown";
-      if (engineModelId.startsWith("anthropic/")) {
-        canonicalId = engineModelId.replace("anthropic/", "");
-        provider = "anthropic";
-      } else if (engineModelId.startsWith("openai/")) {
-        canonicalId = engineModelId.replace("openai/", "");
-        provider = "openai";
-      } else if (engineModelId.startsWith("google/")) {
-        canonicalId = engineModelId.replace("google/", "");
-        provider = "google";
-      } else if (canonicalId.startsWith("claude-")) {
-        provider = "anthropic";
-      } else if (canonicalId.startsWith("gpt-") || canonicalId.startsWith("codex-") || canonicalId.startsWith("o1-") || canonicalId.startsWith("o3-") || canonicalId.startsWith("o4-")) {
-        provider = "openai";
-      } else if (canonicalId.startsWith("gemini-")) {
-        provider = "google";
-      }
-
-      const existing = modelMap.get(canonicalId);
-      if (existing) {
-        existing.engines[engine] = engineModelId;
-      } else {
-        modelMap.set(canonicalId, {
-          id: canonicalId,
-          provider,
-          engines: { [engine]: engineModelId },
-        });
-      }
-    }
+  let catalog: Record<string, Record<string, unknown>>;
+  try {
+    catalog = require("./model-catalog.json") as Record<string, Record<string, unknown>>;
+  } catch {
+    // Catalog not bundled — fall back to the old hardcoded list
+    return buildLegacyFallback();
   }
 
+  const results: ModelEntry[] = [];
+
+  // Provider mapping: litellm_provider → our provider name
+  const PROVIDER_MAP: Record<string, string> = {
+    anthropic: "anthropic",
+    openai: "openai",
+    vertex_ai: "google",
+    "vertex_ai-language-models": "google",
+    gemini: "google",
+  };
+
+  // Only include current-generation chat models
+  const CHAT_PREFIXES = ["claude-", "gpt-", "o1-", "o3-", "o4-", "chatgpt-", "codex-", "gemini-"];
+
+  // Skip dated snapshots, previews, and legacy versions
+  const SKIP_PATTERNS = [
+    /\d{4}-?\d{2}-?\d{2}/, // date-stamped snapshots (20250101, 2025-01-01)
+    /-preview$/,            // preview builds (keep -preview- in name though)
+    /-(0125|0613|1106|0314|0301|0501|0806|1120)$/, // OpenAI date suffixes
+    /:/, // Ollama-style tags in catalog
+  ];
+
+  for (const [modelId, info] of Object.entries(catalog)) {
+    const litellmProvider = (info.litellm_provider ?? "") as string;
+    const provider = PROVIDER_MAP[litellmProvider];
+    if (!provider) continue;
+
+    // Filter to chat models
+    if (!CHAT_PREFIXES.some((p) => modelId.startsWith(p))) continue;
+
+    // Skip snapshots, legacy, and non-chat models
+    if (SKIP_PATTERNS.some((re) => re.test(modelId))) continue;
+    if (modelId.includes("image") || modelId.includes("tts") || modelId.includes("audio")
+      || modelId.includes("transcribe") || modelId.includes("diarize")
+      || modelId.includes("realtime") || modelId.includes("search-api")
+      || modelId.includes("embedding") || modelId.includes("exp-")
+      || modelId.includes("computer-use") || modelId.includes("lite-preview")
+      || modelId.startsWith("gpt-3.5") || modelId.startsWith("gpt-4-")
+      || (modelId.startsWith("gpt-4o") && !modelId.startsWith("gpt-4o-mini"))
+    ) continue;
+
+    const contextWindow = (info.max_input_tokens ?? info.max_tokens) as number | undefined;
+
+    // Build engine mapping
+    const engines: Record<string, string> = {};
+    if (provider === "anthropic") {
+      engines.claude = modelId;
+      engines.opencode = `anthropic/${modelId}`;
+      engines.pi = `anthropic/${modelId}`;
+      engines.factory = modelId;
+    } else if (provider === "openai") {
+      engines.codex = modelId;
+      engines.opencode = `openai/${modelId}`;
+      engines.pi = `openai/${modelId}`;
+      engines.factory = modelId;
+    } else if (provider === "google") {
+      engines.gemini = modelId;
+      engines.pi = `google/${modelId}`;
+    }
+
+    results.push({
+      id: modelId,
+      provider,
+      engines,
+      context_window: contextWindow,
+    });
+  }
+
+  return results;
+}
+
+/** Legacy hardcoded fallback — only used if model-catalog.json is missing. */
+function buildLegacyFallback(): ModelEntry[] {
+  const modelMap = new Map<string, ModelEntry>();
+  for (const [engine, models] of Object.entries(FALLBACK_MODELS)) {
+    for (const engineModelId of models) {
+      let canonicalId = engineModelId;
+      let provider = "unknown";
+      if (engineModelId.includes("/")) {
+        const [prov, id] = engineModelId.split("/", 2);
+        canonicalId = id;
+        provider = prov === "anthropic" ? "anthropic" : prov === "openai" ? "openai" : prov === "google" ? "google" : prov;
+      } else if (canonicalId.startsWith("claude-")) provider = "anthropic";
+      else if (canonicalId.match(/^(gpt-|codex-|o[134]-)/)) provider = "openai";
+      else if (canonicalId.startsWith("gemini-")) provider = "google";
+
+      const existing = modelMap.get(canonicalId);
+      if (existing) { existing.engines[engine] = engineModelId; }
+      else { modelMap.set(canonicalId, { id: canonicalId, provider, engines: { [engine]: engineModelId } }); }
+    }
+  }
   return Array.from(modelMap.values());
 }
 
