@@ -13,7 +13,7 @@ import type { TranslatorOptions } from "../shared/translator-types";
 import { wrapPromptWithSystem } from "../shared/wrap-prompt";
 import { buildOpencodeArgs } from "./args";
 import { buildOpencodeAuthEnv, validateOpencodeRuntime } from "./auth";
-import { buildOpencodeMcpEnv } from "./mcp";
+import { buildOpencodeConfigEnv } from "./mcp";
 import { createOpencodeTranslator } from "./translator";
 import { OPENCODE_WRAPPER_PATH, installOpencodeWrapper } from "./wrapper-script";
 import { prepareOpencodeOnSprite } from "./setup";
@@ -33,7 +33,7 @@ function buildTurn(input: BuildTurnInput): BuildTurnResult {
   const wrappedPrompt = wrapPromptWithSystem(promptText, agent.system, agent.skills);
   const env = {
     ...buildOpencodeAuthEnv(),
-    ...buildOpencodeMcpEnv(agent),
+    ...buildOpencodeConfigEnv(agent),
   };
   // stdin is the raw wrapped prompt — the driver prepends the env block.
   // The opencode wrapper script captures this via PROMPT=$(cat) and
@@ -55,7 +55,7 @@ export const opencodeBackend: Backend = {
 export {
   buildOpencodeArgs,
   buildOpencodeAuthEnv,
-  buildOpencodeMcpEnv,
+  buildOpencodeConfigEnv,
   createOpencodeTranslator,
   installOpencodeWrapper,
   prepareOpencodeOnSprite,
