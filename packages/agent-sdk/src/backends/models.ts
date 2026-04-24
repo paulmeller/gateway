@@ -78,6 +78,11 @@ export function isValidModelForEngine(engine: string, model: string): boolean {
     gemini: ["gemini-"],
     codex: ["gpt-", "o1-", "o3-", "o4-", "codex-", "chatgpt-"],
   };
+  // Local Ollama models bypass prefix validation — any model name is valid
+  const cloudPrefixes = ["claude-", "gpt-", "o1-", "o3-", "o4-", "codex-", "chatgpt-", "gemini-"];
+  const isLocal = !model.includes("/") && !cloudPrefixes.some(p => model.startsWith(p));
+  if (isLocal) return true;
+
   const requiredPrefixes = engineProviderMap[engine];
   if (requiredPrefixes) {
     const modelBase = model.replace(/^(anthropic|openai|google)\//, "");
