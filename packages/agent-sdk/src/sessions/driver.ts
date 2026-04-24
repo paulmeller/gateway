@@ -316,17 +316,50 @@ export async function runTurn(
   if (turnBuild.env.CLAUDE_CODE_OAUTH_TOKEN && turnBuild.env.ANTHROPIC_API_KEY) {
     delete turnBuild.env.ANTHROPIC_API_KEY;
   }
-  // Ollama: inject OLLAMA_HOST so Codex's --local-provider ollama can reach
-  // the host's Ollama server from inside the container.
+  // Ollama: inject env vars so backend CLIs can reach the host's Ollama
+  // server from inside the container.
+  // - OLLAMA_HOST: used by the ollama CLI itself (host:port, no scheme)
+  // - CODEX_OSS_BASE_URL: used by Codex --local-provider ollama (http://host:port/v1)
+  // - OPENCODE_CONFIG_CONTENT: patched with the correct baseURL for opencode
   const ollamaCloudPrefixes = ["claude-", "gpt-", "o1-", "o3-", "o4-", "codex-", "chatgpt-", "gemini-"];
   const isOllamaModel = !agent.model.includes("/") && !ollamaCloudPrefixes.some(p => agent.model.startsWith(p));
-  if (isOllamaModel && !turnBuild.env.OLLAMA_HOST) {
-    const envRow = getEnvironment(session.environment_id);
-    const provName = envRow?.config?.provider ?? "sprites";
-    if (provName === "docker" || provName === "podman") {
-      turnBuild.env.OLLAMA_HOST = "http://host.docker.internal:11434";
-    } else if (provName === "apple-container" || provName === "apple-firecracker") {
-      turnBuild.env.OLLAMA_HOST = getConfig().ollamaUrl ?? "http://localhost:11434";
+  if (isOllamaModel) {
+    let ollamaHostPort: string | undefined;
+    if (!turnBuild.env.OLLAMA_HOST) {
+      const envRow = getEnvironment(session.environment_id);
+      const provName = envRow?.config?.provider ?? "sprites";
+      if (provName === "docker" || provName === "podman") {
+        ollamaHostPort = "host.docker.internal:11434";
+      } else if (provName === "apple-container" || provName === "apple-firecracker") {
+        // Apple Containers run in VMs — localhost inside the VM doesn't reach the host.
+        // Ollama must be started with OLLAMA_HOST=0.0.0.0:11434 to listen on all interfaces.
+        // The container reaches the host via its gateway IP (192.168.64.1 by default).
+        const customUrl = getConfig().ollamaUrl;
+        ollamaHostPort = customUrl !== "http://localhost:11434"
+          ? customUrl.replace(/^https?:\/\//, "")
+          : "192.168.64.1:11434";
+      }
+      if (ollamaHostPort) {
+        turnBuild.env.OLLAMA_HOST = ollamaHostPort;
+      }
+    } else {
+      ollamaHostPort = turnBuild.env.OLLAMA_HOST;
+    }
+    // Codex reads CODEX_OSS_BASE_URL (not OLLAMA_HOST) for its --local-provider ollama
+    if (ollamaHostPort && !turnBuild.env.CODEX_OSS_BASE_URL) {
+      const host = ollamaHostPort.replace(/^https?:\/\//, "");
+      turnBuild.env.CODEX_OSS_BASE_URL = `http://${host}/v1`;
+    }
+    // Patch OpenCode's OPENCODE_CONFIG_CONTENT with the correct Ollama baseURL
+    if (ollamaHostPort && turnBuild.env.OPENCODE_CONFIG_CONTENT) {
+      try {
+        const cfg = JSON.parse(turnBuild.env.OPENCODE_CONFIG_CONTENT);
+        const host = ollamaHostPort.replace(/^https?:\/\//, "");
+        if (cfg.provider?.ollama?.options) {
+          cfg.provider.ollama.options.baseURL = `http://${host}/v1`;
+          turnBuild.env.OPENCODE_CONFIG_CONTENT = JSON.stringify(cfg);
+        }
+      } catch { /* leave config as-is if parse fails */ }
     }
     // Codex needs a dummy OPENAI_API_KEY to not error on startup
     if (!turnBuild.env.OPENAI_API_KEY) {
