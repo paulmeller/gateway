@@ -112,7 +112,8 @@ app.use("/v1/*", cors({ origin: (origin) => origin, credentials: true }));
 app.use("*", async (c, next) => {
   await next();
   c.header("X-Content-Type-Options", "nosniff");
-  c.header("X-Frame-Options", "DENY");
+  // Allow /v1/docs to be iframed by the SPA (same-origin)
+  c.header("X-Frame-Options", c.req.path === "/v1/docs" ? "SAMEORIGIN" : "DENY");
   c.header("Referrer-Policy", "same-origin");
 });
 
