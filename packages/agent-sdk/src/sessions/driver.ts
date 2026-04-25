@@ -184,7 +184,15 @@ export async function runTurn(
   if (row && row.title == null) {
     const firstText = inputs.find((i): i is Extract<TurnInput, { kind: "text" }> => i.kind === "text");
     if (firstText?.text) {
-      updateSessionMutable(sessionId, { title: firstText.text.slice(0, 60) });
+      // Strip control chars, "Image" prefix from pasted content, and collapse whitespace
+      const sanitized = firstText.text
+        .replace(/[\x00-\x1F\x7F\u200B-\u200F\u2028-\u202F\uFEFF]/g, "")
+        .replace(/^Image(?=[A-Z])/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (sanitized) {
+        updateSessionMutable(sessionId, { title: sanitized.slice(0, 60) });
+      }
     }
   }
 

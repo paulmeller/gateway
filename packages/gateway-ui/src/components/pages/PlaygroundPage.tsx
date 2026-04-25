@@ -47,9 +47,12 @@ function ConfigPanel({ sessionId, onSessionCreated }: ConfigPanelProps) {
   const { data: session } = useSession(sessionId);
   const createSession = useCreateSession();
 
-  const [agentId, setAgentId] = useState("");
-  const [environmentId, setEnvironmentId] = useState("");
-  const [vaultId, setVaultId] = useState("__none__");
+  const [agentId, _setAgentId] = useState(() => localStorage.getItem("pg-agent") ?? "");
+  const [environmentId, _setEnvId] = useState(() => localStorage.getItem("pg-env") ?? "");
+  const [vaultId, _setVaultId] = useState(() => localStorage.getItem("pg-vault") ?? "__none__");
+  const setAgentId = (v: string) => { _setAgentId(v); localStorage.setItem("pg-agent", v); };
+  const setEnvironmentId = (v: string) => { _setEnvId(v); localStorage.setItem("pg-env", v); };
+  const setVaultId = (v: string) => { _setVaultId(v); localStorage.setItem("pg-vault", v); };
 
   // Only show vaults belonging to the selected agent
   const { data: vaults } = useVaults(agentId || undefined);

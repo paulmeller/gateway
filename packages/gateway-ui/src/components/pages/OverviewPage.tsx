@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { Server, Zap, Plus, Play, Key, ArrowRight, Eye, EyeOff, Copy, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -101,6 +101,7 @@ const AGENT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 const API_WINDOW_MIN = 60;              // 60 minutes (capped by recorder retention)
 
 export function OverviewPage() {
+  const navigate = useNavigate();
   const agentsQ = useAgents();
   const sessionsQ = useSessions();
   const envsQ = useEnvironments();
@@ -235,16 +236,12 @@ export function OverviewPage() {
                       const agentName =
                         agents?.find((a) => a.id === session.agent?.id)?.name ?? session.agent?.id?.slice(0, 8) ?? "—";
                       return (
-                        <TableRow key={session.id}>
-                          <TableCell>
-                            <Link
-                              to="/playground/$sessionId"
-                              params={{ sessionId: session.id }}
-                              className="text-foreground hover:underline font-medium"
-                            >
-                              {session.title ?? session.id.slice(0, 12) + "…"}
-                            </Link>
-                          </TableCell>
+                        <TableRow
+                          key={session.id}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => navigate({ to: "/playground/$sessionId", params: { sessionId: session.id } })}
+                        >
+                          <TableCell className="font-medium">{session.title ?? session.id.slice(0, 12) + "…"}</TableCell>
                           <TableCell className="text-muted-foreground">{agentName}</TableCell>
                           <TableCell>{statusBadge(session.status)}</TableCell>
                           <TableCell className="text-muted-foreground">{timeAgo(session.created_at)}</TableCell>
