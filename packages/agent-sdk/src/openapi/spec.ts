@@ -2032,7 +2032,7 @@ export function buildOpenApiDocument(opts: { serverUrl: string }): unknown {
     openapi: "3.1.0",
     info: {
       title: "AgentStep Gateway",
-      version: "0.4.14",
+      version: "0.4.15",
       description:
         "Open-source, drop-in replacement for the Claude Managed Agents API. Self-hosted agent gateway with 7 agent harnesses and 11 sandbox providers. Use with `@agentstep/agent-sdk` or the official Anthropic SDK — just change the baseURL.",
     },

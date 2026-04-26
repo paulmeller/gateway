@@ -33,7 +33,7 @@ import {
 import { useWhoami } from "@/hooks/use-whoami";
 import { useLicense } from "@/hooks/use-license";
 
-const VERSION = "0.4.14";
+const VERSION = "0.4.15";
 
 interface NavItem {
   label: string;
