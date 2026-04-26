@@ -72,7 +72,7 @@ export async function forwardToAnthropic(
   // round-trip — pass the original ReadableStream through instead.
   // `duplex: "half"` is required by undici when sending a streaming body.
   const isMultipart = (ct ?? "").toLowerCase().startsWith("multipart/");
-  let body: BodyInit | undefined;
+  let body: string | ReadableStream | undefined;
   if (request.method !== "GET" && request.method !== "HEAD") {
     if (opts?.body !== undefined) {
       body = opts.body;

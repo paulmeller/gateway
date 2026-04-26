@@ -103,7 +103,7 @@ describe("audit log — db layer", () => {
       isGlobalAdmin: false,
       budgetUsd: null,
       rateLimitRpm: null,
-      spentUsd: 0,
+      spentUsd: 0, mode: "gateway" as const,
     };
     recordAudit({ auth, action: "tenants.create", resource_type: "tenant", resource_id: "tenant_abc" });
 
@@ -125,7 +125,7 @@ describe("audit log — db layer", () => {
     const mkAuth = (keyId: string, tenantId: string | null) => ({
       keyId, name: keyId, permissions: { admin: true, scope: null },
       tenantId, isGlobalAdmin: tenantId === null,
-      budgetUsd: null, rateLimitRpm: null, spentUsd: 0,
+      budgetUsd: null, rateLimitRpm: null, spentUsd: 0, mode: "gateway" as const,
     });
     recordAudit({ auth: mkAuth("k1", "tenant_default"), action: "api_keys.create" });
     recordAudit({ auth: mkAuth("k2", "tenant_default"), action: "api_keys.revoke", outcome: "success" });
@@ -150,7 +150,7 @@ describe("audit log — db layer", () => {
     const mkAuth = (tenantId: string | null) => ({
       keyId: "k", name: "k", permissions: { admin: true, scope: null },
       tenantId, isGlobalAdmin: tenantId === null,
-      budgetUsd: null, rateLimitRpm: null, spentUsd: 0,
+      budgetUsd: null, rateLimitRpm: null, spentUsd: 0, mode: "gateway" as const,
     });
     recordAudit({ auth: mkAuth("tenant_default"), action: "a" });
     recordAudit({ auth: mkAuth("tenant_acme"),    action: "b" });

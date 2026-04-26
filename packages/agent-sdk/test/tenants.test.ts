@@ -211,7 +211,7 @@ describe("auth/scope.ts helpers", () => {
     const global: import("../src/types").AuthContext = {
       keyId: "k1", name: "g", permissions: { admin: true, scope: null },
       tenantId: null, isGlobalAdmin: true,
-      budgetUsd: null, rateLimitRpm: null, spentUsd: 0,
+      budgetUsd: null, rateLimitRpm: null, spentUsd: 0, mode: "gateway" as const,
     };
     const scoped: import("../src/types").AuthContext = {
       ...global, keyId: "k2", name: "s", tenantId: "tenant_abc", isGlobalAdmin: false,
@@ -225,7 +225,7 @@ describe("auth/scope.ts helpers", () => {
     const global: import("../src/types").AuthContext = {
       keyId: "k1", name: "g", permissions: { admin: true, scope: null },
       tenantId: null, isGlobalAdmin: true,
-      budgetUsd: null, rateLimitRpm: null, spentUsd: 0,
+      budgetUsd: null, rateLimitRpm: null, spentUsd: 0, mode: "gateway" as const,
     };
     const tenantAdmin: import("../src/types").AuthContext = {
       ...global, keyId: "k2", name: "t", tenantId: "tenant_x", isGlobalAdmin: false,
@@ -239,7 +239,7 @@ describe("auth/scope.ts helpers", () => {
     const global: import("../src/types").AuthContext = {
       keyId: "k1", name: "g", permissions: { admin: true, scope: null },
       tenantId: null, isGlobalAdmin: true,
-      budgetUsd: null, rateLimitRpm: null, spentUsd: 0,
+      budgetUsd: null, rateLimitRpm: null, spentUsd: 0, mode: "gateway" as const,
     };
     const scopedX: import("../src/types").AuthContext = {
       ...global, keyId: "k2", name: "x", tenantId: "tenant_x", isGlobalAdmin: false,
@@ -257,7 +257,7 @@ describe("auth/scope.ts helpers", () => {
     const global: import("../src/types").AuthContext = {
       keyId: "k1", name: "g", permissions: { admin: true, scope: null },
       tenantId: null, isGlobalAdmin: true,
-      budgetUsd: null, rateLimitRpm: null, spentUsd: 0,
+      budgetUsd: null, rateLimitRpm: null, spentUsd: 0, mode: "gateway" as const,
     };
     const scopedX: import("../src/types").AuthContext = {
       ...global, keyId: "k2", name: "x", tenantId: "tenant_x", isGlobalAdmin: false,
