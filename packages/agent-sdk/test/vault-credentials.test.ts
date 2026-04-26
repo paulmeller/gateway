@@ -124,7 +124,7 @@ describe("vault credentials API", () => {
       req(`/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "GitHub Token",
-          auth: { type: "static_bearer", token: "ghp_abc123secret" },
+          auth: { type: "static_bearer", mcp_server_url: "https://mcp.example.com/mcp", token: "ghp_abc123secret" },
         },
       }),
       vaultId,
@@ -137,6 +137,7 @@ describe("vault credentials API", () => {
     expect(body.display_name).toBe("GitHub Token");
     expect(body.vault_id).toBe(vaultId);
     expect((body.auth as Record<string, unknown>).type).toBe("static_bearer");
+    expect((body.auth as Record<string, unknown>).mcp_server_url).toBe("https://mcp.example.com/mcp");
     // Token MUST NOT appear in response
     expect((body.auth as Record<string, unknown>).token).toBeUndefined();
     expect(JSON.stringify(body)).not.toContain("ghp_abc123secret");
@@ -186,7 +187,7 @@ describe("vault credentials API", () => {
       req(`/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "dup-name",
-          auth: { type: "static_bearer", token: "tok1" },
+          auth: { type: "static_bearer", mcp_server_url: "https://mcp.example.com/mcp", token: "tok1" },
         },
       }),
       vaultId,
@@ -195,7 +196,7 @@ describe("vault credentials API", () => {
       req(`/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "dup-name",
-          auth: { type: "static_bearer", token: "tok2" },
+          auth: { type: "static_bearer", mcp_server_url: "https://mcp.example.com/mcp", token: "tok2" },
         },
       }),
       vaultId,
@@ -236,7 +237,7 @@ describe("vault credentials API", () => {
     const res = await handleCreateCredential(
       req(`/v1/vaults/${vaultId}/credentials`, {
         body: {
-          auth: { type: "static_bearer", token: "tok" },
+          auth: { type: "static_bearer", mcp_server_url: "https://mcp.example.com/mcp", token: "tok" },
         },
       }),
       vaultId,
@@ -257,7 +258,7 @@ describe("vault credentials API", () => {
       req(`/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "cred-a",
-          auth: { type: "static_bearer", token: "secret-a" },
+          auth: { type: "static_bearer", mcp_server_url: "https://mcp.example.com/mcp", token: "secret-a" },
         },
       }),
       vaultId,
@@ -266,7 +267,7 @@ describe("vault credentials API", () => {
       req(`/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "cred-b",
-          auth: { type: "static_bearer", token: "secret-b" },
+          auth: { type: "static_bearer", mcp_server_url: "https://mcp.example.com/mcp", token: "secret-b" },
         },
       }),
       vaultId,
@@ -298,7 +299,7 @@ describe("vault credentials API", () => {
       req(`/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "get-test",
-          auth: { type: "static_bearer", token: "get-secret" },
+          auth: { type: "static_bearer", mcp_server_url: "https://mcp.example.com/mcp", token: "get-secret" },
         },
       }),
       vaultId,
@@ -347,7 +348,7 @@ describe("vault credentials API", () => {
       req(`/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "old-name",
-          auth: { type: "static_bearer", token: "tok" },
+          auth: { type: "static_bearer", mcp_server_url: "https://mcp.example.com/mcp", token: "tok" },
         },
       }),
       vaultId,
@@ -379,7 +380,7 @@ describe("vault credentials API", () => {
       req(`/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "rotate-test",
-          auth: { type: "static_bearer", token: "old-token" },
+          auth: { type: "static_bearer", mcp_server_url: "https://mcp.example.com/mcp", token: "old-token" },
         },
       }),
       vaultId,
@@ -416,7 +417,7 @@ describe("vault credentials API", () => {
       req(`/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "to-delete",
-          auth: { type: "static_bearer", token: "tok" },
+          auth: { type: "static_bearer", mcp_server_url: "https://mcp.example.com/mcp", token: "tok" },
         },
       }),
       vaultId,
@@ -543,7 +544,7 @@ describe("vault credentials API", () => {
       req(`/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "secret-cred",
-          auth: { type: "static_bearer", token: "top-secret" },
+          auth: { type: "static_bearer", mcp_server_url: "https://mcp.example.com/mcp", token: "top-secret" },
         },
         apiKey: global.key,
       }),

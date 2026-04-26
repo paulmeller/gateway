@@ -335,6 +335,7 @@ export interface VaultCredentialRow {
 }
 
 export interface VaultCredential {
+  type: "vault_credential";
   id: string;
   vault_id: string;
   display_name: string;
@@ -344,6 +345,7 @@ export interface VaultCredential {
   };
   created_at: string;
   updated_at: string;
+  archived_at: string | null;
 }
 
 // ---------------------------------------------------------------------------

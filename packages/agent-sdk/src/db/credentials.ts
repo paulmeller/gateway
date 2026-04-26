@@ -13,6 +13,7 @@ import type { VaultCredential, VaultCredentialRow } from "../types";
 
 function hydrate(row: VaultCredentialRow): VaultCredential {
   return {
+    type: "vault_credential" as const,
     id: row.id,
     vault_id: row.vault_id,
     display_name: row.display_name,
@@ -22,6 +23,7 @@ function hydrate(row: VaultCredentialRow): VaultCredential {
     },
     created_at: toIso(row.created_at),
     updated_at: toIso(row.updated_at),
+    archived_at: null,
   };
 }
 

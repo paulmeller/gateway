@@ -24,9 +24,10 @@ const CreateCredentialSchema = z.object({
   display_name: z.string().min(1).max(200),
   auth: z.object({
     type: z.enum(["static_bearer"]),
+    mcp_server_url: z.string().url(),
     token: z.string().min(1),
-    mcp_server_url: z.string().url().optional(),
   }),
+  metadata: z.record(z.string()).optional(),
 });
 
 const UpdateCredentialSchema = z.object({
@@ -157,6 +158,6 @@ export function handleDeleteCredential(
 
     const deleted = deleteCredential(credentialId);
     if (!deleted) throw notFound(`credential not found: ${credentialId}`);
-    return jsonOk({ id: credentialId, type: "credential_deleted" });
+    return jsonOk({ id: credentialId, type: "vault_credential_deleted" });
   });
 }
