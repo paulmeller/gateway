@@ -245,7 +245,10 @@ export interface SessionResource {
   content?: string;
   file_id?: string;
   mount_path?: string;
+  /** Internal field name for clone URL */
   repository_url?: string;
+  /** Anthropic API field name for clone URL (fallback) */
+  url?: string;
   branch?: string;
   commit?: string;
 }

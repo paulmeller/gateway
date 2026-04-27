@@ -414,7 +414,7 @@ export async function provisionResources(
       }
     } else if (r.type === "github_repository") {
       // Accept both internal (repository_url) and Anthropic API (url) field names
-      const cloneUrl = r.repository_url ?? (r as Record<string, unknown>).url as string | undefined;
+      const cloneUrl = r.repository_url ?? r.url;
       if (!cloneUrl) continue;
       try {
         const repoDir = safeMountPath
