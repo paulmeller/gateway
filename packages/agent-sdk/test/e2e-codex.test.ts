@@ -67,9 +67,15 @@ function readFixture(name: string): string[] {
     .filter((l) => l.length > 0);
 }
 
-async function seedAgentEnvSession(): Promise<{ sessionId: string }> {
+async function seedAgentEnvSession(
+  opts?: { provider?: string },
+): Promise<{ sessionId: string }> {
   const { getDb } = await import("../src/db/client");
   const db = getDb();
+
+  const configJson = opts?.provider
+    ? JSON.stringify({ provider: opts.provider })
+    : "{}";
 
   db.prepare(
     `INSERT INTO agents (id, current_version, name, created_at, updated_at)
@@ -82,8 +88,8 @@ async function seedAgentEnvSession(): Promise<{ sessionId: string }> {
   ).run();
   db.prepare(
     `INSERT INTO environments (id, name, config_json, state, created_at)
-     VALUES ('env_cx', 't', '{}', 'ready', 0)`,
-  ).run();
+     VALUES ('env_cx', 't', ?, 'ready', 0)`,
+  ).run(configJson);
   db.prepare(
     `INSERT INTO sessions (
        id, agent_id, agent_version, environment_id, status,
@@ -204,6 +210,50 @@ describe("e2e codex round-trip (fake exec)", () => {
     const toolResult = events.find((e) => e.type === "agent.tool_result");
     const resultPayload = JSON.parse(toolResult!.payload_json) as { content: string };
     expect(resultPayload.content).toBe("hello\n");
+  });
+
+  it("sets CODEX_SANDBOX_TYPE=none on Firecracker providers", async () => {
+    const fake = await import("./helpers/fake-exec");
+    fake.resetQueue();
+
+    const { sessionId } = await seedAgentEnvSession({ provider: "sprites" });
+
+    let capturedStdin = "";
+    fake.enqueueTurn({
+      ndjson: readFixture("turn1.ndjson"),
+      onStdin: (body) => {
+        capturedStdin = body;
+      },
+    });
+
+    const { runTurn } = await import("../src/sessions/driver");
+    await runTurn(sessionId, [
+      { kind: "text", eventId: "evt_fc", text: "hello" },
+    ]);
+
+    expect(capturedStdin).toContain("CODEX_SANDBOX_TYPE=none");
+  });
+
+  it("does not set CODEX_SANDBOX_TYPE on non-Firecracker providers", async () => {
+    const fake = await import("./helpers/fake-exec");
+    fake.resetQueue();
+
+    const { sessionId } = await seedAgentEnvSession({ provider: "docker" });
+
+    let capturedStdin = "";
+    fake.enqueueTurn({
+      ndjson: readFixture("turn1.ndjson"),
+      onStdin: (body) => {
+        capturedStdin = body;
+      },
+    });
+
+    const { runTurn } = await import("../src/sessions/driver");
+    await runTurn(sessionId, [
+      { kind: "text", eventId: "evt_dk", text: "hello" },
+    ]);
+
+    expect(capturedStdin).not.toContain("CODEX_SANDBOX_TYPE");
   });
 
   it("rejects user.custom_tool_result for codex agents", async () => {

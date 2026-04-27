@@ -388,6 +388,19 @@ export async function runTurn(
     }
   }
 
+  // Codex bwrap conflicts with Firecracker: disable the inner bubblewrap
+  // sandbox on providers that already run inside a Firecracker VM. The outer
+  // VM provides hardware-level isolation, and bwrap fails because Firecracker
+  // doesn't expose the user namespaces it requires. (openai/codex#15282)
+  if (agent.engine === "codex") {
+    const envRow = getEnvironment(session.environment_id);
+    const provName = envRow?.config?.provider ?? "docker";
+    const firecrackerProviders = new Set(["sprites", "fly", "apple-firecracker"]);
+    if (firecrackerProviders.has(provName)) {
+      turnBuild.env.CODEX_SANDBOX_TYPE = "none";
+    }
+  }
+
   // Compose the wrapper stdin: env KEY=value lines, blank line, prompt body.
   // Both backends' wrappers read env until blank line; from there claude
   // pipes stdin into `claude`, while opencode captures stdin into $PROMPT
