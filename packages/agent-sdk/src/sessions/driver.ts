@@ -298,6 +298,27 @@ export async function runTurn(
     return;
   }
 
+  // Codex bwrap conflicts with Firecracker: disable the inner bubblewrap
+  // sandbox on providers that already run inside a Firecracker VM. The outer
+  // VM provides hardware-level isolation, and bwrap fails because Firecracker
+  // doesn't expose the user namespaces it requires. (openai/codex#15282)
+  // Use --sandbox none (CLI flag) — the env var alone doesn't reliably reach
+  // the codex process inside the VM.
+  if (agent.engine === "codex") {
+    const envRow = getEnvironment(session.environment_id);
+    const provName = envRow?.config?.provider ?? "docker";
+    const firecrackerProviders = new Set(["sprites", "fly", "apple-firecracker"]);
+    if (firecrackerProviders.has(provName)) {
+      // Insert --sandbox none before the trailing `-` (stdin marker)
+      const lastIdx = turnBuild.argv.lastIndexOf("-");
+      if (lastIdx >= 0) {
+        turnBuild.argv.splice(lastIdx, 0, "--sandbox", "none");
+      } else {
+        turnBuild.argv.push("--sandbox", "none");
+      }
+    }
+  }
+
   console.log(`[driver] ${sessionId} executing turn (engine: ${agent.engine}, model: ${agent.model})`);
   const argv = [backend.wrapperPath, ...turnBuild.argv];
 
@@ -385,19 +406,6 @@ export async function runTurn(
     }
     if (!turnBuild.env.CODEX_API_KEY) {
       turnBuild.env.CODEX_API_KEY = "ollama";
-    }
-  }
-
-  // Codex bwrap conflicts with Firecracker: disable the inner bubblewrap
-  // sandbox on providers that already run inside a Firecracker VM. The outer
-  // VM provides hardware-level isolation, and bwrap fails because Firecracker
-  // doesn't expose the user namespaces it requires. (openai/codex#15282)
-  if (agent.engine === "codex") {
-    const envRow = getEnvironment(session.environment_id);
-    const provName = envRow?.config?.provider ?? "docker";
-    const firecrackerProviders = new Set(["sprites", "fly", "apple-firecracker"]);
-    if (firecrackerProviders.has(provName)) {
-      turnBuild.env.CODEX_SANDBOX_TYPE = "none";
     }
   }
 

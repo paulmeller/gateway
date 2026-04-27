@@ -212,17 +212,17 @@ describe("e2e codex round-trip (fake exec)", () => {
     expect(resultPayload.content).toBe("hello\n");
   });
 
-  it("sets CODEX_SANDBOX_TYPE=none on Firecracker providers", async () => {
+  it("passes --sandbox none on Firecracker providers", async () => {
     const fake = await import("./helpers/fake-exec");
     fake.resetQueue();
 
     const { sessionId } = await seedAgentEnvSession({ provider: "sprites" });
 
-    let capturedStdin = "";
+    let capturedArgv: string[] = [];
     fake.enqueueTurn({
       ndjson: readFixture("turn1.ndjson"),
-      onStdin: (body) => {
-        capturedStdin = body;
+      onArgv: (argv) => {
+        capturedArgv = argv;
       },
     });
 
@@ -231,20 +231,24 @@ describe("e2e codex round-trip (fake exec)", () => {
       { kind: "text", eventId: "evt_fc", text: "hello" },
     ]);
 
-    expect(capturedStdin).toContain("CODEX_SANDBOX_TYPE=none");
+    const sandboxIdx = capturedArgv.indexOf("--sandbox");
+    expect(sandboxIdx).toBeGreaterThan(-1);
+    expect(capturedArgv[sandboxIdx + 1]).toBe("none");
+    // --sandbox none must come before the trailing `-` (stdin marker)
+    expect(capturedArgv.at(-1)).toBe("-");
   });
 
-  it("does not set CODEX_SANDBOX_TYPE on non-Firecracker providers", async () => {
+  it("does not pass --sandbox none on non-Firecracker providers", async () => {
     const fake = await import("./helpers/fake-exec");
     fake.resetQueue();
 
     const { sessionId } = await seedAgentEnvSession({ provider: "docker" });
 
-    let capturedStdin = "";
+    let capturedArgv: string[] = [];
     fake.enqueueTurn({
       ndjson: readFixture("turn1.ndjson"),
-      onStdin: (body) => {
-        capturedStdin = body;
+      onArgv: (argv) => {
+        capturedArgv = argv;
       },
     });
 
@@ -253,7 +257,7 @@ describe("e2e codex round-trip (fake exec)", () => {
       { kind: "text", eventId: "evt_dk", text: "hello" },
     ]);
 
-    expect(capturedStdin).not.toContain("CODEX_SANDBOX_TYPE");
+    expect(capturedArgv).not.toContain("--sandbox");
   });
 
   it("rejects user.custom_tool_result for codex agents", async () => {
