@@ -124,3 +124,84 @@ describe("Pool register dedup", () => {
     expect(pool.countInEnv("env-test-dedup")).toBe(0);
   });
 });
+
+describe("wrapProviderWithSecrets", () => {
+  // Regression for: sessions with `resources` failing on first turn with
+  // "SPRITE_TOKEN required" when the token is in the vault but not in
+  // process.env / settings. The driver re-provisions resources after
+  // `acquireForFirstTurn` and previously used an unwrapped provider that
+  // dropped vault secrets on the floor.
+  function makeFakeProvider(): {
+    provider: import("../src/providers/types").ContainerProvider;
+    calls: {
+      exec: Array<{ name: string; argv: string[]; opts?: Record<string, unknown> }>;
+      startExec: Array<{ name: string; opts: Record<string, unknown> }>;
+      create: Array<Record<string, unknown>>;
+      delete: Array<{ name: string; secrets?: Record<string, string> }>;
+    };
+  } {
+    const calls = {
+      exec: [] as Array<{ name: string; argv: string[]; opts?: Record<string, unknown> }>,
+      startExec: [] as Array<{ name: string; opts: Record<string, unknown> }>,
+      create: [] as Array<Record<string, unknown>>,
+      delete: [] as Array<{ name: string; secrets?: Record<string, string> }>,
+    };
+    const provider: import("../src/providers/types").ContainerProvider = {
+      name: "sprites",
+      stripControlChars: false,
+      async create(opts) { calls.create.push(opts as Record<string, unknown>); },
+      async delete(name, secrets) { calls.delete.push({ name, secrets }); },
+      async list() { return []; },
+      async exec(name, argv, opts) {
+        calls.exec.push({ name, argv, opts: opts as Record<string, unknown> | undefined });
+        return { stdout: "", stderr: "", exit_code: 0 };
+      },
+      startExec(name, opts) {
+        calls.startExec.push({ name, opts: opts as unknown as Record<string, unknown> });
+        return Promise.resolve({
+          stdout: new ReadableStream(),
+          exit: Promise.resolve({ code: 0 }),
+          async kill() {},
+        });
+      },
+    };
+    return { provider, calls };
+  }
+
+  it("threads secrets into exec/startExec/create/delete", async () => {
+    const { wrapProviderWithSecrets } = await import("../src/containers/lifecycle");
+    const { provider, calls } = makeFakeProvider();
+    const wrapped = wrapProviderWithSecrets(provider, { SPRITE_TOKEN: "vault-tok" });
+
+    await wrapped.exec("box", ["mkdir", "-p", "/x"]);
+    expect(calls.exec[0].opts?.secrets).toEqual({ SPRITE_TOKEN: "vault-tok" });
+
+    await wrapped.startExec("box", { argv: ["echo"] });
+    expect((calls.startExec[0].opts as { secrets?: unknown }).secrets).toEqual({
+      SPRITE_TOKEN: "vault-tok",
+    });
+
+    await wrapped.create({ name: "box" });
+    expect((calls.create[0] as { secrets?: unknown }).secrets).toEqual({
+      SPRITE_TOKEN: "vault-tok",
+    });
+
+    await wrapped.delete("box");
+    expect(calls.delete[0].secrets).toEqual({ SPRITE_TOKEN: "vault-tok" });
+  });
+
+  it("returns the original provider when secrets are empty or undefined", async () => {
+    const { wrapProviderWithSecrets } = await import("../src/containers/lifecycle");
+    const { provider } = makeFakeProvider();
+    expect(wrapProviderWithSecrets(provider, undefined)).toBe(provider);
+    expect(wrapProviderWithSecrets(provider, {})).toBe(provider);
+  });
+
+  it("preserves caller-provided secrets on delete (caller wins)", async () => {
+    const { wrapProviderWithSecrets } = await import("../src/containers/lifecycle");
+    const { provider, calls } = makeFakeProvider();
+    const wrapped = wrapProviderWithSecrets(provider, { SPRITE_TOKEN: "default" });
+    await wrapped.delete("box", { SPRITE_TOKEN: "explicit" });
+    expect(calls.delete[0].secrets).toEqual({ SPRITE_TOKEN: "explicit" });
+  });
+});

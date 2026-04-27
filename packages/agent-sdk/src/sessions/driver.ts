@@ -33,11 +33,11 @@ import { getAgent } from "../db/agents";
 import { getEnvironment } from "../db/environments";
 import { getConfig } from "../config";
 import { markUserEventProcessed, listEvents } from "../db/events";
-import { acquireForFirstTurn, installSkills, provisionResources } from "../containers/lifecycle";
+import { acquireForFirstTurn, installSkills, provisionResources, wrapProviderWithSecrets } from "../containers/lifecycle";
 import * as pool from "../containers/pool";
 import { resolveBackend } from "../backends/registry";
 import { resolveContainerProvider } from "../providers/registry";
-import { BLOCKED_ENV_KEYS } from "../providers/resolve-secrets";
+import { BLOCKED_ENV_KEYS, resolveVaultSecrets } from "../providers/resolve-secrets";
 import { loadSessionSecrets } from "./secrets";
 import { parseNDJSONLines } from "../backends/shared/ndjson";
 import type { TranslatedEvent } from "../backends/shared/translator-types";
@@ -203,6 +203,14 @@ export async function runTurn(
     sandboxName = await acquireForFirstTurn(sessionId);
     console.log(`[driver] ${sessionId} container ready: ${sandboxName}`);
 
+    // Resolve vault secrets once for any post-acquire provider work below.
+    // Pool entry was populated by acquireForFirstTurn; fall back to vault_ids
+    // for restart cases where the pool is empty until lazy re-population.
+    // Without these, subsequent provider.exec calls fail "SPRITE_TOKEN required"
+    // when the token only lives in the vault, not in process.env / settings.
+    const postAcquireSecrets = pool.getBySession(sessionId)?.vaultSecrets
+      ?? (session.vault_ids?.length ? resolveVaultSecrets(session.vault_ids) : undefined);
+
     // Re-inject skills if agent has been updated (new or changed skills)
     const latestAgent = getAgent(session.agent.id);
     if (latestAgent && latestAgent.skills && latestAgent.skills.length > 0) {
@@ -213,7 +221,8 @@ export async function runTurn(
       if (newSkills.length > 0) {
         console.log(`[driver] ${sessionId} injecting ${newSkills.length} new skill(s)...`);
         const envRow = getEnvironment(session.environment_id);
-        const sp = await resolveContainerProvider(envRow?.config?.provider);
+        const baseProvider = await resolveContainerProvider(envRow?.config?.provider);
+        const sp = wrapProviderWithSecrets(baseProvider, postAcquireSecrets);
         await installSkills(sandboxName, sp, newSkills, agent.engine);
         console.log(`[driver] ${sessionId} skills injected`);
       }
@@ -223,7 +232,8 @@ export async function runTurn(
     const freshSession = getSession(sessionId);
     if (freshSession?.resources && freshSession.resources.length > 0) {
       const envRow = getEnvironment(session.environment_id);
-      const sp = await resolveContainerProvider(envRow?.config?.provider);
+      const baseProvider = await resolveContainerProvider(envRow?.config?.provider);
+      const sp = wrapProviderWithSecrets(baseProvider, postAcquireSecrets);
       await provisionResources(sandboxName, freshSession.resources, sp);
     }
   } catch (err) {
@@ -393,9 +403,7 @@ export async function runTurn(
   const poolEntry = pool.getBySession(sessionId);
   // Pool entry may be missing after restart — fall back to resolving from vault_ids
   const secrets = poolEntry?.vaultSecrets
-    ?? (session.vault_ids?.length
-      ? (await import("../providers/resolve-secrets")).resolveVaultSecrets(session.vault_ids)
-      : undefined);
+    ?? (session.vault_ids?.length ? resolveVaultSecrets(session.vault_ids) : undefined);
 
   const tools = resolveToolset(agent.tools);
   // If threads are enabled, add spawn_agent to custom tool names so the

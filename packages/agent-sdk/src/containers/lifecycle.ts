@@ -39,6 +39,29 @@ const lcLog = (...args: unknown[]): void => {
 const SANDBOX_NAME_PREFIX = "ca-sess-";
 
 /**
+ * Wrap a container provider so every call automatically threads vault secrets.
+ *
+ * Used at sandbox acquisition (initial provision) and from the driver when
+ * re-injecting skills / re-provisioning resources between turns. Without
+ * this wrap, callers that resolve a fresh provider via the registry would
+ * lose vault-sourced credentials (e.g. SPRITE_TOKEN) and the underlying
+ * exec/create calls would 500 on auth.
+ */
+export function wrapProviderWithSecrets(
+  provider: import("../providers/types").ContainerProvider,
+  secrets: Record<string, string> | undefined,
+): import("../providers/types").ContainerProvider {
+  if (!secrets || Object.keys(secrets).length === 0) return provider;
+  return {
+    ...provider,
+    exec: (n, argv, opts?) => provider.exec(n, argv, { ...opts, secrets }),
+    startExec: (n, opts) => provider.startExec(n, { ...opts, secrets }),
+    create: (opts) => provider.create({ ...opts, secrets }),
+    delete: (n, s?) => provider.delete(n, s ?? secrets),
+  };
+}
+
+/**
  * Install agent skills into the container.
  *
  * For Claude backend: writes skills to /home/agent/.claude/skills/<name>/SKILL.md
@@ -152,18 +175,7 @@ export async function acquireForFirstTurn(sessionId: string): Promise<string> {
 
   // Wrap provider so all exec/startExec calls automatically include vault secrets.
   // This avoids threading secrets through every backend function signature.
-  const hasSecrets = Object.keys(secrets).length > 0;
-  const sp = hasSecrets ? {
-    ...provider,
-    exec: (n: string, argv: string[], opts?: Parameters<typeof provider.exec>[2]) =>
-      provider.exec(n, argv, { ...opts, secrets }),
-    startExec: (n: string, opts: Parameters<typeof provider.startExec>[1]) =>
-      provider.startExec(n, { ...opts, secrets }),
-    create: (opts: Parameters<typeof provider.create>[0]) =>
-      provider.create({ ...opts, secrets }),
-    delete: (n: string, s?: Record<string, string>) =>
-      provider.delete(n, s ?? secrets),
-  } : provider;
+  const sp = wrapProviderWithSecrets(provider, secrets);
 
   const name = deriveSandboxName(sessionId);
   lcLog(`[lifecycle] ${sessionId} creating container via ${sp.name}...`);
