@@ -33,7 +33,7 @@
   "author": "AgentStep",
   "repository": {
     "type": "git",
-    "url": "https://github.com/paulmeller/gateway.git",
+    "url": "https://github.com/agentstep/gateway.git",
     "directory": "packages/gateway"
   },
   "license": "Apache-2.0",
