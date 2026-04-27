@@ -12,8 +12,20 @@ export const CODEX_WRAPPER_PATH = "/tmp/.codex-wrapper";
 
 const SANDBOX_WRAPPER_SCRIPT = [
   "#!/bin/bash",
+  // Read env vars from stdin until blank line
   'while IFS= read -r line; do [ -z "$line" ] && break; export "$line"; done',
-  'exec codex "$@"',
+  // Save remaining stdin (the prompt) to a temp file — avoids partial-stdin
+  // issues when exec replaces the process, matching the claude wrapper pattern.
+  'PROMPT_FILE=$(mktemp)',
+  'cat > "$PROMPT_FILE"',
+  // Ensure codex runs in a writable workspace. Without bwrap (--sandbox none),
+  // codex inherits the container exec CWD which may be / or /root with no
+  // project context, causing it to immediately exit with end_turn.
+  'cd /home/user 2>/dev/null || cd /tmp',
+  'codex "$@" < "$PROMPT_FILE"',
+  'EXIT_CODE=$?',
+  'rm -f "$PROMPT_FILE"',
+  'exit $EXIT_CODE',
 ].join("\n");
 
 export async function installCodexWrapper(sandboxName: string, provider: ContainerProvider): Promise<void> {
