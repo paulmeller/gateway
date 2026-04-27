@@ -18,10 +18,14 @@ const SANDBOX_WRAPPER_SCRIPT = [
   // issues when exec replaces the process, matching the claude wrapper pattern.
   'PROMPT_FILE=$(mktemp)',
   'cat > "$PROMPT_FILE"',
-  // Ensure codex runs in a writable workspace. Without bwrap (--sandbox none),
-  // codex inherits the container exec CWD which may be / or /root with no
-  // project context, causing it to immediately exit with end_turn.
-  'cd /home/user 2>/dev/null || cd /tmp',
+  // Set CWD to the first cloned repo if available, otherwise the user's home.
+  // Without bwrap (--sandbox none), codex inherits the container exec CWD
+  // which may be / or /root with no project context.
+  'REPO_DIR=$(find /mnt/session/resources -maxdepth 1 -name "repo_*" -type d 2>/dev/null | head -1)',
+  'if [ -n "$REPO_DIR" ]; then cd "$REPO_DIR"',
+  'elif [ -d /home/sprite ]; then cd /home/sprite',
+  'elif [ -d /home/user ]; then cd /home/user',
+  'else cd /tmp; fi',
   'codex "$@" < "$PROMPT_FILE"',
   'EXIT_CODE=$?',
   'rm -f "$PROMPT_FILE"',

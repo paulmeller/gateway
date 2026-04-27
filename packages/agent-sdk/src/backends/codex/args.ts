@@ -25,6 +25,7 @@ export function buildCodexArgs(input: BuildCodexArgsInput): string[] {
     "exec",
     "--json",
     "--full-auto",
+    "--auto-edit",
     "--skip-git-repo-check",
   ];
 
