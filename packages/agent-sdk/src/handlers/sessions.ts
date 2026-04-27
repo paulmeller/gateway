@@ -88,9 +88,18 @@ const ResourceSchema = z.object({
   content: z.string().optional(),
   file_id: z.string().optional(),
   mount_path: z.string().optional(),
+  // Accept both internal (repository_url, branch, commit) and
+  // Anthropic API (url, checkout, authorization_token) field names.
+  url: z.string().optional(),
   repository_url: z.string().optional(),
   branch: z.string().optional(),
   commit: z.string().optional(),
+  checkout: z.object({
+    type: z.string(),
+    name: z.string().optional(),
+    sha: z.string().optional(),
+  }).optional(),
+  authorization_token: z.string().optional(),
 });
 
 const CreateSchema = z.object({
@@ -325,12 +334,23 @@ export function handleCreateSession(request: Request): Promise<Response> {
         if (data.resources?.length) {
           const { createResource } = await import("../db/session-resources");
           for (const r of data.resources) {
+            let repoUrl = r.type === "github_repository" ? (r.repository_url ?? r.url) : r.uri;
+            if (r.type === "github_repository" && r.authorization_token && repoUrl) {
+              try {
+                const u = new URL(repoUrl);
+                u.username = "x-access-token";
+                u.password = r.authorization_token;
+                repoUrl = u.toString();
+              } catch { /* leave URL as-is if parse fails */ }
+            }
             createResource(session.id, {
               type: r.type as "file" | "github_repository",
               file_id: r.file_id,
               mount_path: r.mount_path,
-              url: r.type === "github_repository" ? r.repository_url : r.uri,
-              checkout: r.branch ? { type: "branch", name: r.branch }
+              url: repoUrl,
+              checkout: r.checkout
+                ? { type: r.checkout.type, name: r.checkout.name ?? r.checkout.sha ?? "" }
+                : r.branch ? { type: "branch", name: r.branch }
                 : r.commit ? { type: "commit", name: r.commit }
                 : undefined,
             });
@@ -392,12 +412,24 @@ export function handleCreateSession(request: Request): Promise<Response> {
       if (data.resources?.length) {
         const { createResource } = await import("../db/session-resources");
         for (const r of data.resources) {
+          // Resolve the repo URL, embedding authorization_token if provided
+          let repoUrl = r.type === "github_repository" ? (r.repository_url ?? r.url) : r.uri;
+          if (r.type === "github_repository" && r.authorization_token && repoUrl) {
+            try {
+              const u = new URL(repoUrl);
+              u.username = "x-access-token";
+              u.password = r.authorization_token;
+              repoUrl = u.toString();
+            } catch { /* leave URL as-is if parse fails */ }
+          }
           createResource(session.id, {
             type: r.type as "file" | "github_repository",
             file_id: r.file_id,
             mount_path: r.mount_path,
-            url: r.type === "github_repository" ? r.repository_url : r.uri,
-            checkout: r.branch ? { type: "branch", name: r.branch }
+            url: repoUrl,
+            checkout: r.checkout
+              ? { type: r.checkout.type, name: r.checkout.name ?? r.checkout.sha ?? "" }
+              : r.branch ? { type: "branch", name: r.branch }
               : r.commit ? { type: "commit", name: r.commit }
               : undefined,
           });

@@ -412,7 +412,10 @@ export async function provisionResources(
       } catch (err) {
         console.warn(`[lifecycle] failed to provision file resource ${r.file_id}:`, err);
       }
-    } else if (r.type === "github_repository" && r.repository_url) {
+    } else if (r.type === "github_repository") {
+      // Accept both internal (repository_url) and Anthropic API (url) field names
+      const cloneUrl = r.repository_url ?? (r as Record<string, unknown>).url as string | undefined;
+      if (!cloneUrl) continue;
       try {
         const repoDir = safeMountPath
           ? (safeMountPath.startsWith("/") ? safeMountPath : `/mnt/session/uploads/${safeMountPath}`)
@@ -427,16 +430,16 @@ export async function provisionResources(
         // Build git clone as argv array — no shell interpolation
         const gitArgs = ["git", "clone", "--depth", "1"];
         if (safeBranch) { gitArgs.push("--branch", safeBranch); }
-        gitArgs.push("--", r.repository_url, repoDir);
+        gitArgs.push("--", cloneUrl, repoDir);
         const result = await provider.exec(sandboxName, gitArgs, { timeoutMs: 120_000 });
         if (safeCommit && result.exit_code === 0) {
           await provider.exec(sandboxName, ["git", "-C", repoDir, "checkout", safeCommit], { timeoutMs: 30_000 });
         }
         if (result.exit_code !== 0) {
-          console.warn(`[lifecycle] git clone failed for ${r.repository_url}: ${result.stderr.slice(0, 200)}`);
+          console.warn(`[lifecycle] git clone failed for ${cloneUrl}: ${result.stderr.slice(0, 200)}`);
         }
       } catch (err) {
-        console.warn(`[lifecycle] failed to clone repo ${r.repository_url}:`, err);
+        console.warn(`[lifecycle] failed to clone repo ${cloneUrl}:`, err);
       }
     }
   }
