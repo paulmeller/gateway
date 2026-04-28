@@ -17,10 +17,12 @@ export interface BuildCodexArgsInput {
 }
 
 export function buildCodexArgs(input: BuildCodexArgsInput): string[] {
-  // --full-auto alone is sufficient for
-  // non-interactive headless execution on v0.118.0. Flags like
-  // --ask-for-approval and --dangerously-bypass-approvals-and-sandbox
-  // do NOT exist in the current codex Rust CLI.
+  // --full-auto is sufficient for headless execution on Docker/Podman
+  // (uses WorkspaceWrite sandbox via bwrap). On Firecracker providers
+  // (sprites, fly, apple-firecracker), the driver swaps this for
+  // --dangerously-bypass-approvals-and-sandbox (DangerFullAccess)
+  // because bwrap requires user namespaces that Firecracker VMs don't
+  // expose. The two flags conflict — only one can be used at a time.
   const args = [
     "exec",
     "--json",
