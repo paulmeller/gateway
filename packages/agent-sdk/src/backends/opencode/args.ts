@@ -21,7 +21,7 @@ export interface BuildOpencodeArgsInput {
 }
 
 export function buildOpencodeArgs(input: BuildOpencodeArgsInput): string[] {
-  const args = ["run", "--format", "json"];
+  const args = ["run", "--format", "json", "--dangerously-skip-permissions"];
   if (input.backendSessionId) {
     args.push("--session", input.backendSessionId);
   }

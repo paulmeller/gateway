@@ -212,7 +212,7 @@ describe("e2e codex round-trip (fake exec)", () => {
     expect(resultPayload.content).toBe("hello\n");
   });
 
-  it("passes --sandbox none on Firecracker providers", async () => {
+  it("passes --yolo and removes --full-auto on Firecracker providers", async () => {
     const fake = await import("./helpers/fake-exec");
     fake.resetQueue();
 
@@ -231,14 +231,13 @@ describe("e2e codex round-trip (fake exec)", () => {
       { kind: "text", eventId: "evt_fc", text: "hello" },
     ]);
 
-    const sandboxIdx = capturedArgv.indexOf("--sandbox");
-    expect(sandboxIdx).toBeGreaterThan(-1);
-    expect(capturedArgv[sandboxIdx + 1]).toBe("none");
-    // --sandbox none must come before the trailing `-` (stdin marker)
+    expect(capturedArgv).toContain("--dangerously-bypass-approvals-and-sandbox");
+    expect(capturedArgv).not.toContain("--full-auto");
+    // --yolo must come before the trailing `-` (stdin marker)
     expect(capturedArgv.at(-1)).toBe("-");
   });
 
-  it("does not pass --sandbox none on non-Firecracker providers", async () => {
+  it("keeps --full-auto on non-Firecracker providers", async () => {
     const fake = await import("./helpers/fake-exec");
     fake.resetQueue();
 
@@ -257,7 +256,8 @@ describe("e2e codex round-trip (fake exec)", () => {
       { kind: "text", eventId: "evt_dk", text: "hello" },
     ]);
 
-    expect(capturedArgv).not.toContain("--sandbox");
+    expect(capturedArgv).toContain("--full-auto");
+    expect(capturedArgv).not.toContain("--dangerously-bypass-approvals-and-sandbox");
   });
 
   it("rejects user.custom_tool_result for codex agents", async () => {

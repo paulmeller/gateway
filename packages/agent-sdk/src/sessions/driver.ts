@@ -298,23 +298,25 @@ export async function runTurn(
     return;
   }
 
-  // Codex bwrap conflicts with Firecracker: disable the inner bubblewrap
-  // sandbox on providers that already run inside a Firecracker VM. The outer
-  // VM provides hardware-level isolation, and bwrap fails because Firecracker
-  // doesn't expose the user namespaces it requires. (openai/codex#15282)
-  // Use --sandbox none (CLI flag) — the env var alone doesn't reliably reach
-  // the codex process inside the VM.
+  // Codex bwrap conflicts with Firecracker: the inner bubblewrap sandbox
+  // requires user namespaces that Firecracker VMs don't expose. The outer VM
+  // already provides hardware-level isolation. Replace --full-auto with
+  // --dangerously-bypass-approvals-and-sandbox (--yolo) which skips bwrap
+  // entirely. The two flags conflict — can't use both. (openai/codex#15282)
   if (agent.engine === "codex") {
     const envRow = getEnvironment(session.environment_id);
     const provName = envRow?.config?.provider ?? "docker";
     const firecrackerProviders = new Set(["sprites", "fly", "apple-firecracker"]);
     if (firecrackerProviders.has(provName)) {
-      // Insert --sandbox none before the trailing `-` (stdin marker)
+      // Remove --full-auto (conflicts with --yolo)
+      const faIdx = turnBuild.argv.indexOf("--full-auto");
+      if (faIdx >= 0) turnBuild.argv.splice(faIdx, 1);
+      // Insert --yolo before the trailing `-` (stdin marker)
       const lastIdx = turnBuild.argv.lastIndexOf("-");
       if (lastIdx >= 0) {
-        turnBuild.argv.splice(lastIdx, 0, "--sandbox", "none");
+        turnBuild.argv.splice(lastIdx, 0, "--dangerously-bypass-approvals-and-sandbox");
       } else {
-        turnBuild.argv.push("--sandbox", "none");
+        turnBuild.argv.push("--dangerously-bypass-approvals-and-sandbox");
       }
     }
   }
