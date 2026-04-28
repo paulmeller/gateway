@@ -83,7 +83,7 @@ function loadConfig(): Config {
       process.env.DEFAULT_MODEL ||
       readSetting("default_model") ||
       "claude-sonnet-4-6",
-    agentMaxTurns: num(process.env.AGENT_MAX_TURNS, 10),
+    agentMaxTurns: num(process.env.AGENT_MAX_TURNS, 0),
     agentTimeoutMs: num(process.env.AGENT_TIMEOUT_MS, 600_000),
     spriteTimeoutMs: num(process.env.SPRITE_TIMEOUT_MS, 30_000),
     concurrency: num(process.env.CONCURRENCY, 4),

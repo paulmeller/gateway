@@ -33,9 +33,13 @@ export function buildClaudeArgs(input: BuildArgsInput): string[] {
     "--verbose",
     "--permission-mode",
     permissionMode,
-    "--max-turns",
-    String(input.maxTurns ?? cfg.agentMaxTurns),
   ];
+
+  // Only cap turns if explicitly configured (default 0 = unlimited, like Anthropic MA)
+  const maxTurns = input.maxTurns ?? cfg.agentMaxTurns;
+  if (maxTurns > 0) {
+    argv.push("--max-turns", String(maxTurns));
+  }
 
   if (input.claudeSessionId) {
     argv.push("--resume", input.claudeSessionId);
