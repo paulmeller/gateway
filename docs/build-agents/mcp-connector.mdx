@@ -1,0 +1,131 @@
+---
+title: MCP Connector
+description: Connect agents to MCP servers, configure auth via vault keys, and understand per-engine config differences.
+---
+
+MCP (Model Context Protocol) servers extend agents with external tools and data sources. Declare servers on an agent's `mcp_servers` field and the gateway passes the config to the engine each turn.
+
+## Declaring MCP servers
+
+`mcp_servers` is a plain object keyed by server name. Each value is a server config:
+
+```json
+{
+  "mcp_servers": {
+    "github": {
+      "type": "http",
+      "url": "https://api.github.com/mcp"
+    },
+    "local-db": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/app/db-server.mjs"]
+    }
+  }
+}
+```
+
+### Server config fields
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `"stdio"` \| `"http"` \| `"sse"` | Transport type. |
+| `url` | string | Server URL. Required for `http` and `sse`. |
+| `command` | string \| string[] | Command to run. Required for `stdio`. |
+| `args` | string[] | Additional arguments for `stdio` servers. |
+| `headers` | object | Static HTTP headers sent with every request. |
+| `env` | object | Environment variables for `stdio` process. |
+
+## Per-engine config translation
+
+The same `mcp_servers` declaration is translated differently for each engine.
+
+### Claude (`claude`)
+
+MCP servers are passed as a `--mcp-config` JSON flag:
+
+```
+--mcp-config '{"mcpServers": { "github": { "type": "http", "url": "..." } }}'
+```
+
+The config shape matches Claude Code's native `--mcp-config` format. Header fields are forwarded as-is.
+
+### OpenCode (`opencode`)
+
+OpenCode uses the `OPENCODE_CONFIG_CONTENT` environment variable. The type names differ from Claude's:
+
+| Claude type | OpenCode type |
+|---|---|
+| `"stdio"` | `"local"` |
+| `"http"` | `"remote"` |
+| `"sse"` | `"remote"` |
+
+For `stdio` servers, the gateway merges `command` and `args` into a single command array (OpenCode's format). The resulting config is JSON-encoded into `OPENCODE_CONFIG_CONTENT` alongside any Ollama provider config.
+
+### Codex (`codex`)
+
+Codex does not accept a JSON config blob. Each MCP server field is passed as a separate `-c` flag:
+
+```
+-c mcp_servers.github.type="http"
+-c mcp_servers.github.url="https://api.github.com/mcp"
+-c mcp_servers.github.http_headers.Authorization="Bearer ..."
+```
+
+Headers are serialized as `mcp_servers.<name>.http_headers.<header_name>`.
+
+## Authenticating MCP servers with vaults
+
+Static headers in `mcp_servers` are stored in the agent version and visible to anyone who can read the agent. For secrets (API keys, bearer tokens), use vault entries instead.
+
+### How it works
+
+When a session is created with `vault_ids`, the gateway loads the vault entries at turn time and injects them as HTTP headers into the matching MCP server config before passing the config to the engine. The agent's stored `mcp_servers` definition is never mutated.
+
+### Vault key conventions
+
+| Vault key pattern | Injected header |
+|---|---|
+| `MCP_AUTH_<SERVER>` | `Authorization: Bearer <value>` |
+| `MCP_HEADER_<SERVER>_<HEADER>` | `<HEADER>: <value>` |
+
+Server name matching is case-insensitive and converts hyphens to underscores. For a server named `my-db`:
+
+- `MCP_AUTH_MY_DB` → `Authorization: Bearer <token>`
+- `MCP_HEADER_MY_DB_X_API_KEY` → `X-API-KEY: <value>`
+
+For multi-part server names, the gateway tries progressively shorter server name prefixes so `MCP_HEADER_MY_DB_SERVER_X_API_KEY` is unambiguous as long as only one server matches `MY_DB_SERVER`.
+
+### Example: authenticated HTTP MCP server
+
+1. Create a vault and add an entry:
+
+```http
+PUT /v1/vaults/:vault_id/entries/MCP_AUTH_GITHUB
+{ "value": "ghp_your_token_here" }
+```
+
+2. Declare the MCP server without the secret:
+
+```json
+{
+  "mcp_servers": {
+    "github": {
+      "type": "http",
+      "url": "https://api.github.com/mcp"
+    }
+  }
+}
+```
+
+3. Reference the vault when creating sessions:
+
+```json
+{
+  "agent_id": "agent_...",
+  "environment_id": "env_...",
+  "vault_ids": ["vault_..."]
+}
+```
+
+At turn time the gateway injects `Authorization: Bearer ghp_your_token_here` into the `github` server config before handing it to the engine. The token never touches the agent version record or the agent API response.

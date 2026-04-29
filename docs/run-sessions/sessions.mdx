@@ -1,0 +1,177 @@
+---
+title: Start a Session
+description: Create and manage sessions — the stateful containers that run your agent against user messages.
+---
+
+A **session** pairs an agent with an environment and maintains conversation state across multiple turns. Each session has a lifecycle: it starts `idle`, transitions to `running` while the agent is processing a turn, and eventually becomes `terminated` when explicitly deleted or archived.
+
+## Create a session
+
+```http
+POST /v1/sessions
+```
+
+```json
+{
+  "agent": "agent_01abc",
+  "environment_id": "env_01xyz"
+}
+```
+
+The `agent` field accepts either a plain agent ID string or an object with an explicit version pin:
+
+```json
+{
+  "agent": { "id": "agent_01abc", "version": 3 },
+  "environment_id": "env_01xyz"
+}
+```
+
+Omitting `version` always uses the agent's current version at session creation time.
+
+### Request body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `agent` | string \| object | Yes | Agent ID, or `{ id, version }` to pin a specific version |
+| `environment_id` | string | Yes | The environment that provides the compute sandbox |
+| `title` | string | No | Human-readable label for the session |
+| `metadata` | object | No | Arbitrary key-value pairs attached to the session |
+| `max_budget_usd` | number | No | Hard spending cap in USD; the session terminates when exceeded |
+| `vault_ids` | string[] | No | Vault IDs whose secrets are injected into the container at turn start |
+| `resources` | object[] | No | Files, URIs, or GitHub repositories to mount into the session |
+
+### Resources
+
+Resources are mounted into the container before the first turn runs. Supported types:
+
+| Type | Required fields | Description |
+|------|----------------|-------------|
+| `uri` | `uri` | A plain URI passed as context |
+| `text` | `content` | Raw text content |
+| `file` | `file_id`, optionally `mount_path` | A previously uploaded file |
+| `github_repository` | `repository_url` (or `url`), `branch` or `commit` or `checkout` | Clone a repo; use `authorization_token` to embed credentials |
+
+```json
+{
+  "agent": "agent_01abc",
+  "environment_id": "env_01xyz",
+  "resources": [
+    {
+      "type": "github_repository",
+      "repository_url": "https://github.com/org/repo",
+      "branch": "main",
+      "authorization_token": "ghp_..."
+    }
+  ]
+}
+```
+
+The `authorization_token` is embedded into the clone URL as `x-access-token:<token>@...` — it never appears in the session object returned by the API.
+
+## Session statuses
+
+| Status | Meaning |
+|--------|---------|
+| `idle` | Waiting for a user message. The agent is not running. |
+| `running` | A turn is actively being processed. |
+| `rescheduling` | The turn was interrupted and is being requeued (transient). |
+| `terminated` | The session is permanently closed. No more turns can be sent. |
+
+A session's `stop_reason` field records why it last transitioned to `idle`. Common values: `end_turn`, `error`, `interrupted`.
+
+## Retrieve a session
+
+```http
+GET /v1/sessions/:id
+```
+
+Returns the full session object, including cumulative usage stats and cost:
+
+```json
+{
+  "id": "session_01...",
+  "type": "session",
+  "agent": { "type": "agent", "id": "agent_01abc", "version": 3 },
+  "environment_id": "env_01xyz",
+  "status": "idle",
+  "stop_reason": "end_turn",
+  "title": null,
+  "metadata": {},
+  "max_budget_usd": null,
+  "resources": [],
+  "vault_ids": [],
+  "stats": {
+    "turn_count": 2,
+    "tool_calls_count": 5,
+    "active_seconds": 18,
+    "duration_seconds": 18
+  },
+  "usage": {
+    "input_tokens": 4200,
+    "output_tokens": 810,
+    "cache_read_input_tokens": 0,
+    "cache_creation_input_tokens": 0,
+    "cost_usd": 0.0042
+  },
+  "created_at": "2026-04-01T12:00:00.000Z",
+  "updated_at": "2026-04-01T12:00:18.000Z",
+  "archived_at": null
+}
+```
+
+## List sessions
+
+```http
+GET /v1/sessions
+```
+
+Returns a paginated list. Use the `next_page` cursor from the response as the `page` query parameter to fetch the next page.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `agent_id` | string | Filter to a specific agent |
+| `agent_version` | number | Filter to a specific agent version |
+| `environment_id` | string | Filter to a specific environment |
+| `status` | string | Filter by status: `idle`, `running`, `rescheduling`, or `terminated` |
+| `limit` | number | Results per page (default 20) |
+| `order` | `asc` \| `desc` | Sort direction by creation time |
+| `include_archived` | boolean | Include archived sessions (default false) |
+| `page` | string | Cursor from a previous response's `next_page` |
+| `created_at[gt]` | number \| string | Filter sessions created after this timestamp (ms or ISO 8601) |
+| `created_at[lt]` | number \| string | Filter sessions created before this timestamp |
+
+## Update a session
+
+```http
+PATCH /v1/sessions/:id
+```
+
+Only `title` and `metadata` are mutable after creation:
+
+```json
+{
+  "title": "Refactor auth module",
+  "metadata": { "ticket": "ENG-1234" }
+}
+```
+
+## Archive a session
+
+```http
+POST /v1/sessions/:id/archive
+```
+
+Archiving stops the session and flags it as archived. Archived sessions are excluded from list results by default. The session object is returned with `archived_at` set.
+
+## Delete a session
+
+```http
+DELETE /v1/sessions/:id
+```
+
+Deletion is permanent. The session is interrupted if running, its container is released, and a `session.status_terminated` event with `reason: "deleted"` is appended to the event log. Returns:
+
+```json
+{ "id": "session_01...", "type": "session_deleted" }
+```

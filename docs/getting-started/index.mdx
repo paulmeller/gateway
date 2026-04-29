@@ -1,0 +1,71 @@
+---
+title: Introduction
+description: What AgentStep Gateway is, who it's for, and how it works.
+---
+
+AgentStep Gateway is a self-hosted, open-source server that implements the Anthropic Managed Agents API. Point any HTTP client at `http://localhost:4000/v1` with the `anthropic-beta: managed-agents-2026-04-01` header and you get the same resource model — agents, vaults, sessions, environments, and SSE event streams — running entirely on your own infrastructure. Prompts, code, and outputs stay local. SQLite storage. No telemetry without consent.
+
+## Who it's for
+
+- **Teams that cannot send code to external services** — air-gapped or regulated environments where data sovereignty is non-negotiable.
+- **Developers who want engine flexibility** — swap between Claude, Codex, OpenCode, Gemini, Factory, or Pi with a single config change.
+- **Platform engineers building multi-tenant systems** — the tenant and API-key model lets you operate a shared gateway for multiple users or teams.
+- **Anyone who wants observability** — the built-in web UI and `/v1/metrics` endpoints give you cost, token usage, and error rates out of the box.
+
+## Core concepts
+
+| Concept | Description |
+|---|---|
+| **Agent** | A versioned configuration: model, engine (claude / codex / …), system prompt, skills, and tool settings. Agents are immutable snapshots — editing creates a new version so session history is always reproducible. |
+| **Environment** | The sandbox where agent turns execute. Backed by a container provider (Docker, Sprites, E2B, …). Environments can be shared across sessions or created fresh per session. |
+| **Session** | A conversation thread that pairs one agent version with one environment. Each turn drives the agent inside the sandbox and appends events to an append-only log. Sessions accumulate cost, token usage, and tool-call statistics. |
+| **Events** | The append-only event log for a session. Every agent action — text deltas, tool calls, tool results, errors, status changes — is a typed event with a sequence number. Clients consume events via SSE (`/stream`) or the REST `/events` list endpoint. |
+
+## How it works
+
+1. **Create an agent** — define the model, engine, and system prompt via `POST /v1/agents`.
+2. **Create an environment** — choose a sandbox provider (Docker, Sprites, E2B, …) via `POST /v1/environments`. The gateway provisions the container and waits for it to be ready.
+3. **Start a session** — `POST /v1/sessions` links an agent version to an environment and returns a session ID.
+4. **Send a turn** — `POST /v1/sessions/:id/turns` with a user message. The turn driver runs the engine inside the sandbox, streaming NDJSON events from the process back through a translator.
+5. **Consume the stream** — open `GET /v1/sessions/:id/stream` (SSE) to receive typed events in real time, or poll `GET /v1/sessions/:id/events` for the full log.
+
+## Self-hosted vs Anthropic's hosted Managed Agents
+
+| | AgentStep Gateway (self-hosted) | Anthropic Managed Agents (hosted) |
+|---|---|---|
+| **Infrastructure** | Your servers, your cloud, or localhost | Anthropic's cloud |
+| **Data residency** | Stays on your machine | Processed by Anthropic |
+| **Engine choice** | Claude, Codex, OpenCode, Gemini, Factory, Pi | Claude only |
+| **Sandbox providers** | 11 providers (Docker, Sprites, E2B, Fly, …) | Anthropic-managed |
+| **Cost visibility** | Per-session USD cost tracking | Via Anthropic billing |
+| **API compatibility** | Same resource model and SSE event shape | Reference implementation |
+| **Passthrough mode** | `sk-ant-api*` keys forwarded transparently | N/A |
+
+The gateway also supports a **sync-and-proxy** mode: create an environment with `provider: "anthropic"` and the gateway syncs your local agent config to Anthropic, creates a hosted session, and proxies execution traffic. Anthropic manages the sandbox; your config stays local.
+
+## Supported engines
+
+| Engine | Key | Notes |
+|---|---|---|
+| **Claude Code** | `claude` | Default. Runs `claude` CLI inside the sandbox. Requires `ANTHROPIC_API_KEY`. |
+| **OpenCode** | `opencode` | Runs the `opencode` CLI. Supports OpenAI models (`openai/gpt-4o`, etc.). |
+| **Codex** | `codex` | Runs OpenAI Codex CLI. Requires `OPENAI_API_KEY`. |
+| **Gemini** | `gemini` | Runs Gemini CLI. Requires `GEMINI_API_KEY`. |
+| **Factory** | `factory` | Factory.ai agent harness. Requires `FACTORY_API_KEY`. |
+| **Pi** | `pi` | Multi-provider harness (Anthropic, OpenAI, Google). |
+
+## Supported sandbox providers
+
+| Provider | Key | Type | Notes |
+|---|---|---|---|
+| **Sprites** | `sprites` | Cloud | Default. Managed sandboxes via sprites.dev. |
+| **Docker** | `docker` | Local | Requires Docker daemon on the host. |
+| **Apple Container** | `apple-container` | Local | macOS Virtualization framework containers. |
+| **Apple Firecracker / MVM** | `apple-firecracker`, `mvm` | Local | microVM via MVM on Apple Silicon. |
+| **Podman** | `podman` | Local | Drop-in Docker alternative. |
+| **E2B** | `e2b` | Cloud | Sandboxes via e2b.dev. Requires `E2B_API_KEY`. |
+| **Vercel** | `vercel` | Cloud | Vercel Functions sandboxes. Requires token + team + project. |
+| **Daytona** | `daytona` | Cloud | Daytona workspaces. Requires `DAYTONA_API_KEY`. |
+| **Fly.io** | `fly` | Cloud | Fly Machines. Requires `FLY_API_TOKEN` and `FLY_APP_NAME`. |
+| **Modal** | `modal` | Cloud | Modal serverless containers. Requires token ID + secret. |
+| **Anthropic** | `anthropic` | Cloud | Sync-and-proxy to Anthropic's hosted Managed Agents. |

@@ -1,0 +1,160 @@
+---
+title: Container Reference
+description: All supported container and sandbox providers, their configuration, and how to select one per environment.
+---
+
+AgentStep Gateway runs agent backends inside isolated containers or sandboxes. Each environment specifies a `provider` field that controls which runtime is used. All providers implement the same `ContainerProvider` interface, so agents and backends are unaware of the underlying platform.
+
+## Supported providers
+
+| Provider | Type | Where it runs | Requires |
+|---|---|---|---|
+| `sprites` | Cloud (default) | sprites.dev managed containers | `SPRITE_TOKEN` |
+| `docker` | Local | Docker daemon on the host | Docker Desktop / Engine |
+| `apple-container` | Local | Apple Containers (VM-per-container) | macOS 26+ with Apple Silicon |
+| `apple-firecracker` / `mvm` | Local | Firecracker microVMs via mvm | `mvm` CLI + warm pool |
+| `podman` | Local | Podman daemon on the host | Podman |
+| `e2b` | Cloud | E2B cloud sandboxes | `E2B_API_KEY`, `e2b` npm package |
+| `vercel` | Cloud | Vercel Sandboxes | `VERCEL_TOKEN` + `@vercel/sandbox` npm package |
+| `daytona` | Cloud | Daytona sandboxes | `DAYTONA_API_KEY` |
+| `fly` | Cloud | Fly Machines (REST API, no SDK) | `FLY_API_TOKEN`, `FLY_APP_NAME` |
+| `modal` | Cloud | Modal sandboxes | `MODAL_TOKEN_ID` + `MODAL_TOKEN_SECRET`, `modal` npm package |
+| `mvm` | Local | Alias for `apple-firecracker` | Same as `apple-firecracker` |
+
+## Provider details
+
+### sprites (default)
+
+The default provider. Communicates with [sprites.dev](https://sprites.dev) over HTTP. Each session gets a managed Linux container; no local daemon is required.
+
+- **Credential**: `SPRITE_TOKEN` — set in `.env`, as an environment variable, or stored via `PUT /v1/settings` with key `sprite_token`.
+- **API base**: defaults to `https://api.sprites.dev`; override with `SPRITE_API`.
+- stdout framing bytes from the HTTP multiplexing layer are stripped automatically (`stripControlChars: true`).
+
+### docker
+
+Runs backends in local Docker containers using the `docker` CLI. Containers are created with `docker create --name <name> node:22 sleep infinity` and started with `docker start`.
+
+- **Image**: `node:22` by default; override with `DOCKER_IMAGE`.
+- **Prerequisite**: Docker Desktop (macOS/Windows) or Docker Engine (Linux) must be installed and running.
+
+### apple-container
+
+Uses Apple's native container runtime (`container` CLI) available on macOS 26 (Tahoe) with Apple Silicon. Each container runs in its own VM using `Virtualization.framework` — not a shared kernel.
+
+- **Image**: `node:22` by default; override with `APPLE_CONTAINER_IMAGE`.
+- **Prerequisite**: Install via `brew install container` (requires macOS 26+), then start the service with `brew services start container`.
+- The gateway checks that the `container system status` output includes `running` before accepting work.
+
+### apple-firecracker / mvm
+
+Runs backends in Firecracker microVMs via the `mvm` CLI (AgentStep Machines). Each session gets a hardware-isolated VM with its own Linux kernel. VMs are acquired from a warm pool (`mvm start <name>`) in approximately 0.3 seconds.
+
+- **Prerequisite**: `npm install -g @agentstep/mvm && mvm init && mvm serve install && mvm pool warm`
+- **Network policy**: `deny` by default; override with `MVM_NET_POLICY`.
+- `mvm` and `apple-firecracker` are aliases for the same implementation.
+- On first container creation the gateway pre-warms the V8 bytecode cache to reduce turn-1 startup time from ~55 s to ~8 s.
+
+### podman
+
+Drop-in equivalent of the Docker provider using the `podman` CLI. Lifecycle and exec commands mirror Docker exactly.
+
+- **Image**: `node:22` by default; override with `PODMAN_IMAGE`.
+- **Prerequisite**: `brew install podman`, then `podman machine start`.
+
+### e2b
+
+Uses the [E2B](https://e2b.dev) cloud sandbox SDK (`e2b` npm package, v2.x). Sandboxes are created from a template and managed via ConnectRPC.
+
+- **Credential**: `E2B_API_KEY`.
+- **Template**: `base` by default; override with `E2B_TEMPLATE`.
+- **Optional dependency**: `npm install e2b` — the package is not bundled. A clear error is thrown at runtime if it is missing.
+
+### vercel
+
+Uses the [Vercel Sandbox](https://vercel.com/docs/sandbox) SDK (`@vercel/sandbox` npm package, v1.9+).
+
+- **Credentials**: `VERCEL_TOKEN` + `VERCEL_TEAM_ID` + `VERCEL_PROJECT_ID`. For deployments on Vercel, `VERCEL_OIDC_TOKEN` is accepted instead.
+- **Runtime**: `node24` by default; override with `VERCEL_SANDBOX_RUNTIME`.
+- **Optional dependency**: `npm install @vercel/sandbox`.
+
+### daytona
+
+Uses [Daytona](https://daytona.io) sandboxes via plain HTTP (no SDK). Two endpoints are used: the control plane (`https://app.daytona.io/api`) for lifecycle operations, and the toolbox proxy (`https://proxy.app.daytona.io/toolbox`) for exec.
+
+- **Credential**: `DAYTONA_API_KEY`.
+- **Custom endpoints**: `DAYTONA_API_URL`, `DAYTONA_PROXY_URL`.
+
+### fly
+
+Uses [Fly Machines](https://docs.machines.dev) via the REST API (no SDK). Machines are created with 2 shared CPUs and 1 024 MB RAM. Exec is always buffered — Fly does not expose a streaming exec endpoint.
+
+- **Credentials**: `FLY_API_TOKEN`, `FLY_APP_NAME`.
+- **Image**: `node:22` by default; override with `FLY_IMAGE`.
+
+### modal
+
+Uses the [Modal](https://modal.com) SDK (`modal` npm package, v0.7+) via gRPC. Sandboxes are created under the `agentstep-gateway` Modal app with 2 vCPUs and 2 048 MiB RAM, and a maximum lifetime of 1 hour.
+
+- **Credentials**: `MODAL_TOKEN_ID` + `MODAL_TOKEN_SECRET`, or a `~/.modal.toml` config file (run `modal token set`). Credentials can also be stored in vault secrets.
+- **Optional dependency**: `npm install modal`.
+
+## ContainerProvider interface
+
+All providers implement the following TypeScript interface (`packages/agent-sdk/src/providers/types.ts`):
+
+```ts
+interface ContainerProvider {
+  name: ProviderName;
+
+  // Optional pre-flight check. Returns { available: true } or
+  // { available: false, message: "..." }. Called before the first turn.
+  checkAvailability?(secrets?: ProviderSecrets): Promise<AvailabilityResult>;
+
+  // Create and start a new container/sandbox.
+  create(opts: { name: string; secrets?: ProviderSecrets }): Promise<void>;
+
+  // Force-remove a container (best-effort, does not throw on missing).
+  delete(name: string, secrets?: ProviderSecrets): Promise<void>;
+
+  // List containers matching an optional name prefix.
+  list(opts?: { prefix?: string }): Promise<Array<{ name: string }>>;
+
+  // One-shot execution — waits for exit, returns stdout + stderr + exit code.
+  // Used for backend setup (install CLI, run wrapper, etc.).
+  exec(
+    name: string,
+    argv: string[],
+    opts?: { stdin?: string; timeoutMs?: number; secrets?: ProviderSecrets },
+  ): Promise<{ stdout: string; stderr: string; exit_code: number }>;
+
+  // Streaming execution — streams stdout as a ReadableStream.
+  // Used by the turn driver for live agent output.
+  startExec(name: string, opts: ExecOptions): Promise<ExecSession>;
+
+  // Whether to strip HTTP multiplexing control bytes from stdout.
+  // True for sprites, false for all other providers.
+  stripControlChars: boolean;
+}
+```
+
+`ProviderSecrets` is a `Record<string, string>`. At turn time, the session lifecycle resolves vault secrets and passes them through all provider calls so credentials never need to be in `process.env`.
+
+## Selecting a provider
+
+The provider is set in the environment's `config` object. Use the REST API or the gateway UI to create an environment with a specific provider:
+
+```json
+POST /v1/environments
+{
+  "name": "my-env",
+  "config": {
+    "type": "cloud",
+    "provider": "docker"
+  }
+}
+```
+
+If `provider` is omitted, the gateway throws an error at session start. The default provider for new environments created via the interactive quickstart (`gateway chat`) is `sprites`.
+
+Provider credentials follow precedence order: **vault secrets → `process.env` → settings DB**. Credentials stored via `PUT /v1/settings` are read by `readEnvOrSetting()` at turn time, so they work without restarting the server.

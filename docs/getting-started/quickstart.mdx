@@ -1,0 +1,199 @@
+---
+title: Quickstart
+description: Install AgentStep Gateway, start the server, and run your first agent session in five steps.
+---
+
+## Prerequisites
+
+- **Node.js 22+** — check with `node --version`.
+- **An API key** for at least one engine: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY`.
+- **A sandbox provider** — Docker is the easiest local option. Cloud providers (Sprites, E2B, …) work without any local daemon.
+
+## Install
+
+**npm (global install):**
+
+```bash
+npm install -g @agentstep/gateway
+```
+
+**npx (zero install — try it once):**
+
+```bash
+npx @agentstep/gateway quickstart
+```
+
+**Docker:**
+
+```bash
+docker run -p 4000:4000 \
+  -e ANTHROPIC_API_KEY=sk-ant-... \
+  ghcr.io/agentstep/gateway
+```
+
+---
+
+## Step 1: Start the server
+
+```bash
+gateway serve
+```
+
+The server starts on `http://localhost:4000` (loopback only by default). You'll see:
+
+```
+  AgentStep Gateway v0.4.24
+
+  → UI:      http://localhost:4000
+  → API:     http://localhost:4000/v1
+  → Docs:    http://localhost:4000/v1/docs
+  → Key:     ck_ab12••••ef34   (unmasked key in data/.api-key)
+```
+
+The API key is printed masked. Grab the full key from `data/.api-key` — you'll use it in the `x-api-key` header for every request below.
+
+```bash
+export GATEWAY_KEY=$(cat data/.api-key)
+```
+
+To bind to all interfaces (e.g., inside Docker or a VM):
+
+```bash
+gateway serve --host 0.0.0.0
+```
+
+---
+
+## Step 2: Create an agent
+
+An agent is a versioned config: model, engine, and system prompt.
+
+**curl:**
+
+```bash
+curl -s -X POST http://localhost:4000/v1/agents \
+  -H "x-api-key: $GATEWAY_KEY" \
+  -H "anthropic-beta: managed-agents-2026-04-01" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "coder", "model": "claude-sonnet-4-6", "engine": "claude"}' \
+  | jq '{id, name, model, engine}'
+```
+
+**CLI:**
+
+```bash
+gateway agents create --name coder --model claude-sonnet-4-6 --engine claude
+```
+
+Note the `id` from the response — for example `agt_01J...`.
+
+---
+
+## Step 3: Create an environment
+
+An environment is the sandbox where the agent runs. Use `docker` if Docker is installed locally, or `sprites` for a managed cloud sandbox.
+
+**curl:**
+
+```bash
+curl -s -X POST http://localhost:4000/v1/environments \
+  -H "x-api-key: $GATEWAY_KEY" \
+  -H "anthropic-beta: managed-agents-2026-04-01" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "dev", "config": {"type": "cloud", "provider": "docker"}}' \
+  | jq '{id, name, state}'
+```
+
+**CLI:**
+
+```bash
+gateway environments create --name dev --provider docker
+```
+
+The environment moves through `initializing` → `ready`. Poll until it's ready:
+
+```bash
+gateway environments wait <env-id>
+```
+
+---
+
+## Step 4: Start a session and send a message
+
+A session links an agent version to an environment. Create the session, then send the first turn (user message) in one go:
+
+**curl — create session:**
+
+```bash
+SESSION=$(curl -s -X POST http://localhost:4000/v1/sessions \
+  -H "x-api-key: $GATEWAY_KEY" \
+  -H "anthropic-beta: managed-agents-2026-04-01" \
+  -H "Content-Type: application/json" \
+  -d "{\"agent\": \"<agent-id>\", \"environment_id\": \"<env-id>\"}" \
+  | jq -r '.id')
+echo "Session: $SESSION"
+```
+
+**curl — send a turn:**
+
+```bash
+curl -s -X POST "http://localhost:4000/v1/sessions/$SESSION/turns" \
+  -H "x-api-key: $GATEWAY_KEY" \
+  -H "anthropic-beta: managed-agents-2026-04-01" \
+  -H "Content-Type: application/json" \
+  -d '{"content": [{"type": "text", "text": "Write a hello world Python script and run it."}]}'
+```
+
+**CLI (creates session + starts chat loop in one step):**
+
+```bash
+gateway sessions create --agent <agent-id> --env <env-id>
+gateway chat <session-id>
+```
+
+---
+
+## Step 5: Stream the response
+
+Open an SSE connection to receive events as the agent works. The stream closes automatically when the session goes idle.
+
+**curl:**
+
+```bash
+curl -N "http://localhost:4000/v1/sessions/$SESSION/stream" \
+  -H "x-api-key: $GATEWAY_KEY" \
+  -H "anthropic-beta: managed-agents-2026-04-01" \
+  -H "Accept: text/event-stream"
+```
+
+You'll see a series of SSE events:
+
+```
+data: {"type":"session.status_running","seq":1,...}
+data: {"type":"message_start","seq":2,...}
+data: {"type":"content_block_delta","seq":3,"delta":{"type":"text_delta","text":"Here's a..."}}
+data: {"type":"tool_use","seq":4,...}
+data: {"type":"tool_result","seq":5,...}
+data: {"type":"session.status_idle","seq":6,...}
+```
+
+To fetch the completed event log at any time:
+
+```bash
+curl -s "http://localhost:4000/v1/sessions/$SESSION/events" \
+  -H "x-api-key: $GATEWAY_KEY" \
+  -H "anthropic-beta: managed-agents-2026-04-01" \
+  | jq '.data[].type'
+```
+
+---
+
+## One-command alternative
+
+If you want to skip the manual steps above, the `quickstart` command does everything interactively — it prompts for engine, provider, and API key, then drops you straight into a chat:
+
+```bash
+gateway quickstart
+# or with flags for non-interactive use:
+gateway quickstart --engine claude --model claude-sonnet-4-6 --provider docker
+```

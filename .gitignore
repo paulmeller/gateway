@@ -21,8 +21,9 @@ dist/
 # Superpowers brainstorm artifacts (local dev tool state)
 .superpowers/
 
-# Docs (internal working docs, not shipped)
-docs/
+# Docs internal working files (specs, plans — not shipped)
+docs/superpowers/
+docs/plans/
 
 # Test coverage and results
 coverage/

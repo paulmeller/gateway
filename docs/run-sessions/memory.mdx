@@ -1,0 +1,169 @@
+---
+title: Using Agent Memory
+description: Persist and retrieve agent knowledge across sessions with memory stores — structured, searchable collections of text entries.
+---
+
+**Memory stores** are persistent collections of text entries scoped to an agent. Unlike session state (which is per-session), memory persists across sessions and can be read or written programmatically via the API or from inside a running session using the built-in `memory` tool.
+
+Each entry has a **path** (a unique string identifier within the store, similar to a file path) and **content** (arbitrary text). Paths let agents organise memories into namespaces like `user/preferences`, `project/notes`, or `facts/geography`.
+
+## Create a memory store
+
+```http
+POST /v1/memory-stores
+```
+
+```json
+{
+  "name": "project-context",
+  "description": "Long-term context about the current project",
+  "agent_id": "agent_01abc"
+}
+```
+
+`agent_id` is required. A store belongs to one agent and inherits that agent's tenant. The `description` field is optional and is surfaced to the agent to help it decide which store to use when multiple stores are available.
+
+Response:
+
+```json
+{
+  "id": "ms_01...",
+  "name": "project-context",
+  "description": "Long-term context about the current project",
+  "agent_id": "agent_01abc",
+  "created_at": "2026-04-01T12:00:00.000Z",
+  "updated_at": "2026-04-01T12:00:00.000Z"
+}
+```
+
+## List memory stores
+
+```http
+GET /v1/memory-stores
+```
+
+Filter by agent:
+
+```
+GET /v1/memory-stores?agent_id=agent_01abc
+```
+
+Returns `{ "data": [...] }` ordered by creation time descending.
+
+## Get a memory store
+
+```http
+GET /v1/memory-stores/:id
+```
+
+## Delete a memory store
+
+```http
+DELETE /v1/memory-stores/:id
+```
+
+Deletes the store and all its memories. Returns `{ "id": "...", "type": "memory_store_deleted" }`.
+
+## Add memories
+
+```http
+POST /v1/memory-stores/:storeId/memories
+```
+
+```json
+{
+  "path": "user/timezone",
+  "content": "Europe/London"
+}
+```
+
+`path` is unique within the store. If an entry already exists at that path it is overwritten (upsert semantics). The response includes a `content_sha256` field — keep this when you plan to update the entry later.
+
+Response:
+
+```json
+{
+  "id": "mem_01...",
+  "store_id": "ms_01...",
+  "path": "user/timezone",
+  "content": "Europe/London",
+  "content_sha256": "a3f2...",
+  "created_at": "2026-04-01T12:00:00.000Z",
+  "updated_at": "2026-04-01T12:00:00.000Z"
+}
+```
+
+## List memories
+
+```http
+GET /v1/memory-stores/:storeId/memories
+```
+
+Returns all entries in the store ordered by `path` ascending:
+
+```json
+{
+  "data": [
+    { "id": "mem_01...", "path": "project/stack", "content": "TypeScript + Hono", ... },
+    { "id": "mem_02...", "path": "user/timezone", "content": "Europe/London", ... }
+  ]
+}
+```
+
+## Get a memory
+
+```http
+GET /v1/memory-stores/:storeId/memories/:memId
+```
+
+## Update a memory
+
+```http
+PATCH /v1/memory-stores/:storeId/memories/:memId
+```
+
+```json
+{
+  "content": "America/New_York",
+  "content_sha256": "a3f2..."
+}
+```
+
+The optional `content_sha256` field is a write precondition. If the stored entry's hash no longer matches this value when the update arrives, the server returns `409 Conflict` — the entry has been modified since you last read it. Re-read the entry and retry with the new hash.
+
+Omitting `content_sha256` applies an unconditional update.
+
+## Delete a memory
+
+```http
+DELETE /v1/memory-stores/:storeId/memories/:memId
+```
+
+Returns `{ "id": "...", "type": "memory_deleted" }`.
+
+## The `memory` built-in tool
+
+When a memory store is attached to an agent's configuration, the agent can call the `memory` tool directly during a session without any external integration. The gateway handles the tool server-side and returns results to the agent automatically.
+
+Supported commands:
+
+| Command | Description |
+|---------|-------------|
+| `view` | List all memories in a store |
+| `search` | Find memories by substring match on path or content |
+| `create` | Create or upsert a memory at a path |
+| `update` | Update an existing memory by ID |
+| `delete` | Delete a memory by ID |
+| `list_stores` | List all available stores |
+
+The `search` command matches against both `path` and `content` fields, making it useful for keyword or topic lookup without an embedding model.
+
+## Searching memories
+
+The search implementation uses SQL `LIKE` matching on both `path` and `content`:
+
+```
+GET /v1/memory-stores/:storeId/memories?search=timezone  (not a real endpoint)
+```
+
+Use the `memory` tool with `command: "search"` from inside a running session, or call `searchMemories` from your own server-side tooling via the SDK. Results are returned ordered by `path`.

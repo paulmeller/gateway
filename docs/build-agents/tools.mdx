@@ -1,0 +1,143 @@
+---
+title: Tools
+description: Configure built-in agent tools, enable or disable individual tools, and define custom tools with re-entry callbacks.
+---
+
+An agent's `tools` array controls what capabilities the underlying engine has access to. Two tool types are supported: the built-in `agent_toolset_20260401` group and user-defined `custom` tools.
+
+## Built-in toolset: `agent_toolset_20260401`
+
+The built-in toolset exposes the following tools to the `claude` engine:
+
+| Name | Description |
+|---|---|
+| `Bash` | Run shell commands inside the container. |
+| `Read` | Read file contents. |
+| `Write` | Write or overwrite files. |
+| `Edit` | Make targeted edits to existing files. |
+| `Glob` | Find files by path pattern. |
+| `Grep` | Search file contents with regex. |
+| `WebFetch` | Fetch a URL and return the body. |
+| `WebSearch` | Search the web and return results. |
+
+These map directly to the Claude Code CLI's native tool names and are passed to the engine as `--allowed-tools` / `--disallowed-tools` flags.
+
+### Default: all tools enabled
+
+Omitting `tools` (or not sending the field) creates the agent with the full toolset enabled:
+
+```json
+{
+  "tools": [{ "type": "agent_toolset_20260401" }]
+}
+```
+
+This is equivalent to setting `default_config: { enabled: true }` with no per-tool overrides.
+
+### Disable all built-in tools
+
+```json
+{
+  "tools": [
+    {
+      "type": "agent_toolset_20260401",
+      "default_config": { "enabled": false }
+    }
+  ]
+}
+```
+
+### Enable specific tools, disable others
+
+Use `configs` to override individual tools. The `default_config` sets the baseline; `configs` entries override it per tool.
+
+```json
+{
+  "tools": [
+    {
+      "type": "agent_toolset_20260401",
+      "default_config": { "enabled": false },
+      "configs": [
+        { "name": "Read",  "enabled": true },
+        { "name": "Grep",  "enabled": true },
+        { "name": "Glob",  "enabled": true }
+      ]
+    }
+  ]
+}
+```
+
+This gives the agent read-only filesystem access with no shell or web capability.
+
+### Resolution logic
+
+1. If no `agent_toolset_20260401` entry is present, all built-in tools are disabled.
+2. If an entry is present, `default_config.enabled` (default `true`) sets the starting set.
+3. Each entry in `configs` overrides the default for that specific tool name.
+4. Only names that appear in the built-in list are recognized; unknown names are silently ignored.
+
+## Custom tools
+
+Custom tools let you inject your own function definitions into the agent. When the agent calls a custom tool, execution pauses with `stop_reason: "custom_tool_call"` and control returns to your application.
+
+### Declare a custom tool
+
+```json
+{
+  "tools": [
+    {
+      "type": "agent_toolset_20260401"
+    },
+    {
+      "type": "custom",
+      "name": "lookup_customer",
+      "description": "Look up a customer record by email address.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Customer email address"
+          }
+        },
+        "required": ["email"]
+      }
+    }
+  ]
+}
+```
+
+`input_schema` follows JSON Schema. The gateway forwards it verbatim to the engine.
+
+### How custom tool calls work
+
+The gateway implements custom tools via a synthetic MCP stdio server (the "tool bridge") written into the container at session start. When the agent calls `lookup_customer`:
+
+1. The bridge writes the call to `/tmp/tool-bridge/request.json` and creates a `/tmp/tool-bridge/pending` sentinel.
+2. The session stops with `stop_reason: "custom_tool_call"`. Your application receives the tool name and input via the event stream.
+3. Your application calls the real implementation and sends the result back with `POST /v1/sessions/:id/turns`:
+
+```json
+{
+  "type": "user",
+  "content": [
+    {
+      "type": "tool_result",
+      "tool_use_id": "<id from the custom_tool_use event>",
+      "content": "{ \"name\": \"Alice\", \"plan\": \"pro\" }"
+    }
+  ]
+}
+```
+
+4. The driver writes `/tmp/tool-bridge/response.json`, removes the pending sentinel, and resumes the agent with `--resume`.
+
+The bridge uses `fs.watch` (inotify/kqueue) to detect the response file and falls back to `fs.watchFile` polling on systems where `watch` is unavailable.
+
+### Resume replay
+
+If the container is restarted mid-turn, the bridge checks for a pre-existing `response.json` before creating a new pending sentinel. This ensures that a `--resume` re-entry replays the result rather than creating a duplicate pending call.
+
+## Non-claude engines
+
+The `tools` field only applies to the `claude` engine. Passing `tools` to a non-claude agent returns a 400 — other engines (`opencode`, `codex`, `gemini`, etc.) manage their own tool permissions internally.

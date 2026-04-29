@@ -1,0 +1,113 @@
+---
+title: Define Your Agent
+description: Agent config fields, create/update/archive lifecycle, and integer versioning with optimistic concurrency.
+---
+
+An agent is the central configuration object: it defines which model and engine runs, what the system prompt says, which tools are available, and how webhooks and skills are attached. Every mutation to an agent creates a new immutable version row, so sessions always reference a reproducible snapshot.
+
+## Create an agent
+
+```http
+POST /v1/agents
+```
+
+```json
+{
+  "name": "code-reviewer",
+  "model": "claude-opus-4-5",
+  "engine": "claude",
+  "system": "You are a senior engineer. Review the diff and output structured feedback.",
+  "tools": [
+    {
+      "type": "agent_toolset_20260401",
+      "default_config": { "enabled": true },
+      "configs": [
+        { "name": "WebSearch", "enabled": false }
+      ]
+    }
+  ]
+}
+```
+
+The response body is an `Agent` object at `version: 1`.
+
+## Config fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `name` | string | — | Display name. Must be unique within your tenant. |
+| `model` | string | — | Model identifier. Must be supported by the chosen engine. |
+| `engine` | string | `"claude"` | Execution engine: `claude`, `opencode`, `codex`, `gemini`, `factory`, `pi`, or `anthropic`. |
+| `system` | string \| null | `null` | System prompt injected before every turn. |
+| `tools` | array | `[{type:"agent_toolset_20260401"}]` | Tool configuration. See [Tools](/build-agents/tools). |
+| `mcp_servers` | object | `{}` | MCP server declarations keyed by server name. See [MCP Connector](/build-agents/mcp-connector). |
+| `skills` | array | `[]` | Skill bundles installed into the container at session start. See [Skills](/build-agents/skills). |
+| `webhook_url` | string \| null | `null` | URL that receives session lifecycle events. |
+| `webhook_events` | string[] | `["session.status_idle","session.status_running","session.error"]` | Which events to deliver. |
+| `webhook_secret` | string | — | HMAC-SHA256 shared secret (min 32 chars). When set, deliveries include `X-AgentStep-Signature: sha256=<hex>`. The secret is never returned by the API — only `webhook_signing_enabled: true/false` is surfaced. |
+| `threads_enabled` | boolean | `false` | Adds a synthetic `spawn_agent` custom tool so the agent can delegate sub-tasks. |
+| `confirmation_mode` | boolean | `false` | Enables the permission bridge. Claude runs with `default` permission mode and pauses before destructive tool calls. |
+| `callable_agents` | array | `[]` | Agents this agent may spawn when `threads_enabled` is `true`. Each entry is `{type:"agent", id, version?}`. |
+| `model_config` | object | `{}` | Engine-level model hints. Currently supports `speed: "standard" \| "fast"` (maps to `--fast` on the Claude CLI). |
+
+### Engine constraints
+
+- `tools` may only be set on the `claude` engine. Other engines manage their own tool permissions internally — passing `tools` to a non-claude agent returns a 400.
+- `model` is validated against the engine's known model list at creation time. An unsupported model returns a 400 with the list of valid models.
+- `engine` cannot be changed after creation.
+
+## Update an agent
+
+```http
+PATCH /v1/agents/:id
+```
+
+Send only the fields you want to change. Every successful PATCH increments `version` and writes a new `agent_versions` row. The previous version remains readable via the `?version=N` query parameter on GET.
+
+```json
+{
+  "model": "claude-sonnet-4-5",
+  "system": "Updated system prompt."
+}
+```
+
+Passing `webhook_secret: null` clears the secret so subsequent deliveries are unsigned. Omitting the field leaves the existing secret untouched.
+
+## Agent versioning
+
+Every agent carries an integer `version` counter. The response from GET, POST, and PATCH always returns the current (highest) version. To retrieve a historical snapshot:
+
+```http
+GET /v1/agents/:id?version=2
+```
+
+Versions are written in a transaction that increments `current_version` on the parent `agents` row, so concurrent updates are serialized — the second writer will see the latest state and should retry if needed.
+
+Existing sessions pin the `agent_version` they were created with. A PATCH to the agent does not affect running or idle sessions.
+
+## List agents
+
+```http
+GET /v1/agents
+```
+
+Query parameters:
+
+| Parameter | Description |
+|---|---|
+| `limit` | Number of results (1–100, default 20). |
+| `order` | `asc` or `desc` (default `desc`). |
+| `page` | Cursor — the `id` of the last result from the previous page. |
+| `include_archived` | `true` to include archived agents. |
+
+Returns `{ data: Agent[], next_page: string | null }`.
+
+## Archive an agent
+
+```http
+DELETE /v1/agents/:id
+```
+
+Sets `archived_at` and returns `{ id, type: "agent_deleted" }`. Archived agents are excluded from list results unless `include_archived=true`. All historical version rows are preserved; sessions that reference the agent continue to function.
+
+Archiving is irreversible through the API — there is no unarchive endpoint.

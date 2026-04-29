@@ -1,0 +1,114 @@
+---
+title: Skills
+description: Package reusable instructions as skills and attach them to agents for automatic installation at session start.
+---
+
+Skills are named bundles of Markdown content that are written into the agent's container when a session starts. They provide agents with persistent, reusable instructions — think of them as named SKILL.md files pre-loaded alongside the agent's system prompt.
+
+## What skills are
+
+A skill has three fields:
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | string | Directory-safe identifier (alphanumeric, `_`, `-`, `.` only). Used as the subdirectory name on disk. |
+| `source` | string | Where the skill came from — a URL, a repository reference, or a freeform label. Not interpreted by the gateway. |
+| `content` | string | The skill content, typically Markdown. Max 256 KB per skill, 1 MB total across all skills on one agent. |
+| `installed_at` | string (ISO 8601) | Timestamp. Auto-populated if omitted. |
+
+## Attaching skills to an agent
+
+Skills are declared inline on the agent at create or update time. There is no standalone `POST /v1/skills` endpoint — skills are part of the agent version record.
+
+### At create time
+
+```json
+{
+  "name": "infra-agent",
+  "model": "claude-opus-4-5",
+  "skills": [
+    {
+      "name": "terraform-style",
+      "source": "https://github.com/example/skills/terraform-style",
+      "content": "# Terraform Style Guide\n\nAlways use `terraform fmt` before committing..."
+    },
+    {
+      "name": "security-checklist",
+      "source": "internal",
+      "content": "# Security Checklist\n\n- Never hardcode credentials\n- Use IAM roles..."
+    }
+  ]
+}
+```
+
+### Updating skills
+
+Send the full `skills` array in a PATCH request. The array replaces the existing skills on the new agent version:
+
+```http
+PATCH /v1/agents/:id
+```
+
+```json
+{
+  "skills": [
+    {
+      "name": "terraform-style",
+      "source": "https://github.com/example/skills/terraform-style",
+      "content": "# Updated Terraform Style Guide\n\n..."
+    }
+  ]
+}
+```
+
+An agent can have up to 20 skills. Total content across all skills must not exceed 1 MB.
+
+## How skills are installed
+
+Skills are written into the container at the start of the session's first turn (immediately after the engine is installed). The gateway sanitizes skill names — names that contain characters outside `[a-zA-Z0-9_.-]` are skipped with a warning.
+
+### Claude engine
+
+For the `claude` engine, each skill is written to two locations:
+
+- `/home/agent/.claude/skills/<name>/SKILL.md` — Claude Code's native skills directory.
+- `/home/agent/.agents/skills/<name>/SKILL.md` — Universal location for agent compatibility.
+
+Claude Code automatically discovers skills in `.claude/skills/` and includes their content as context.
+
+### Other engines
+
+For all other engines (`opencode`, `codex`, `gemini`, etc.), skills are written to the universal path only:
+
+- `/home/agent/.agents/skills/<name>/SKILL.md`
+
+Engines that natively support skill discovery can look here; others can be prompted to reference the path via the system prompt.
+
+## Browsing the skills catalog
+
+The gateway exposes a read-only skills catalog backed by the agentstep.com index (72k+ community skills):
+
+```http
+GET /v1/skills?q=terraform&sort=installs&limit=20
+```
+
+Query parameters:
+
+| Parameter | Description |
+|---|---|
+| `q` | Full-text search query. |
+| `owner` | Filter by GitHub owner. |
+| `source` | Filter by repository (e.g. `owner/repo`). |
+| `sort` | `installs`, `trending`, or `hot`. |
+| `limit` | Results per page (default 50). |
+| `offset` | Pagination offset. |
+
+You can also use the leaderboard feed endpoints:
+
+```http
+GET /v1/skills/catalog?leaderboard=trending&limit=50
+GET /v1/skills/stats
+GET /v1/skills/sources
+```
+
+These catalog endpoints are read-only and do not require admin permissions.

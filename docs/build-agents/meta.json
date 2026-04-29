@@ -1,0 +1,10 @@
+{
+  "title": "Build Agents",
+  "pages": [
+    "agent-setup",
+    "environments",
+    "tools",
+    "skills",
+    "mcp-connector"
+  ]
+}

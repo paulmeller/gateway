@@ -1,0 +1,142 @@
+---
+title: Cloud Environment Setup
+description: Create and manage environments — the container sandboxes where agent turns execute.
+---
+
+An environment pairs a sandbox provider with a networking policy and optional package lists. When a session's first turn fires, the gateway acquires a container from the environment's provider, installs the engine, and runs the agent inside it. The environment is reused across turns within the same session.
+
+## Create an environment
+
+```http
+POST /v1/environments
+```
+
+```json
+{
+  "name": "python-sandbox",
+  "config": {
+    "type": "cloud",
+    "provider": "docker",
+    "packages": {
+      "pip": ["pandas", "matplotlib"]
+    },
+    "networking": {
+      "type": "limited",
+      "allow_package_managers": true,
+      "allowed_hosts": ["api.example.com"]
+    }
+  },
+  "description": "Python data analysis sandbox"
+}
+```
+
+The gateway validates provider availability synchronously before saving the row, then kicks off background setup. The environment starts in `state: "preparing"`.
+
+## Config fields
+
+### `config` object
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `type` | `"cloud"` | yes | Always `"cloud"`. |
+| `provider` | string | yes | Sandbox provider key. See the table below. |
+| `packages` | object | no | Packages to pre-install by ecosystem. |
+| `networking` | object | no | Network access policy for containers. |
+
+### Providers
+
+| Provider | Key | Notes |
+|---|---|---|
+| Sprites | `sprites` | Default managed sandboxes via sprites.dev. |
+| Docker | `docker` | Local Docker daemon. Availability checked at create time. |
+| Apple Container | `apple-container` | macOS Virtualization framework. |
+| Apple Firecracker / MVM | `apple-firecracker`, `mvm` | microVM on Apple Silicon. |
+| Podman | `podman` | Drop-in Docker alternative. |
+| E2B | `e2b` | Cloud sandboxes via e2b.dev. |
+| Vercel | `vercel` | Vercel Functions sandboxes. |
+| Daytona | `daytona` | Daytona cloud workspaces. |
+| Fly.io | `fly` | Fly Machines. |
+| Modal | `modal` | Modal serverless containers. |
+| Anthropic | `anthropic` | Sync-and-proxy to Anthropic's hosted Managed Agents. |
+
+Local providers (`docker`, `podman`, `apple-container`, `apple-firecracker`, `mvm`) have availability checked at environment creation time. Cloud providers (`sprites`, `e2b`, `vercel`, `daytona`, `fly`, `modal`) rely on API credentials stored in vaults or environment variables and are not pre-flight validated.
+
+### Package installation
+
+Packages are installed during environment setup. Supported ecosystems:
+
+```json
+"packages": {
+  "apt": ["git", "jq"],
+  "pip": ["requests", "numpy"],
+  "npm": ["typescript"],
+  "cargo": ["ripgrep"],
+  "gem": ["nokogiri"],
+  "go": ["golang.org/x/tools/cmd/goimports@latest"]
+}
+```
+
+### Networking options
+
+**Unrestricted** — container has full outbound network access:
+
+```json
+"networking": { "type": "unrestricted" }
+```
+
+**Limited** — only explicitly allowed hosts are reachable:
+
+```json
+"networking": {
+  "type": "limited",
+  "allowed_hosts": ["api.stripe.com", "cdn.example.com"],
+  "allow_mcp_servers": true,
+  "allow_package_managers": false
+}
+```
+
+`allow_mcp_servers` adds the agent's declared MCP server hostnames to the allowlist automatically. `allow_package_managers` opens access to `pypi.org`, `npmjs.com`, and similar registries.
+
+## Environment lifecycle
+
+| State | Meaning |
+|---|---|
+| `preparing` | Container is being provisioned. Not usable yet. |
+| `ready` | Container is ready. Sessions can be started. |
+| `failed` | Setup failed. `state_message` contains the error detail. |
+
+A session creation attempt against a non-`ready` environment returns a 400.
+
+## Update an environment
+
+```http
+PATCH /v1/environments/:id
+```
+
+You can update `name`, `description`, `metadata`, and `config`. Config changes take effect on the next session that acquires a new container; existing running sessions are not affected.
+
+## List environments
+
+```http
+GET /v1/environments
+```
+
+Query parameters match agents: `limit`, `order`, `page`, `include_archived`.
+
+Returns `{ data: Environment[], next_page: string | null }`.
+
+## Archive an environment
+
+```http
+POST /v1/environments/:id/archive
+```
+
+Sets `archived_at`. Fails with 409 if any non-terminated sessions are attached. Archived environments are hidden from list results unless `include_archived=true`.
+
+## Delete an environment
+
+```http
+DELETE /v1/environments/:id
+```
+
+Permanently removes the environment row. Also fails with 409 if active sessions are attached. Unlike archiving, deletion is permanent — the record cannot be recovered.

@@ -1,0 +1,154 @@
+---
+title: Configuration
+description: Environment variables, the config cascade, settings persistence, and all available configuration keys.
+---
+
+AgentStep Gateway resolves configuration from three sources in priority order:
+
+1. **Process environment variables** (`process.env`) — highest priority.
+2. **Settings DB** — values written via `PUT /v1/settings` or `writeSetting()`.
+3. **Compiled defaults** — fallback values in source code.
+
+The resolved config object is cached for 30 seconds (`CACHE_MS = 30_000`). Calling `PUT /v1/settings` invalidates the cache immediately so the next request sees the updated value.
+
+## Environment variables
+
+### Agent execution
+
+| Variable | Default | Description |
+|---|---|---|
+| `AGENT_MAX_TURNS` | `0` (unlimited) | Maximum number of turns per session. `0` means no limit. |
+| `AGENT_TIMEOUT_MS` | `600000` (10 min) | Wall-clock timeout for a single agent turn, in milliseconds. |
+| `SPRITE_TIMEOUT_MS` | `30000` (30 s) | Timeout for container create/delete operations, in milliseconds. |
+
+### Concurrency
+
+| Variable | Default | Description |
+|---|---|---|
+| `CONCURRENCY` | `4` | Maximum number of turns that can run simultaneously across all sessions (global queue). |
+| `MAX_SANDBOXES_PER_ENV` | `8` | Maximum number of live containers per environment. New sessions wait when the limit is reached. |
+
+### Session lifecycle
+
+| Variable | Default | Description |
+|---|---|---|
+| `SESSION_MAX_AGE_MS` | `604800000` (7 days) | Sessions older than this value are eligible for sweeper cleanup. |
+| `SWEEPER_INTERVAL_MS` | `60000` (1 min) | How often the background sweeper runs to reap old sessions and containers. |
+
+### Storage
+
+| Variable | Default | Description |
+|---|---|---|
+| `DATABASE_PATH` | `./gateway.db` (set by CLI) | Path to the libsql/SQLite database file. Set by the CLI entrypoint; not read by `config/index.ts` directly. |
+
+### Model providers
+
+| Variable | Settings key | Description |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | `anthropic_api_key` | API key for Anthropic models (Claude). |
+| `CLAUDE_CODE_OAUTH_TOKEN` | `claude_token` | OAuth token for Claude Code backends. |
+| `OPENAI_API_KEY` | `openai_api_key` | API key for OpenAI models. |
+| `GEMINI_API_KEY` | `gemini_api_key` | API key for Google Gemini models. |
+| `FACTORY_API_KEY` | `factory_api_key` | API key for Factory backends. |
+| `DEFAULT_MODEL` | `default_model` | Model ID used when none is specified. Defaults to `claude-sonnet-4-6`. |
+| `OLLAMA_URL` | `ollama_url` | Base URL for Ollama API. Defaults to `http://localhost:11434`. |
+
+### Container providers
+
+| Variable | Settings key | Description |
+|---|---|---|
+| `SPRITE_TOKEN` | `sprite_token` | API token for sprites.dev (default provider). |
+| `SPRITE_API` | `sprite_api` | sprites.dev API base URL. Defaults to `https://api.sprites.dev`. |
+
+Cloud provider credentials (`E2B_API_KEY`, `VERCEL_TOKEN`, `FLY_API_TOKEN`, etc.) are not in the core config object. They are resolved per-turn via `readEnvOrSetting(envVarName)`, which looks up `process.env` first and then the settings DB using the snake-cased env var name as the key (e.g., `VERCEL_TEAM_ID` → settings key `vercel_team_id`).
+
+### Observability
+
+| Variable | Settings key | Description |
+|---|---|---|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` or `OTLP_ENDPOINT` | `otlp_endpoint` | OTLP/HTTP endpoint for trace export. |
+| `OTEL_EXPORTER_OTLP_HEADERS_AUTHORIZATION` or `OTLP_AUTHORIZATION` | `otlp_authorization` | Auth header value for OTLP export (e.g. `Bearer <token>`). |
+| `OBS_REDACT_KEYS` | `obs_redact_keys` | Comma-separated list of env-var names whose values are redacted from trace payloads. |
+
+### Passthrough
+
+| Variable | Settings key | Default | Description |
+|---|---|---|---|
+| `ANTHROPIC_PASSTHROUGH_ENABLED` | `anthropic_passthrough_enabled` | `false` | When `true`, requests with an `sk-ant-api*` key in `x-api-key` are forwarded to Anthropic using the caller's own key. No gateway DB state is read or written. See [Anthropic passthrough](/guides/anthropic-passthrough). |
+
+Accepted truthy values for boolean variables: `1`, `true`, `yes` (case-insensitive).
+
+## Settings API
+
+Settings are persisted to the `settings` table (libsql/SQLite). They survive server restarts and are read on every config load.
+
+### Write a setting
+
+```http
+PUT /v1/settings
+Content-Type: application/json
+X-API-Key: <your-gateway-key>
+
+{ "key": "anthropic_api_key", "value": "sk-ant-..." }
+```
+
+Returns `{ "ok": true }` on success. Unknown keys return `400`.
+
+### Read a setting
+
+```http
+GET /v1/settings/:key
+X-API-Key: <your-gateway-key>
+```
+
+Secret keys (credentials) are always returned masked — the raw value is never echoed back by the API:
+
+```json
+{ "key": "anthropic_api_key", "value": "sk-ant-••••••••••lAQR", "configured": true, "masked": true }
+```
+
+Non-secret keys (`vercel_team_id`, `vercel_project_id`, `fly_app_name`, `saved_repositories`, `skills_feed_url`, `skills_index_url`) are returned verbatim.
+
+### Writable keys
+
+The following keys are accepted by the settings API. All others return `400 Bad Request`.
+
+| Key | Secret | Description |
+|---|---|---|
+| `sprite_token` | yes | sprites.dev API token |
+| `anthropic_api_key` | yes | Anthropic API key |
+| `openai_api_key` | yes | OpenAI API key |
+| `gemini_api_key` | yes | Google Gemini API key |
+| `factory_api_key` | yes | Factory API key |
+| `claude_token` | yes | Claude Code OAuth token |
+| `e2b_api_key` | yes | E2B API key |
+| `vercel_token` | yes | Vercel API token |
+| `daytona_api_key` | yes | Daytona API key |
+| `fly_api_token` | yes | Fly.io API token |
+| `modal_token_id` | yes | Modal token ID |
+| `modal_token_secret` | yes | Modal token secret |
+| `vercel_team_id` | no | Vercel team ID |
+| `vercel_project_id` | no | Vercel project ID |
+| `fly_app_name` | no | Fly.io app name |
+| `skills_feed_url` | no | Custom skills catalog feed URL |
+| `skills_index_url` | no | Custom skills catalog index URL |
+| `saved_repositories` | no | UI-persisted repository list |
+
+## Programmatic access
+
+Within the codebase, use these functions from `packages/agent-sdk/src/config/index.ts`:
+
+```ts
+import { getConfig, writeSetting, readSetting, invalidateConfigCache } from "./config";
+
+// Read the current config (cached up to 30 s)
+const cfg = getConfig();
+
+// Write a setting and immediately invalidate the cache
+writeSetting("default_model", "claude-opus-4-5");
+
+// Read a single setting key (no cache)
+const token = readSetting("sprite_token");
+```
+
+`writeSetting()` calls `invalidateConfigCache()` automatically, so the next `getConfig()` call will pick up the new value.

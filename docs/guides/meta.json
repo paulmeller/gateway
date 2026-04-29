@@ -1,0 +1,9 @@
+{
+  "title": "Guides",
+  "pages": [
+    "anthropic-integration",
+    "ollama-integration",
+    "webhooks",
+    "files"
+  ]
+}

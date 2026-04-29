@@ -1,0 +1,11 @@
+{
+  "title": "AgentStep Gateway",
+  "pages": [
+    "getting-started",
+    "build-agents",
+    "run-sessions",
+    "infrastructure",
+    "guides",
+    "concepts"
+  ]
+}

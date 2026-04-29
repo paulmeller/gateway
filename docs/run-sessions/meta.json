@@ -1,0 +1,9 @@
+{
+  "title": "Run Sessions",
+  "pages": [
+    "sessions",
+    "events",
+    "vaults",
+    "memory"
+  ]
+}

@@ -1,0 +1,168 @@
+---
+title: Files API
+description: Upload files into sessions, mount them as resources, and retrieve agent-created outputs.
+---
+
+AgentStep Gateway implements the Anthropic Managed Agents Files API for
+uploading files into sessions and retrieving agent-created outputs.
+
+## Upload a file
+
+```bash
+curl -X POST http://localhost:4000/v1/files \
+  -H "x-api-key: $API_KEY" \
+  -F "file=@data.csv" \
+  -F "scope_id=sess_..." \
+  -F "scope_type=session"
+```
+
+Response:
+
+```json
+{
+  "id": "file_01ABC...",
+  "type": "file",
+  "filename": "data.csv",
+  "mime_type": "text/csv",
+  "size_bytes": 1024,
+  "downloadable": true,
+  "scope": { "type": "session", "id": "sess_01ABC..." },
+  "created_at": "2026-04-21T00:00:00.000Z"
+}
+```
+
+## Mount a file into a session
+
+### At session creation
+
+```bash
+curl -X POST http://localhost:4000/v1/sessions \
+  -H "x-api-key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent": "agent_01ABC...",
+    "environment_id": "env_01ABC...",
+    "resources": [{
+      "type": "file",
+      "file_id": "file_01ABC...",
+      "mount_path": "/mnt/session/uploads/data.csv"
+    }]
+  }'
+```
+
+### Mid-session
+
+```bash
+curl -X POST http://localhost:4000/v1/sessions/sess_01ABC.../resources \
+  -H "x-api-key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "file",
+    "file_id": "file_01ABC...",
+    "mount_path": "/mnt/session/uploads/extra.json"
+  }'
+```
+
+Resources use `sesrsc_*` IDs and can be retrieved or deleted individually:
+
+```bash
+# Get a single resource
+GET /v1/sessions/{id}/resources/{rid}
+
+# Delete a resource
+DELETE /v1/sessions/{id}/resources/{rid}
+```
+
+## Path conventions
+
+| Path | Purpose |
+|------|---------|
+| `/mnt/session/uploads/` | Mounted input files (read-only) |
+| `/mnt/session/outputs/` | Convention for agent deliverables |
+| `/mnt/session/resources/` | Non-file resources (URIs, text) |
+| `/home/agent/`, `/root/`, `/tmp/` | Writable scratch space |
+
+If no `mount_path` is specified, files default to
+`/mnt/session/uploads/<file_id>/<filename>`.
+
+Mounted files are **read-only** (`chmod a-w`). The agent should copy
+inputs elsewhere before editing.
+
+## Retrieve agent-created files
+
+Files the agent creates during a session are automatically synced to
+the gateway's file store after each turn. List them:
+
+```bash
+curl http://localhost:4000/v1/files?scope_id=sess_01ABC... \
+  -H "x-api-key: $API_KEY"
+```
+
+Response includes cursor pagination:
+
+```json
+{
+  "data": [
+    {
+      "id": "file_01XYZ...",
+      "type": "file",
+      "filename": "report.html",
+      "mime_type": "text/html",
+      "size_bytes": 4096,
+      "downloadable": true,
+      "scope": { "type": "session", "id": "sess_01ABC..." },
+      "created_at": "2026-04-21T00:01:00.000Z"
+    }
+  ],
+  "has_more": false,
+  "first_id": "file_01XYZ...",
+  "last_id": "file_01XYZ..."
+}
+```
+
+Download content:
+
+```bash
+curl http://localhost:4000/v1/files/file_01XYZ.../content \
+  -H "x-api-key: $API_KEY"
+```
+
+## Pagination
+
+File listing supports cursor-based pagination:
+
+```
+GET /v1/files?scope_id=sess_...&limit=10&after_id=file_01ABC...
+```
+
+Parameters:
+- `limit` — max results per page (default 100, max 500)
+- `after_id` — return files after this ID (forward pagination)
+- `before_id` — return files before this ID (backward pagination)
+
+## Limits
+
+- **100 resources** per session (enforced on `POST /resources`)
+- **50 MB** per file upload
+- **20 files** synced per turn from the container (configurable)
+
+## Container file sync
+
+When an agent creates or modifies files during a turn, the gateway
+automatically extracts them from the container after the turn completes.
+
+Supported tool names:
+- Claude: `Write`, `Edit`
+- Codex: `file_edit` (falls back to `find -mmin` discovery)
+- Gemini: `write_file`, `edit_file`
+- OpenCode: `apply_patch`
+- Pi: `write`, `edit`
+
+Files are deduplicated by content hash (SHA-256) across turns. Only the
+latest version of each file path is returned by `listFiles`.
+
+## Anthropic provider (proxy)
+
+When using the `anthropic` provider (sync-and-proxy), files are stored
+remotely on Anthropic's infrastructure. The gateway proxies download
+requests on demand. The `scope_id` filter works the same way.

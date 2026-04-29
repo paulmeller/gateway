@@ -1,0 +1,151 @@
+---
+title: Authenticate with Vaults
+description: Store secrets for your agents in encrypted vaults and inject them automatically into session containers.
+---
+
+A **vault** is a per-agent key-value store for secrets. Vault entries are encrypted at rest with AES-256-GCM and are never returned in plaintext over the API. When a session starts with `vault_ids` set, the gateway decrypts each entry and injects it as an environment variable into the container before the first turn runs.
+
+## How secrets are resolved
+
+The gateway resolves secrets in this order for each session turn:
+
+1. Vault entries from the `vault_ids` attached to the session
+2. Environment variables set in the gateway process
+3. Settings from the database (via `PUT /v1/settings`)
+
+The first match wins. This lets you override a gateway-wide default key for specific agents without changing the global configuration.
+
+## Create a vault
+
+```http
+POST /v1/vaults
+```
+
+```json
+{
+  "agent_id": "agent_01abc",
+  "name": "production-secrets"
+}
+```
+
+A vault belongs to exactly one agent. You cannot share a vault across agents. The `display_name` field is accepted as an alias for `name` for compatibility with the Anthropic API.
+
+The response:
+
+```json
+{
+  "id": "vault_01...",
+  "agent_id": "agent_01abc",
+  "name": "production-secrets",
+  "display_name": "production-secrets",
+  "created_at": "2026-04-01T12:00:00.000Z",
+  "updated_at": "2026-04-01T12:00:00.000Z"
+}
+```
+
+## Add entries
+
+```http
+PUT /v1/vaults/:id/entries/:key
+```
+
+```json
+{ "value": "sk-ant-api03-..." }
+```
+
+The key is the environment variable name that will be set in the container. Use the same names your agent or tool expects:
+
+```http
+PUT /v1/vaults/vault_01.../entries/ANTHROPIC_API_KEY
+{ "value": "sk-ant-api03-..." }
+
+PUT /v1/vaults/vault_01.../entries/DATABASE_URL
+{ "value": "postgres://user:pass@host/db" }
+```
+
+Calling `PUT` on an existing key overwrites it. The stored value is always encrypted before it reaches the database.
+
+## Encryption at rest
+
+Vault values are encrypted with **AES-256-GCM** using a 32-byte key loaded from the `VAULT_ENCRYPTION_KEY` environment variable. On first run, if no key is set, the gateway auto-generates one and writes it to `.env`.
+
+The ciphertext format stored in the database is:
+
+```
+enc:v1:<base64(iv[12] + tag[16] + ciphertext)>
+```
+
+The `enc:v1:` prefix allows the gateway to distinguish encrypted values from legacy plaintext entries and re-encrypt them on the next write.
+
+**Back up your `VAULT_ENCRYPTION_KEY`.** Losing it makes all vault entries permanently unrecoverable.
+
+For container deployments, set `VAULT_ENCRYPTION_KEY_FILE` to a path on a persistent volume. The gateway will read the key from that file (or write a new one if the file does not yet exist).
+
+## List entries
+
+```http
+GET /v1/vaults/:id/entries
+```
+
+Returns all entry keys with **masked** values — the API never returns plaintext secrets. The mask format is `<first4>****<last2>` for values longer than 6 characters:
+
+```json
+{
+  "data": [
+    { "key": "ANTHROPIC_API_KEY", "value": "sk-a****03" },
+    { "key": "DATABASE_URL", "value": "post****db" }
+  ]
+}
+```
+
+## Get a single entry
+
+```http
+GET /v1/vaults/:id/entries/:key
+```
+
+Also returns the masked value.
+
+## Delete an entry
+
+```http
+DELETE /v1/vaults/:id/entries/:key
+```
+
+Returns `{ "key": "...", "type": "entry_deleted" }`.
+
+## List vaults
+
+```http
+GET /v1/vaults
+```
+
+Filter by agent:
+
+```
+GET /v1/vaults?agent_id=agent_01abc
+```
+
+## Delete a vault
+
+```http
+DELETE /v1/vaults/:id
+```
+
+Deletes the vault and all its entries. Returns `{ "id": "...", "type": "vault_deleted" }`.
+
+## Attach vaults to a session
+
+Pass `vault_ids` when creating a session:
+
+```json
+{
+  "agent": "agent_01abc",
+  "environment_id": "env_01xyz",
+  "vault_ids": ["vault_01...", "vault_02..."]
+}
+```
+
+All vault IDs must belong to the same agent as the session. The gateway validates ownership at session creation time — attaching a vault from a different agent returns a `400` error.
+
+At turn start, the driver decrypts every entry from every attached vault and sets them as environment variables inside the container. Later turns in the same session re-inject the same variables from the same vaults, so you can rotate a secret by updating the vault entry and the next turn will use the new value.
