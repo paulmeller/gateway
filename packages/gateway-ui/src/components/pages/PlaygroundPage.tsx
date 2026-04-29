@@ -15,7 +15,7 @@ import { useAgents } from "@/hooks/use-agents";
 import { useEnvironments } from "@/hooks/use-environments";
 import { useVaults } from "@/hooks/use-vaults";
 import { useCreateSession, useSession } from "@/hooks/use-sessions";
-import { useAppStore } from "@/stores/app-store";
+import { useAppStore, withBase } from "@/stores/app-store";
 import { ChatThread } from "@/components/chat/ChatThread";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { EventStream } from "@/components/events/EventStream";
@@ -386,7 +386,7 @@ export function PlaygroundPage({ sessionId: initialSessionId }: { sessionId?: st
   useEffect(() => {
     if (playgroundSessionId) {
       useAppStore.setState({ activeSessionId: playgroundSessionId });
-      window.history.replaceState(null, "", `/playground/${playgroundSessionId}`);
+      window.history.replaceState(null, "", withBase(`/playground/${playgroundSessionId}`));
     }
   }, [playgroundSessionId]);
 

@@ -432,7 +432,10 @@ const routeTree = rootRoute.addChildren([
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 
-export const router = createRouter({ routeTree });
+export const router = createRouter({
+  routeTree,
+  basepath: (window as unknown as { __BASE_PATH__?: string }).__BASE_PATH__ || "/",
+});
 
 declare module "@tanstack/react-router" {
   interface Register {

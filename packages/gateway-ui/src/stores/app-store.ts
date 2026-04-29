@@ -1,5 +1,18 @@
 import { create } from "zustand";
 
+/** Base path for the SPA, set by the host page via window.__BASE_PATH__. */
+const BASE = ((window as unknown as { __BASE_PATH__?: string }).__BASE_PATH__ || "").replace(/\/$/, "");
+
+/** Prepend the basepath to an app-relative path. */
+export function withBase(path: string): string {
+  return BASE ? `${BASE}${path}` : path;
+}
+
+/** Strip the basepath prefix from a pathname for route matching. */
+function stripBase(pathname: string): string {
+  return BASE && pathname.startsWith(BASE) ? pathname.slice(BASE.length) || "/" : pathname;
+}
+
 interface Route {
   sessionId: string | null;
   settingsOpen: boolean;
@@ -8,7 +21,7 @@ interface Route {
 }
 
 function getInitialRoute(): Route {
-  const path = window.location.pathname;
+  const path = stripBase(window.location.pathname);
   if (path === "/analytics") {
     return {
       sessionId: null,
@@ -93,9 +106,9 @@ export const useAppStore = create<AppState>((set) => ({
   activeSessionId: initial.sessionId,
   setActiveSessionId: (id) => {
     if (id) {
-      window.history.pushState(null, "", `/sessions/${id}`);
+      window.history.pushState(null, "", withBase(`/sessions/${id}`));
     } else {
-      window.history.pushState(null, "", "/");
+      window.history.pushState(null, "", withBase("/"));
     }
     set({ activeSessionId: id, settingsOpen: false });
   },
@@ -109,10 +122,10 @@ export const useAppStore = create<AppState>((set) => ({
   settingsOpen: initial.settingsOpen,
   setSettingsOpen: (open) => {
     if (open) {
-      window.history.pushState(null, "", "/settings");
+      window.history.pushState(null, "", withBase("/settings"));
     } else {
       const sid = useAppStore.getState().activeSessionId;
-      window.history.pushState(null, "", sid ? `/sessions/${sid}` : "/");
+      window.history.pushState(null, "", withBase(sid ? `/sessions/${sid}` : "/"));
     }
     set({ settingsOpen: open, dashboardOpen: open ? false : useAppStore.getState().dashboardOpen });
   },
@@ -123,10 +136,10 @@ export const useAppStore = create<AppState>((set) => ({
   dashboardOpen: initial.dashboardOpen,
   setDashboardOpen: (open) => {
     if (open) {
-      window.history.pushState(null, "", "/analytics");
+      window.history.pushState(null, "", withBase("/analytics"));
     } else {
       const sid = useAppStore.getState().activeSessionId;
-      window.history.pushState(null, "", sid ? `/sessions/${sid}` : "/");
+      window.history.pushState(null, "", withBase(sid ? `/sessions/${sid}` : "/"));
     }
     // Opening the dashboard closes settings (and vice-versa) so they
     // don't collide — SettingsPage and DashboardPage both render in
