@@ -1,7 +1,7 @@
 {
   "license": "Apache-2.0",
   "name": "@agentstep/agent-sdk",
-  "version": "0.4.27",
+  "version": "0.4.28",
   "description": "Core engine for AgentStep Gateway \u2014 backends, sandbox providers, session orchestration, and vault encryption.",
   "keywords": [
     "anthropic",

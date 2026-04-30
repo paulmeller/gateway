@@ -116,12 +116,12 @@ async function installToolBridge(
   await provider.exec(sandboxName, ["mkdir", "-p", TOOL_BRIDGE_DIR]);
   await provider.exec(
     sandboxName,
-    ["bash", "-c", `cat > ${TOOL_BRIDGE_SCRIPT_PATH}`],
+    ["sh", "-c", `cat > "${TOOL_BRIDGE_SCRIPT_PATH}"`],
     { stdin: generateBridgeScript() },
   );
   await provider.exec(
     sandboxName,
-    ["bash", "-c", `cat > ${TOOL_BRIDGE_TOOLS_PATH}`],
+    ["sh", "-c", `cat > "${TOOL_BRIDGE_TOOLS_PATH}"`],
     { stdin: toolsToJson(customTools) },
   );
   await provider.exec(sandboxName, ["chmod", "+x", TOOL_BRIDGE_SCRIPT_PATH]);

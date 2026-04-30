@@ -610,16 +610,26 @@ export function handlePostEvents(request: Request, sessionId: string): Promise<R
           });
           rows.push(row);
 
-          const inp: TurnInput = {
-            kind: "tool_result",
-            eventId: row.id,
-            custom_tool_use_id: event.custom_tool_use_id,
-            content: event.content as unknown[],
-          };
+          // If the session is running, the tool bridge MCP server inside
+          // the container is blocking on response.json. Write it now so
+          // Claude can continue within the same turn.
           const currentStatus = getSessionRow(sessionId)?.status ?? "idle";
-          if (currentStatus === "running" || sawInterrupt) {
-            pushPendingUserInput({ sessionId, input: inp });
+          if (currentStatus === "running") {
+            const { writeToolBridgeResponse } = await import("../sessions/driver");
+            void writeToolBridgeResponse(
+              sessionId,
+              event.content as unknown[],
+            ).catch((err: unknown) => {
+              console.warn(`[events] writeToolBridgeResponse failed:`, err);
+            });
           } else {
+            // Session is idle — queue as a re-entry turn input
+            const inp: TurnInput = {
+              kind: "tool_result",
+              eventId: row.id,
+              custom_tool_use_id: event.custom_tool_use_id,
+              content: event.content as unknown[],
+            };
             pendingForTurn.push(inp);
           }
           continue;

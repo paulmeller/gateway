@@ -55,6 +55,11 @@ import {
   PERMISSION_BRIDGE_REQUEST_PATH,
   PERMISSION_BRIDGE_RESPONSE_PATH,
 } from "../backends/claude/permission-hook";
+import {
+  TOOL_BRIDGE_PENDING_PATH,
+  TOOL_BRIDGE_REQUEST_PATH,
+  TOOL_BRIDGE_RESPONSE_PATH,
+} from "../backends/claude/tool-bridge";
 
 /**
  * Format stop_reason as an object for API responses.
@@ -520,6 +525,22 @@ export async function runTurn(
     }, 2000);
   }
 
+  // Custom tool bridge: poll for /tmp/tool-bridge/pending during the stream
+  // loop. When found, read request.json, emit agent.custom_tool_use, and wait
+  // for the client to respond with user.custom_tool_result (which calls
+  // writeToolBridgeResponse to unblock the bridge inside the container).
+  const customToolNames = resolveToolset(agent.tools).customToolNames;
+  let toolBridgePollTimer: ReturnType<typeof setInterval> | null = null;
+  if (agent.engine === "claude" && customToolNames.size > 0) {
+    toolBridgePollTimer = setInterval(() => {
+      void checkToolBridgeSentinel(sessionId, sandboxName, provider, secrets, trace).catch(
+        (err: unknown) => {
+          console.warn(`[driver] tool bridge sentinel check failed:`, err);
+        },
+      );
+    }, 1000);
+  }
+
   try {
     const reader = exec.stdout.getReader();
     const decoder = new TextDecoder();
@@ -635,6 +656,8 @@ export async function runTurn(
     }
   } finally {
     if (permissionPollTimer) clearInterval(permissionPollTimer);
+    if (toolBridgePollTimer) clearInterval(toolBridgePollTimer);
+    getPendingToolBridgeCalls().delete(sessionId);
     runtime.inFlightRuns.delete(sessionId);
   }
 
@@ -1045,5 +1068,121 @@ export async function writePermissionResponse(
 
   // Clear the pending flag so the poller can pick up future requests
   getPendingConfirmations().delete(sessionId);
+}
+
+// ---------------------------------------------------------------------------
+// Custom tool bridge sentinel poller
+// ---------------------------------------------------------------------------
+
+/** Sessions with an in-flight tool bridge call (prevents duplicate events). */
+const pendingToolBridgeCalls = new Set<string>();
+export function getPendingToolBridgeCalls(): Set<string> {
+  return pendingToolBridgeCalls;
+}
+
+/**
+ * Check for /tmp/tool-bridge/pending inside the container. If found, read
+ * request.json, emit agent.custom_tool_use, and wait for the client to
+ * send user.custom_tool_result (which triggers writeToolBridgeResponse).
+ *
+ * Mirrors the checkPermissionSentinel pattern — runs on a 1s interval
+ * during the stream loop so the MCP bridge inside the container isn't
+ * blocked waiting for response.json that nobody writes.
+ */
+async function checkToolBridgeSentinel(
+  sessionId: string,
+  sandboxName: string,
+  provider: ContainerProvider,
+  secrets: Record<string, string> | undefined,
+  trace: TraceContext,
+): Promise<void> {
+  if (pendingToolBridgeCalls.has(sessionId)) return;
+
+  try {
+    const result = await provider.exec(
+      sandboxName,
+      ["test", "-f", TOOL_BRIDGE_PENDING_PATH],
+      { secrets },
+    );
+    if (result.exit_code !== 0) return; // No pending sentinel
+  } catch {
+    return;
+  }
+
+  // Sentinel exists — read the request
+  let request: { tool_use_id?: string; name?: string; input?: unknown };
+  try {
+    const result = await provider.exec(
+      sandboxName,
+      ["cat", TOOL_BRIDGE_REQUEST_PATH],
+      { secrets },
+    );
+    request = JSON.parse(result.stdout) as typeof request;
+  } catch (err) {
+    console.warn(`[driver] failed to read tool bridge request for ${sessionId}:`, err);
+    return;
+  }
+
+  // Mark as pending to avoid duplicate events
+  pendingToolBridgeCalls.add(sessionId);
+
+  console.log(`[driver] ${sessionId} custom tool call: ${request.name} (${request.tool_use_id})`);
+
+  // Emit agent.custom_tool_use so the client sees it on the SSE stream
+  appendEvent(sessionId, {
+    type: "agent.custom_tool_use",
+    payload: {
+      tool_use_id: request.tool_use_id ?? "",
+      name: request.name ?? "unknown",
+      input: request.input ?? {},
+    },
+    origin: "server",
+    processedAt: nowMs(),
+    traceId: trace.trace_id,
+    spanId: trace.span_id,
+    parentSpanId: trace.parent_span_id,
+  });
+}
+
+/**
+ * Write response.json into the container to unblock the tool bridge MCP
+ * server. Called from the events route when a `user.custom_tool_result`
+ * event is received while the session is running (tool bridge is blocking).
+ */
+export async function writeToolBridgeResponse(
+  sessionId: string,
+  content: unknown[],
+): Promise<void> {
+  const row = getSessionRow(sessionId);
+  if (!row?.sandbox_name) {
+    console.warn(`[driver] no sandbox for session ${sessionId}, cannot write tool bridge response`);
+    return;
+  }
+
+  const env = getEnvironment(row.environment_id);
+  const provider = await resolveContainerProvider(env?.config?.provider);
+  const bridgeSecrets = pool.getBySession(sessionId)?.vaultSecrets;
+
+  // The bridge expects {content: [...]} with text blocks
+  const response = JSON.stringify({ content });
+
+  try {
+    await provider.exec(
+      row.sandbox_name,
+      ["sh", "-c", `cat > ${TOOL_BRIDGE_RESPONSE_PATH}`],
+      { stdin: response, secrets: bridgeSecrets },
+    );
+    // Remove the pending sentinel so the bridge doesn't re-trigger
+    await provider.exec(
+      row.sandbox_name,
+      ["rm", "-f", TOOL_BRIDGE_PENDING_PATH],
+      { secrets: bridgeSecrets },
+    );
+    console.log(`[driver] ${sessionId} tool bridge response written`);
+  } catch (err) {
+    console.warn(`[driver] failed to write tool bridge response for ${sessionId}:`, err);
+  }
+
+  pendingToolBridgeCalls.delete(sessionId);
 }
 
