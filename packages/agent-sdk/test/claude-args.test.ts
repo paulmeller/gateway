@@ -19,23 +19,29 @@ function freshDbEnv(): void {
   delete g.__caConfigCache;
 }
 
-function makeAgent(overrides: Record<string, unknown> = {}): import("../src/types").Agent {
+function makeAgent(overrides: Partial<import("../src/types").Agent> = {}): import("../src/types").Agent {
   return {
     id: "agent_test",
-    type: "agent",
     version: 1,
     name: "test",
     model: "claude-sonnet-4-6",
-    engine: "claude",
+    engine: "claude" as const,
     system: null,
     tools: [],
     mcp_servers: {},
     skills: [],
-    metadata: {},
+    webhook_url: null,
+    webhook_events: [],
+    webhook_signing_enabled: false,
+    threads_enabled: false,
+    confirmation_mode: false,
+    callable_agents: [],
+    model_config: {},
+    fallback_json: null,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
     ...overrides,
-  } as import("../src/types").Agent;
+  };
 }
 
 describe("buildClaudeArgs", () => {
