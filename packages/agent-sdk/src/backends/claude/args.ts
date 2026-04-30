@@ -13,6 +13,7 @@
  * recently observed id from the previous turn's `system.init`.
  */
 import { getConfig } from "../../config";
+import { withGatewayPreamble } from "../shared/wrap-prompt";
 import type { Agent, McpServerConfig } from "../../types";
 import { resolveToolset } from "../../sessions/tools";
 
@@ -45,9 +46,7 @@ export function buildClaudeArgs(input: BuildArgsInput): string[] {
     argv.push("--resume", input.claudeSessionId);
   }
 
-  if (input.agent.system) {
-    argv.push("--system-prompt", input.agent.system);
-  }
+  argv.push("--system-prompt", withGatewayPreamble(input.agent.system));
 
   if (input.agent.model) {
     argv.push("--model", input.agent.model);
