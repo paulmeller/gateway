@@ -46,15 +46,30 @@ export function buildClaudeArgs(input: BuildArgsInput): string[] {
     argv.push("--resume", input.claudeSessionId);
   }
 
-  argv.push("--system-prompt", withGatewayPreamble(input.agent.system));
+  const tools = resolveToolset(input.agent.tools);
+
+  // Build system prompt with gateway preamble + custom tool hints
+  let systemPrompt = withGatewayPreamble(input.agent.system);
+  if (tools.customToolNames.size > 0) {
+    const toolList = Array.from(tools.customToolNames)
+      .map((name) => `mcp__tool-bridge__${name}`)
+      .join(", ");
+    systemPrompt += `\n\nYour custom tools are: ${toolList}. Call them by these exact names — do not use ToolSearch to find them.`;
+  }
+  argv.push("--system-prompt", systemPrompt);
 
   if (input.agent.model) {
     argv.push("--model", input.agent.model);
   }
 
-  const tools = resolveToolset(input.agent.tools);
-  if (tools.allowedTools.length) {
-    argv.push("--allowed-tools", tools.allowedTools.join(","));
+  // Add MCP-namespaced custom tool names so Claude Code's ToolSearch
+  // can discover them. MCP tools are registered as mcp__<server>__<name>.
+  const mcpToolNames = Array.from(tools.customToolNames).map(
+    (name) => `mcp__tool-bridge__${name}`,
+  );
+  const allAllowed = [...tools.allowedTools, ...mcpToolNames];
+  if (allAllowed.length) {
+    argv.push("--allowed-tools", allAllowed.join(","));
   }
   if (tools.disallowedTools.length) {
     argv.push("--disallowed-tools", tools.disallowedTools.join(","));
