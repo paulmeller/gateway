@@ -41,13 +41,12 @@ function buildTurn(input: BuildTurnInput): BuildTurnResult {
   });
   const env = buildClaudeAuthEnv();
 
-  // If the agent has custom tools or threads_enabled (which adds spawn_agent
-  // as a bridge tool), inject the tool bridge MCP server into --mcp-config.
-  // The bridge script + tools.json are installed on the sandbox by prepareOnSandbox.
-  // This overrides any existing --mcp-config in argsBase — we find it and merge.
+  // With --bare, MCP servers must be passed explicitly via --mcp-config.
+  // Merge the tool bridge server (if agent has custom tools) with any
+  // agent-level mcp_servers into a single --mcp-config JSON blob.
   const customTools = agent.tools.filter((t): t is CustomTool => t.type === "custom");
   const hasBridgeTools = customTools.length > 0 || agent.threads_enabled;
-  if (hasBridgeTools) {
+  if (hasBridgeTools || (agent.mcp_servers && Object.keys(agent.mcp_servers).length > 0)) {
     const mcpIdx = argsBase.indexOf("--mcp-config");
     let existingServers: Record<string, unknown> = {};
     if (mcpIdx >= 0 && mcpIdx + 1 < argsBase.length) {
@@ -55,10 +54,9 @@ function buildTurn(input: BuildTurnInput): BuildTurnResult {
         const existing = JSON.parse(argsBase[mcpIdx + 1]) as { mcpServers?: Record<string, unknown> };
         existingServers = existing.mcpServers ?? {};
       } catch {}
-      // Remove the old --mcp-config pair
       argsBase.splice(mcpIdx, 2);
     }
-    const merged = buildBridgeMcpConfig(existingServers);
+    const merged = hasBridgeTools ? buildBridgeMcpConfig(existingServers) : existingServers;
     argsBase.push("--mcp-config", JSON.stringify({ mcpServers: merged }));
   }
 

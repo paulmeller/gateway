@@ -335,6 +335,12 @@ export async function runTurn(
     turnBuild.env.RESOURCES_DIR = "/tmp/resources";
   }
 
+  // Give MCP servers more time to connect on Firecracker VMs where
+  // Node.js cold-start takes ~1.2s. Default is 5s which is too tight.
+  if (agent.engine === "claude" && !turnBuild.env.MCP_TIMEOUT) {
+    turnBuild.env.MCP_TIMEOUT = "30000";
+  }
+
   // Inject vault entries as env vars (override server defaults).
   // Skip MCP_AUTH_* and MCP_HEADER_* keys — they were already consumed
   // as MCP server headers and should not leak into the container env.
@@ -1117,7 +1123,9 @@ async function checkToolBridgeSentinel(
       ["cat", TOOL_BRIDGE_REQUEST_PATH],
       { secrets },
     );
-    request = JSON.parse(result.stdout) as typeof request;
+    // Strip sprites HTTP exec control chars (stdout/stderr multiplexing)
+    const clean = result.stdout.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+    request = JSON.parse(clean) as typeof request;
   } catch (err) {
     console.warn(`[driver] failed to read tool bridge request for ${sessionId}:`, err);
     return;

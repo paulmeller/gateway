@@ -20,163 +20,112 @@
 import type { CustomTool } from "../../types";
 
 export const TOOL_BRIDGE_DIR = "/tmp/tool-bridge";
-export const TOOL_BRIDGE_SCRIPT_PATH = `${TOOL_BRIDGE_DIR}/bridge.mjs`;
+export const TOOL_BRIDGE_SCRIPT_PATH = `${TOOL_BRIDGE_DIR}/bridge.sh`;
 export const TOOL_BRIDGE_TOOLS_PATH = `${TOOL_BRIDGE_DIR}/tools.json`;
 export const TOOL_BRIDGE_REQUEST_PATH = `${TOOL_BRIDGE_DIR}/request.json`;
 export const TOOL_BRIDGE_RESPONSE_PATH = `${TOOL_BRIDGE_DIR}/response.json`;
+export const TOOL_BRIDGE_MCP_CONFIG_PATH = `${TOOL_BRIDGE_DIR}/mcp.json`;
 export const TOOL_BRIDGE_PENDING_PATH = `${TOOL_BRIDGE_DIR}/pending`;
 
 /**
  * Generate the MCP stdio server script as a string.
  * This script is written to the container and run by claude's --mcp-config.
  */
+/**
+ * Generate a pure-bash MCP stdio server. No Node.js — instant startup
+ * (~10ms vs ~1.2s for Node on Firecracker VMs).
+ *
+ * Handles both raw JSON lines (Claude Code v2.1.83+) and Content-Length
+ * framed JSON-RPC. Responds with raw JSON lines (no Content-Length
+ * framing) — required by newer Claude Code versions.
+ */
 export function generateBridgeScript(): string {
-  return `#!/usr/bin/env node
-// Auto-generated MCP stdio server for custom tool bridge.
-// Reads tool definitions from ${TOOL_BRIDGE_TOOLS_PATH}
-import { readFileSync, writeFileSync, unlinkSync, existsSync, watch, watchFile, unwatchFile } from 'node:fs';
-import { createInterface } from 'node:readline';
+  return `#!/bin/bash
+# Auto-generated MCP stdio server for custom tool bridge.
+# Pure bash — no Node.js dependency. Instant startup on Firecracker VMs.
 
-const TOOLS_PATH = ${JSON.stringify(TOOL_BRIDGE_TOOLS_PATH)};
-const REQUEST_PATH = ${JSON.stringify(TOOL_BRIDGE_REQUEST_PATH)};
-const RESPONSE_PATH = ${JSON.stringify(TOOL_BRIDGE_RESPONSE_PATH)};
-const PENDING_PATH = ${JSON.stringify(TOOL_BRIDGE_PENDING_PATH)};
+TOOLS_PATH="${TOOL_BRIDGE_TOOLS_PATH}"
+REQUEST_PATH="${TOOL_BRIDGE_REQUEST_PATH}"
+RESPONSE_PATH="${TOOL_BRIDGE_RESPONSE_PATH}"
+PENDING_PATH="${TOOL_BRIDGE_PENDING_PATH}"
 
-let tools = [];
-try { tools = JSON.parse(readFileSync(TOOLS_PATH, 'utf8')); } catch {}
-
-function sendResponse(id, result) {
-  const msg = JSON.stringify({ jsonrpc: '2.0', id, result });
-  const buf = Buffer.from(msg, 'utf8');
-  process.stdout.write('Content-Length: ' + buf.length + '\\r\\n\\r\\n');
-  process.stdout.write(buf);
+send_response() {
+  printf '%s\\n' "$1"
 }
 
-function sendError(id, code, message) {
-  const msg = JSON.stringify({ jsonrpc: '2.0', id, error: { code, message } });
-  const buf = Buffer.from(msg, 'utf8');
-  process.stdout.write('Content-Length: ' + buf.length + '\\r\\n\\r\\n');
-  process.stdout.write(buf);
+TOOLS_LIST_JSON=""
+if [ -f "$TOOLS_PATH" ]; then
+  TOOLS_LIST_JSON=$(sed 's/input_schema/inputSchema/g' "$TOOLS_PATH")
+fi
+
+handle_request() {
+  local body="$1"
+  local method id
+  method=$(echo "$body" | grep -o '"method":"[^"]*"' | head -1 | cut -d'"' -f4)
+  id=$(echo "$body" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
+
+  case "$method" in
+    initialize)
+      send_response '{"jsonrpc":"2.0","id":'"$id"',"result":{"protocolVersion":"2025-11-25","capabilities":{"tools":{"listChanged":false}},"serverInfo":{"name":"tool-bridge","version":"1.0.0"}}}'
+      ;;
+    notifications/initialized) ;;
+    tools/list)
+      send_response '{"jsonrpc":"2.0","id":'"$id"',"result":{"tools":'"$TOOLS_LIST_JSON"'}}'
+      ;;
+    tools/call)
+      local tool_name tool_args
+      tool_name=$(echo "$body" | grep -o '"name":"[^"]*"' | tail -1 | cut -d'"' -f4)
+      tool_args=$(echo "$body" | grep -o '"arguments":{[^}]*}' | head -1 | sed 's/^"arguments"://')
+      [ -z "$tool_args" ] && tool_args="{}"
+
+      # Replay case: response.json already exists (--resume re-entry)
+      if [ -f "$RESPONSE_PATH" ]; then
+        local rdata
+        rdata=$(cat "$RESPONSE_PATH" | tr -d '\\n' | sed 's/\\\\/\\\\\\\\/g; s/"/\\\\"/g')
+        rm -f "$RESPONSE_PATH"
+        send_response '{"jsonrpc":"2.0","id":'"$id"',"result":{"content":[{"type":"text","text":"'"$rdata"'"}],"isError":false}}'
+        return
+      fi
+
+      # Write request and create pending sentinel
+      printf '{"tool_use_id":%s,"name":"%s","input":%s}' "$id" "$tool_name" "$tool_args" > "$REQUEST_PATH"
+      touch "$PENDING_PATH"
+
+      # Poll for response.json (200ms interval, 5min timeout)
+      local elapsed=0
+      while [ $elapsed -lt 1500 ]; do
+        if [ -f "$RESPONSE_PATH" ]; then
+          local rdata
+          rdata=$(cat "$RESPONSE_PATH" | tr -d '\\n' | sed 's/\\\\/\\\\\\\\/g; s/"/\\\\"/g')
+          rm -f "$RESPONSE_PATH" "$PENDING_PATH"
+          send_response '{"jsonrpc":"2.0","id":'"$id"',"result":{"content":[{"type":"text","text":"'"$rdata"'"}],"isError":false}}'
+          return
+        fi
+        sleep 0.2
+        elapsed=$((elapsed + 1))
+      done
+      # Timeout
+      rm -f "$PENDING_PATH"
+      send_response '{"jsonrpc":"2.0","id":'"$id"',"error":{"code":-32603,"message":"Timeout waiting for tool response"}}'
+      ;;
+    *)
+      [ -n "$id" ] && send_response '{"jsonrpc":"2.0","id":'"$id"',"error":{"code":-32601,"message":"Method not found"}}'
+      ;;
+  esac
 }
 
-function handleRequest(req) {
-  if (req.method === 'initialize') {
-    sendResponse(req.id, {
-      protocolVersion: '2024-11-05',
-      capabilities: { tools: { listChanged: false } },
-      serverInfo: { name: 'tool-bridge', version: '1.0.0' },
-    });
-    return;
-  }
-  if (req.method === 'notifications/initialized') return;
-  if (req.method === 'tools/list') {
-    sendResponse(req.id, {
-      tools: tools.map(t => ({
-        name: t.name,
-        description: t.description || '',
-        inputSchema: t.input_schema || { type: 'object', properties: {} },
-      })),
-    });
-    return;
-  }
-  if (req.method === 'tools/call') {
-    const toolName = req.params?.name;
-    const toolInput = req.params?.arguments || {};
-
-    // Replay case: if response.json already exists (from a --resume re-entry),
-    // return it immediately without creating a pending sentinel.
-    if (existsSync(RESPONSE_PATH)) {
-      try {
-        const resp = JSON.parse(readFileSync(RESPONSE_PATH, 'utf8'));
-        sendResponse(req.id, {
-          content: [{ type: 'text', text: JSON.stringify(resp.content ?? resp) }],
-          isError: false,
-        });
-        try { unlinkSync(RESPONSE_PATH); } catch {}
-        return;
-      } catch (e) {
-        console.error('[tool-bridge] replay failed:', e);
-        process.exit(1);
-      }
-    }
-
-    // Write the request and create pending sentinel
-    writeFileSync(REQUEST_PATH, JSON.stringify({
-      tool_use_id: req.id,
-      name: toolName,
-      input: toolInput,
-    }));
-    writeFileSync(PENDING_PATH, '');
-
-    // Watch for response.json — prefer fs.watch (inotify/kqueue) over
-    // fs.watchFile (stat polling). Fall back to watchFile if watch fails.
-    let resolved = false;
-    const onResponse = () => {
-      if (resolved) return;
-      if (!existsSync(RESPONSE_PATH)) return;
-      resolved = true;
-      // Clean up whichever watcher is active
-      if (watcher) { try { watcher.close(); } catch {} }
-      try { unwatchFile(RESPONSE_PATH, pollFallback); } catch {}
-      try {
-        const resp = JSON.parse(readFileSync(RESPONSE_PATH, 'utf8'));
-        try { unlinkSync(RESPONSE_PATH); } catch {}
-        try { unlinkSync(PENDING_PATH); } catch {}
-        sendResponse(req.id, {
-          content: [{ type: 'text', text: JSON.stringify(resp.content ?? resp) }],
-          isError: false,
-        });
-      } catch (e) {
-        sendError(req.id, -32603, 'Failed to read response: ' + e.message);
-      }
-    };
-    const pollFallback = () => onResponse();
-    let watcher = null;
-    // Check immediately in case it was written between our existsSync check
-    onResponse();
-    if (resolved) return;
-    try {
-      watcher = watch(RESPONSE_PATH, () => onResponse());
-      watcher.on('error', () => {
-        // fs.watch failed mid-watch — fall back to polling
-        try { watcher.close(); } catch {}
-        watcher = null;
-        watchFile(RESPONSE_PATH, { interval: 200 }, pollFallback);
-      });
-    } catch {
-      // fs.watch not available — fall back to stat polling
-      watchFile(RESPONSE_PATH, { interval: 200 }, pollFallback);
-    }
-    return;
-  }
-  // Unknown method
-  if (req.id != null) {
-    sendError(req.id, -32601, 'Method not found: ' + req.method);
-  }
-}
-
-// Read MCP stdio protocol: Content-Length headers + JSON body
-let buffer = '';
-process.stdin.setEncoding('utf8');
-process.stdin.on('data', (chunk) => {
-  buffer += chunk;
-  while (true) {
-    const headerEnd = buffer.indexOf('\\r\\n\\r\\n');
-    if (headerEnd === -1) break;
-    const header = buffer.slice(0, headerEnd);
-    const match = header.match(/Content-Length:\\s*(\\d+)/i);
-    if (!match) { buffer = buffer.slice(headerEnd + 4); continue; }
-    const len = parseInt(match[1], 10);
-    const bodyStart = headerEnd + 4;
-    if (buffer.length < bodyStart + len) break;
-    const body = buffer.slice(bodyStart, bodyStart + len);
-    buffer = buffer.slice(bodyStart + len);
-    try {
-      handleRequest(JSON.parse(body));
-    } catch {}
-  }
-});
-process.stdin.on('end', () => process.exit(0));
+# Main loop: handle both raw JSON lines and Content-Length framed messages
+while IFS= read -r line; do
+  line=\${line%$'\\r'}
+  [ -z "$line" ] && continue
+  case "$line" in
+    Content-Length:*)
+      while IFS= read -r hdr; do hdr=\${hdr%$'\\r'}; [ -z "$hdr" ] && break; done
+      body=$(head -c "\${line#Content-Length: }")
+      handle_request "$body" ;;
+    "{"*) handle_request "$line" ;;
+  esac
+done
 `;
 }
 
@@ -190,8 +139,7 @@ export function buildBridgeMcpConfig(
   return {
     ...existingServers,
     "tool-bridge": {
-      type: "stdio",
-      command: "node",
+      command: "bash",
       args: [TOOL_BRIDGE_SCRIPT_PATH],
     },
   };
