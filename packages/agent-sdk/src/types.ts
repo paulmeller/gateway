@@ -333,8 +333,23 @@ export interface VaultCredentialRow {
   auth_type: string;
   auth_token_encrypted: string;
   mcp_server_url: string | null;
+  expires_at: string | null;
+  refresh_config_encrypted: string | null;
   created_at: number;
   updated_at: number;
+}
+
+/** Public auth shape for static_bearer credentials (secrets stripped). */
+export interface VaultCredentialAuthStaticBearer {
+  type: "static_bearer";
+  mcp_server_url: string | null;
+}
+
+/** Public auth shape for mcp_oauth credentials (secrets stripped). */
+export interface VaultCredentialAuthMcpOauth {
+  type: "mcp_oauth";
+  mcp_server_url: string | null;
+  expires_at: string | null;
 }
 
 export interface VaultCredential {
@@ -342,10 +357,7 @@ export interface VaultCredential {
   id: string;
   vault_id: string;
   display_name: string;
-  auth: {
-    type: string;
-    mcp_server_url: string | null;
-  };
+  auth: VaultCredentialAuthStaticBearer | VaultCredentialAuthMcpOauth;
   created_at: string;
   updated_at: string;
   archived_at: string | null;

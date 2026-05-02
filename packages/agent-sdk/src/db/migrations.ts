@@ -632,6 +632,17 @@ export function runMigrations(db: InstanceType<typeof Database>): void {
     )
   `);
 
+  // v0.5: mcp_oauth support — add expires_at and refresh_config_encrypted columns
+  const credCols = db
+    .prepare(`PRAGMA table_info(vault_credentials)`)
+    .all() as Array<{ name: string }>;
+  if (!credCols.some((c) => c.name === "expires_at")) {
+    db.exec(`ALTER TABLE vault_credentials ADD COLUMN expires_at TEXT`);
+  }
+  if (!credCols.some((c) => c.name === "refresh_config_encrypted")) {
+    db.exec(`ALTER TABLE vault_credentials ADD COLUMN refresh_config_encrypted TEXT`);
+  }
+
   // Rename sprite_name → sandbox_name, template_sprite → template_sandbox
   const sessCols3 = db
     .prepare(`PRAGMA table_info(sessions)`)

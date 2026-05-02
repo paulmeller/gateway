@@ -574,6 +574,286 @@ describe("vault credentials API", () => {
   });
 });
 
+describe("mcp_oauth credential type", () => {
+  beforeEach(() => freshDbEnv());
+
+  it("creates mcp_oauth credential -> 201, returns auth shape without secrets", async () => {
+    await bootDb();
+    const agent = await createTestAgent();
+    const vault = await createTestVault(agent.id as string);
+    const vaultId = vault.id as string;
+
+    const { handleCreateCredential } = await import(
+      "../src/handlers/credentials"
+    );
+    const res = await handleCreateCredential(
+      req(`/v1/vaults/${vaultId}/credentials`, {
+        body: {
+          display_name: "My OAuth Server",
+          auth: {
+            type: "mcp_oauth",
+            mcp_server_url: "https://mcp.example.com",
+            access_token: "eyJhbGciOiJSUzI1NiJ9.test",
+            expires_at: "2026-06-01T00:00:00Z",
+            refresh: {
+              token_endpoint: "https://auth.example.com/token",
+              client_id: "client_123",
+              scope: "read write",
+              refresh_token: "rt_abc_secret",
+              token_endpoint_auth: {
+                type: "client_secret_basic",
+                client_secret: "secret_xyz",
+              },
+            },
+          },
+        },
+      }),
+      vaultId,
+    );
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as Record<string, unknown>;
+
+    expect(body.id).toBeDefined();
+    expect((body.id as string).startsWith("cred_")).toBe(true);
+    expect(body.display_name).toBe("My OAuth Server");
+    expect(body.vault_id).toBe(vaultId);
+
+    const auth = body.auth as Record<string, unknown>;
+    expect(auth.type).toBe("mcp_oauth");
+    expect(auth.mcp_server_url).toBe("https://mcp.example.com");
+    expect(auth.expires_at).toBe("2026-06-01T00:00:00Z");
+
+    // Secret fields MUST NOT appear in response
+    const json = JSON.stringify(body);
+    expect(json).not.toContain("eyJhbGciOiJSUzI1NiJ9");
+    expect(json).not.toContain("rt_abc_secret");
+    expect(json).not.toContain("secret_xyz");
+    expect(json).not.toContain("client_123");
+    expect(json).not.toContain("token_endpoint");
+    expect(auth.access_token).toBeUndefined();
+    expect(auth.refresh).toBeUndefined();
+  });
+
+  it("creates mcp_oauth credential without refresh config -> 201", async () => {
+    await bootDb();
+    const agent = await createTestAgent();
+    const vault = await createTestVault(agent.id as string);
+    const vaultId = vault.id as string;
+
+    const { handleCreateCredential } = await import(
+      "../src/handlers/credentials"
+    );
+    const res = await handleCreateCredential(
+      req(`/v1/vaults/${vaultId}/credentials`, {
+        body: {
+          display_name: "Simple OAuth",
+          auth: {
+            type: "mcp_oauth",
+            mcp_server_url: "https://mcp.simple.com",
+            access_token: "simple_token_123",
+          },
+        },
+      }),
+      vaultId,
+    );
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as Record<string, unknown>;
+    const auth = body.auth as Record<string, unknown>;
+    expect(auth.type).toBe("mcp_oauth");
+    expect(auth.mcp_server_url).toBe("https://mcp.simple.com");
+    expect(auth.expires_at).toBeNull();
+    expect(JSON.stringify(body)).not.toContain("simple_token_123");
+  });
+
+  it("get mcp_oauth credential -> returns auth shape without secrets", async () => {
+    await bootDb();
+    const agent = await createTestAgent();
+    const vault = await createTestVault(agent.id as string);
+    const vaultId = vault.id as string;
+
+    const { handleCreateCredential, handleGetCredential } = await import(
+      "../src/handlers/credentials"
+    );
+    const createRes = await handleCreateCredential(
+      req(`/v1/vaults/${vaultId}/credentials`, {
+        body: {
+          display_name: "OAuth Get Test",
+          auth: {
+            type: "mcp_oauth",
+            mcp_server_url: "https://mcp.get-test.com",
+            access_token: "get_test_token",
+            expires_at: "2026-12-31T23:59:59Z",
+            refresh: {
+              token_endpoint: "https://auth.get-test.com/token",
+              client_id: "get_client",
+              refresh_token: "rt_get_refresh",
+            },
+          },
+        },
+      }),
+      vaultId,
+    );
+    const created = (await createRes.json()) as Record<string, unknown>;
+
+    const res = await handleGetCredential(
+      req(`/v1/vaults/${vaultId}/credentials/${created.id}`),
+      vaultId,
+      created.id as string,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    const auth = body.auth as Record<string, unknown>;
+    expect(auth.type).toBe("mcp_oauth");
+    expect(auth.mcp_server_url).toBe("https://mcp.get-test.com");
+    expect(auth.expires_at).toBe("2026-12-31T23:59:59Z");
+
+    const json = JSON.stringify(body);
+    expect(json).not.toContain("get_test_token");
+    expect(json).not.toContain("rt_get_refresh");
+  });
+
+  it("list includes mcp_oauth credentials with correct shape", async () => {
+    await bootDb();
+    const agent = await createTestAgent();
+    const vault = await createTestVault(agent.id as string);
+    const vaultId = vault.id as string;
+
+    const { handleCreateCredential, handleListCredentials } = await import(
+      "../src/handlers/credentials"
+    );
+
+    // Create one static_bearer and one mcp_oauth
+    await handleCreateCredential(
+      req(`/v1/vaults/${vaultId}/credentials`, {
+        body: {
+          display_name: "Static Cred",
+          auth: { type: "static_bearer", token: "static_tok" },
+        },
+      }),
+      vaultId,
+    );
+    await handleCreateCredential(
+      req(`/v1/vaults/${vaultId}/credentials`, {
+        body: {
+          display_name: "OAuth Cred",
+          auth: {
+            type: "mcp_oauth",
+            mcp_server_url: "https://mcp.list-test.com",
+            access_token: "oauth_tok",
+          },
+        },
+      }),
+      vaultId,
+    );
+
+    const res = await handleListCredentials(
+      req(`/v1/vaults/${vaultId}/credentials`),
+      vaultId,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: Array<Record<string, unknown>> };
+    expect(body.data).toHaveLength(2);
+
+    const oauthCred = body.data.find(
+      (c) => (c.auth as Record<string, unknown>).type === "mcp_oauth",
+    );
+    const staticCred = body.data.find(
+      (c) => (c.auth as Record<string, unknown>).type === "static_bearer",
+    );
+    expect(oauthCred).toBeDefined();
+    expect(staticCred).toBeDefined();
+
+    const json = JSON.stringify(body);
+    expect(json).not.toContain("static_tok");
+    expect(json).not.toContain("oauth_tok");
+  });
+
+  it("update mcp_oauth credential (rotate access_token + expires_at) -> 200", async () => {
+    await bootDb();
+    const agent = await createTestAgent();
+    const vault = await createTestVault(agent.id as string);
+    const vaultId = vault.id as string;
+
+    const { handleCreateCredential, handleUpdateCredential } = await import(
+      "../src/handlers/credentials"
+    );
+    const createRes = await handleCreateCredential(
+      req(`/v1/vaults/${vaultId}/credentials`, {
+        body: {
+          display_name: "Rotate OAuth",
+          auth: {
+            type: "mcp_oauth",
+            mcp_server_url: "https://mcp.rotate.com",
+            access_token: "old_access_token",
+            expires_at: "2026-01-01T00:00:00Z",
+          },
+        },
+      }),
+      vaultId,
+    );
+    const created = (await createRes.json()) as Record<string, unknown>;
+
+    const res = await handleUpdateCredential(
+      req(`/v1/vaults/${vaultId}/credentials/${created.id}`, {
+        body: {
+          auth: {
+            access_token: "new_access_token",
+            expires_at: "2026-12-31T00:00:00Z",
+          },
+        },
+      }),
+      vaultId,
+      created.id as string,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    const auth = body.auth as Record<string, unknown>;
+    expect(auth.expires_at).toBe("2026-12-31T00:00:00Z");
+
+    const json = JSON.stringify(body);
+    expect(json).not.toContain("old_access_token");
+    expect(json).not.toContain("new_access_token");
+
+    // Verify the token was actually rotated via DB layer
+    const { getCredentialToken } = await import("../src/db/credentials");
+    expect(getCredentialToken(created.id as string)).toBe("new_access_token");
+  });
+
+  it("mcp_oauth credential token appears in session secrets", async () => {
+    await bootDb();
+    const agent = await createTestAgent();
+
+    const { createVault } = await import("../src/db/vaults");
+    const vault = createVault({
+      agent_id: agent.id as string,
+      name: "oauth-secrets",
+    });
+
+    const { createCredential } = await import("../src/db/credentials");
+    createCredential({
+      vault_id: vault.id,
+      display_name: "OAuth MCP",
+      auth_type: "mcp_oauth",
+      token: "oauth_secret_token",
+      mcp_server_url: "https://mcp.oauth-test.com",
+      expires_at: "2026-06-01T00:00:00Z",
+    });
+
+    const { loadSessionSecrets } = await import("../src/sessions/secrets");
+    const secrets = loadSessionSecrets([vault.id]);
+
+    // Should contain MCP_AUTH_OAUTH_TEST from the mcp_server_url
+    const mcpAuth = secrets.find((s) => s.key === "MCP_AUTH_OAUTH_TEST");
+    expect(mcpAuth).toBeDefined();
+    expect(mcpAuth!.value).toBe("oauth_secret_token");
+
+    // Should contain CREDENTIAL_OAUTH_MCP
+    const credKey = secrets.find((s) => s.key === "CREDENTIAL_OAUTH_MCP");
+    expect(credKey).toBeDefined();
+    expect(credKey!.value).toBe("oauth_secret_token");
+  });
+});
+
 describe("loadSessionSecrets() with credentials", () => {
   beforeEach(() => freshDbEnv());
 
