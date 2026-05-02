@@ -166,7 +166,7 @@ export async function syncContainerFiles(opts: {
   sandboxName: string;
   provider: ContainerProvider;
   secrets?: ProviderSecrets;
-}): Promise<{ synced: number; skipped: number; files: SyncedFile[] }> {
+}): Promise<{ synced: number; skipped: number; files: SyncedFile[]; autoExecuted: Array<{ scriptPath: string; success: boolean }> }> {
   const { sessionId, sandboxName, provider, secrets } = opts;
 
   const extracted = extractFilePaths(sessionId);
@@ -175,32 +175,49 @@ export async function syncContainerFiles(opts: {
   console.log(`[container-file-sync] ${sessionId}: extracted ${allPaths.length} paths, sawFileTools=${extracted.sawFileTools}, sawBash=${extracted.sawBash}`);
 
   // Auto-execute: if the agent wrote a .js/.mjs script that imports a document
-  // generation library (docx, pdfkit, exceljs, etc.) but never ran it via Bash,
-  // execute it now so the output file exists for sync. This fixes the common
-  // pattern where the model writes a script but skips the "node script.js" step.
+  // generation library but never ran it via Bash, execute it now so the output
+  // file exists for sync. This fixes the persistent model behavior where agents
+  // write document scripts but skip the "node script.js" step.
+  //
+  // Binary output files (docx, pdf, xlsx) must NEVER pass through the LLM as
+  // base64 — the gateway extracts them directly from the container.
+  const autoExecResults: Array<{ scriptPath: string; success: boolean }> = [];
   if (extracted.sawFileTools && !extracted.sawBash) {
     const scriptPaths = allPaths.filter(p => /\.(js|mjs)$/.test(p));
     for (const scriptPath of scriptPaths) {
       try {
-        const peek = await provider.exec(sandboxName, ["head", "-5", scriptPath], { secrets, timeoutMs: 5000 });
+        const peek = await provider.exec(sandboxName, ["head", "-20", "--", scriptPath], { secrets, timeoutMs: 5000 });
         const head = (peek.stdout ?? "").replace(/[\x00-\x1f]/g, "");
-        const DOC_LIBS = /require\(["']docx["']\)|from\s+["']docx["']|require\(["']pdfkit["']\)|require\(["']exceljs["']\)/;
-        if (DOC_LIBS.test(head)) {
-          console.log(`[container-file-sync] ${sessionId}: auto-executing document script: ${scriptPath}`);
-          const dir = scriptPath.replace(/\/[^/]+$/, "") || "/tmp";
-          // Install the library if needed, then run the script
-          const run = await provider.exec(
-            sandboxName,
-            ["sh", "-c", `cd "${dir}" && npm list docx 2>/dev/null || npm install docx 2>/dev/null; node "${scriptPath}"`],
-            { secrets, timeoutMs: 30000 },
-          );
-          if (run.exit_code === 0) {
-            console.log(`[container-file-sync] ${sessionId}: script executed successfully`);
-            // Mark as if Bash was used so discovery picks up the output
-            extracted.sawBash = true;
-          } else {
-            console.warn(`[container-file-sync] ${sessionId}: script failed (exit ${run.exit_code}): ${(run.stderr ?? "").slice(0, 200)}`);
-          }
+
+        // Match specific document generation libraries
+        const LIB_PATTERNS: Array<{ re: RegExp; pkg: string }> = [
+          { re: /require\(["']docx["']\)|from\s+["']docx["']/, pkg: "docx" },
+          { re: /require\(["']pdfkit["']\)|from\s+["']pdfkit["']/, pkg: "pdfkit" },
+          { re: /require\(["']exceljs["']\)|from\s+["']exceljs["']/, pkg: "exceljs" },
+          { re: /require\(["']officegen["']\)|from\s+["']officegen["']/, pkg: "officegen" },
+        ];
+        const matched = LIB_PATTERNS.find(p => p.re.test(head));
+        if (!matched) continue;
+
+        console.log(`[container-file-sync] ${sessionId}: auto-executing ${matched.pkg} script: ${scriptPath}`);
+        const dir = path.dirname(scriptPath) || "/tmp";
+
+        // Install the detected library if needed, then run the script.
+        // Use -- to prevent path injection. Chain with && so node only
+        // runs if the install succeeds.
+        const run = await provider.exec(
+          sandboxName,
+          ["sh", "-c", `cd -- "${dir}" && (npm list "${matched.pkg}" 2>/dev/null || npm install "${matched.pkg}" 2>/dev/null) && node -- "${scriptPath}"`],
+          { secrets, timeoutMs: 30000 },
+        );
+        if (run.exit_code === 0) {
+          console.log(`[container-file-sync] ${sessionId}: script executed successfully`);
+          extracted.sawBash = true;
+          autoExecResults.push({ scriptPath, success: true });
+        } else {
+          const stderr = (run.stderr ?? "").replace(/[\x00-\x1f]/g, "").slice(0, 200);
+          console.warn(`[container-file-sync] ${sessionId}: script failed (exit ${run.exit_code}): ${stderr}`);
+          autoExecResults.push({ scriptPath, success: false });
         }
       } catch (err) {
         console.warn(`[container-file-sync] ${sessionId}: auto-execute check failed for ${scriptPath}:`, err);
@@ -224,7 +241,7 @@ export async function syncContainerFiles(opts: {
   }
   if (allPaths.length === 0) {
     console.log(`[container-file-sync] ${sessionId}: no paths to sync`);
-    return { synced: 0, skipped: 0, files: [] };
+    return { synced: 0, skipped: 0, files: [], autoExecuted: [] };
   }
 
   // Filter paths
@@ -247,7 +264,7 @@ export async function syncContainerFiles(opts: {
 
   console.log(`[container-file-sync] ${sessionId}: ${validPaths.length} valid paths, ${skipped} skipped`);
 
-  if (validPaths.length === 0) return { synced: 0, skipped, files: [] };
+  if (validPaths.length === 0) return { synced: 0, skipped, files: [], autoExecuted: autoExecResults };
 
   // Cap at MAX_FILES_PER_SYNC
   if (validPaths.length > MAX_FILES_PER_SYNC) {
@@ -274,7 +291,8 @@ export async function syncContainerFiles(opts: {
       const isBinary = BINARY_READ_EXTS.has(ext);
 
       const result = isBinary
-        ? await provider.exec(sandboxName, ["base64", "-w", "0", "--", filePath], { secrets, timeoutMs: 15000 })
+        // Portable base64: pipe through tr to strip newlines (works on GNU, BusyBox, macOS)
+        ? await provider.exec(sandboxName, ["sh", "-c", `base64 < "${filePath}" | tr -d '\\n'`], { secrets, timeoutMs: 15000 })
         : await provider.exec(sandboxName, ["cat", "--", filePath], { secrets, timeoutMs: 15000 });
 
       if (result.exit_code !== 0 || !result.stdout) {
@@ -331,7 +349,7 @@ export async function syncContainerFiles(opts: {
     }
   }
 
-  return { synced, skipped, files: syncedFiles };
+  return { synced, skipped, files: syncedFiles, autoExecuted: autoExecResults };
 }
 
 /** Simple extension-to-MIME map for common code/config file types. */

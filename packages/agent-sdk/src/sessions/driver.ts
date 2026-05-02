@@ -742,6 +742,14 @@ export async function runTurn(
         provider,
         secrets,
       });
+      // Emit session.script_executed for auto-run scripts so clients have
+      // full visibility into what the gateway did post-turn.
+      for (const ae of syncResult.autoExecuted) {
+        emit("session.script_executed", {
+          script_path: ae.scriptPath,
+          success: ae.success,
+        });
+      }
       if (syncResult.synced > 0) {
         console.log(`[driver] synced ${syncResult.synced} files from container (${syncResult.skipped} skipped)`);
         // Emit session.file_synced for each extracted file so SSE clients
@@ -1173,23 +1181,6 @@ async function checkToolBridgeSentinel(
     request = JSON.parse(clean) as typeof request;
   } catch (err) {
     console.warn(`[driver] failed to read tool bridge request for ${sessionId}:`, err);
-    return;
-  }
-
-  // Guard: if save_output is called with a script file (.js, .py, .sh, .ts),
-  // auto-respond with an error telling the agent to run the script first.
-  // This prevents the model from short-circuiting (Write → save_output)
-  // when it should be (Write → Bash run → save_output with result).
-  const input = request.input as Record<string, unknown> | undefined;
-  const filename = (input?.filename as string) ?? "";
-  const SCRIPT_EXTS = /\.(js|ts|py|sh|mjs|cjs)$/i;
-  if (request.name === "save_output" && SCRIPT_EXTS.test(filename)) {
-    console.log(`[driver] ${sessionId} rejecting save_output for script file: ${filename}`);
-    pendingToolBridgeCalls.add(sessionId);
-    await writeToolBridgeResponse(sessionId, [{
-      type: "text",
-      text: `Error: "${filename}" is a script file, not a deliverable. Run the script first (e.g. "node ${filename}" or "python3 ${filename}"), then call save_output with the OUTPUT file (e.g. the .docx, .pdf, or .csv that the script produces).`,
-    }]);
     return;
   }
 
