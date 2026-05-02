@@ -12,10 +12,18 @@
  */
 import { createSprite, deleteSprite, listSprites } from "./client";
 import * as pool from "./pool";
+import {
+  addWarm,
+  claimWarm,
+  countInflight,
+  countWarm,
+  decrementInflight,
+  incrementInflight,
+} from "./warm-pool";
 import { installClaudeWrapper } from "../backends/claude/wrapper-script";
 import { resolveBackend } from "../backends/registry";
 import { getAgent } from "../db/agents";
-import { getEnvironment, getEnvironmentRow } from "../db/environments";
+import { getEnvironment, getEnvironmentRow, listEnvironments } from "../db/environments";
 import {
   getSession,
   getSessionRow,
@@ -29,6 +37,7 @@ import { resolveContainerProvider } from "../providers/registry";
 import { dockerProvider } from "../providers/docker";
 import { resolveVaultSecrets } from "../providers/resolve-secrets";
 import type { SessionResource, AgentSkill } from "../types";
+import { ulid } from "ulid";
 
 // Gate container-lifecycle logs behind DEBUG_LIFECYCLE=1 so a busy
 // gateway's logs aren't dominated by per-session creation chatter.
@@ -144,7 +153,9 @@ export async function acquireForFirstTurn(sessionId: string): Promise<string> {
     );
   }
 
-  if (pool.countInEnv(env.id) >= getConfig().maxSandboxesPerEnv) {
+  const config = getConfig();
+  // Count warm containers against the limit (they hold real provider resources).
+  if (pool.countInEnv(env.id) + countWarm(env.id) >= config.maxSandboxesPerEnv) {
     throw new ApiError(503, "server_busy", "env sandbox pool exhausted");
   }
 
@@ -176,6 +187,99 @@ export async function acquireForFirstTurn(sessionId: string): Promise<string> {
   // Wrap provider so all exec/startExec calls automatically include vault secrets.
   // This avoids threading secrets through every backend function signature.
   const sp = wrapProviderWithSecrets(provider, secrets);
+
+  // --- Warm pool fast path ---
+  // Try to claim a pre-created, engine-prepped container. If successful, skip
+  // the expensive create + prepareOnSandbox step (~20-60s on cloud providers).
+  const warm = claimWarm(env.id, backend.name, provider.name);
+  if (warm) {
+    lcLog(`[lifecycle] ${sessionId} claimed warm container: ${warm.sandboxName}`);
+    const name = warm.sandboxName;
+
+    try {
+      // Session-specific steps that cannot be pre-run at warm fill time.
+      if (agent.engine === "claude") {
+        const customTools = agent.tools.filter(
+          (t): t is import("../types").CustomTool => t.type === "custom",
+        );
+        const allBridgeTools = [...customTools];
+        if (agent.threads_enabled) {
+          allBridgeTools.push({
+            type: "custom",
+            name: "spawn_agent",
+            description: "Spawn a sub-agent to handle a task. Returns the sub-agent's response.",
+            input_schema: {
+              type: "object",
+              properties: {
+                agent_id: { type: "string", description: "ID of the agent to spawn" },
+                prompt: { type: "string", description: "Task for the sub-agent" },
+              },
+              required: ["agent_id", "prompt"],
+            },
+          });
+        }
+        if (allBridgeTools.length > 0) {
+          const { installToolBridge } = await import("../backends/claude/index");
+          await installToolBridge(name, allBridgeTools, sp);
+        }
+        if (agent.confirmation_mode) {
+          const { installPermissionHook } = await import("../backends/claude/index");
+          await installPermissionHook(name, sp);
+        }
+      }
+
+      if (agent.skills && agent.skills.length > 0) {
+        lcLog(`[lifecycle] ${sessionId} installing ${agent.skills.length} skill(s) on warm container...`);
+        await installSkills(name, sp, agent.skills, agent.engine);
+      }
+    } catch (err) {
+      // If session-specific setup fails, delete the warm container and fall through
+      // to cold-create by re-throwing. The warm pool is already decremented via claimWarm.
+      await sp.delete(name).catch(() => {});
+      throw err;
+    }
+
+    // Provision resources if any.
+    const { listResources: listSessionResources } = await import("../db/session-resources");
+    const tableResources = listSessionResources(sessionId);
+    if (tableResources.length > 0) {
+      const mapped: SessionResource[] = tableResources.map((r) => {
+        if (r.type === "file") return { type: "file", file_id: r.file_id, mount_path: r.mount_path };
+        if (r.type === "github_repository") {
+          const checkout = r.checkout;
+          return {
+            type: "github_repository" as const,
+            repository_url: r.url,
+            mount_path: r.mount_path,
+            branch: checkout?.type === "branch" ? checkout.name : undefined,
+            commit: checkout?.type === "commit" ? checkout.name : undefined,
+          };
+        }
+        return { type: "uri" as const, uri: r.url, mount_path: r.mount_path };
+      });
+      await provisionResources(name, mapped, sp);
+    } else {
+      const session = getSession(sessionId);
+      if (session?.resources && session.resources.length > 0) {
+        await provisionResources(name, session.resources, sp);
+      }
+    }
+
+    pool.register({
+      sandboxName: name,
+      envId: env.id,
+      sessionId,
+      createdAt: nowMs(),
+      vaultSecrets: Object.keys(secrets).length > 0 ? secrets : undefined,
+    });
+    setSessionSandbox(sessionId, name);
+
+    // Fire-and-forget replenishment so the warm pool slot is filled again.
+    void replenishWarmPool(env.id, backend.name, provider, secrets);
+
+    return name;
+  }
+  // --- End warm pool fast path ---
 
   const name = deriveSandboxName(sessionId);
   lcLog(`[lifecycle] ${sessionId} creating container via ${sp.name}...`);
@@ -303,6 +407,133 @@ export async function acquireForFirstTurn(sessionId: string): Promise<string> {
   });
   setSessionSandbox(sessionId, name);
   return name;
+}
+
+// ---------------------------------------------------------------------------
+// Warm pool helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Effective warm pool size for an environment.
+ * Per-environment config override takes precedence over the global setting.
+ */
+function effectiveWarmPoolSize(envId: string): number {
+  const cfg = getConfig();
+  const envObj = getEnvironment(envId);
+  return envObj?.config?.warm_pool_size ?? cfg.warmPoolSize;
+}
+
+/**
+ * Replenish the warm pool for one environment/engine/provider slot.
+ *
+ * Fire-and-forget — call without await. Errors are logged and swallowed.
+ * The inflight counter prevents concurrent over-provisioning.
+ */
+export async function replenishWarmPool(
+  envId: string,
+  engine: string,
+  provider: import("../providers/types").ContainerProvider,
+  secrets: Record<string, string>,
+): Promise<void> {
+  if (!provider.supportsWarmPool) return;
+
+  const target = effectiveWarmPoolSize(envId);
+  if (target <= 0) return;
+
+  // Check capacity — warm + inflight must be below target before we start another
+  if (countWarm(envId) + countInflight(envId) >= target) return;
+
+  // Also check global env capacity
+  const cfg = getConfig();
+  if (pool.countInEnv(envId) + countWarm(envId) + countInflight(envId) >= cfg.maxSandboxesPerEnv) return;
+
+  incrementInflight(envId);
+  try {
+    const sp = wrapProviderWithSecrets(provider, secrets);
+    const name = `ca-warm-${ulid().toLowerCase()}`;
+    lcLog(`[warm-pool] creating warm container for env=${envId} engine=${engine}: ${name}`);
+
+    await sp.create({ name });
+
+    // Resolve the backend to call prepareOnSandbox
+    const backend = resolveBackend(engine);
+    await backend.prepareOnSandbox(name, sp);
+
+    const cfg2 = getConfig();
+    addWarm({
+      sandboxName: name,
+      envId,
+      engine,
+      provider: provider.name,
+      createdAt: nowMs(),
+      expiresAt: nowMs() + cfg2.warmPoolTtlMs,
+      vaultSecrets: Object.keys(secrets).length > 0 ? secrets : undefined,
+    });
+
+    lcLog(`[warm-pool] warm container ready: ${name} (env=${envId})`);
+  } catch (err) {
+    console.warn(`[warm-pool] replenish failed for env=${envId} engine=${engine}:`, err);
+  } finally {
+    decrementInflight(envId);
+  }
+}
+
+/**
+ * Fill warm pools for all ready environments on startup.
+ *
+ * Runs in the background (non-blocking). Processes at most 3 environments
+ * concurrently to avoid overwhelming provider rate limits.
+ */
+export async function fillWarmPools(): Promise<void> {
+  const cfg = getConfig();
+  if (cfg.warmPoolSize <= 0) return; // fast exit when warm pool is globally off
+
+  const envs = listEnvironments({ includeArchived: false, limit: 100 });
+  const readyEnvs = envs.filter((e) => e.state === "ready");
+  if (readyEnvs.length === 0) return;
+
+  // Simple semaphore — at most 3 concurrent environment fills
+  const CONCURRENCY = 3;
+  let active = 0;
+  let idx = 0;
+
+  async function processNext(): Promise<void> {
+    while (idx < readyEnvs.length) {
+      if (active >= CONCURRENCY) {
+        // Wait a tick and retry
+        await new Promise<void>((r) => setTimeout(r, 0));
+        continue;
+      }
+      const env = readyEnvs[idx++];
+      active++;
+      void fillOneEnv(env).finally(() => active--);
+    }
+  }
+
+  // Kick off without blocking
+  void processNext();
+}
+
+async function fillOneEnv(env: import("../types").Environment): Promise<void> {
+  const target = effectiveWarmPoolSize(env.id);
+  if (target <= 0) return;
+
+  try {
+    const provider = await resolveContainerProvider(env.config?.provider);
+    if (!provider.supportsWarmPool) return;
+
+    // We need a backend to know which engine to prep. For multi-backend envs
+    // we don't know the engine at fill time — use the default (claude).
+    // Sessions with a different engine will fall through to cold-create.
+    const backend = resolveBackend("claude");
+
+    const needed = target - countWarm(env.id) - countInflight(env.id);
+    for (let i = 0; i < needed; i++) {
+      void replenishWarmPool(env.id, backend.name, provider, {});
+    }
+  } catch (err) {
+    console.warn(`[warm-pool] fillOneEnv failed for env=${env.id}:`, err);
+  }
 }
 
 /**

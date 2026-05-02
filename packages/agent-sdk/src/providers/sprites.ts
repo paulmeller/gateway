@@ -18,6 +18,7 @@ import { getConfig } from "../config/index";
 export const spritesProvider: ContainerProvider = {
   name: "sprites",
   stripControlChars: true, // sprites.dev HTTP exec multiplexes stdout/stderr with control bytes
+  supportsWarmPool: true,
 
   async checkAvailability(secrets?: ProviderSecrets) {
     const cfg = getConfig();

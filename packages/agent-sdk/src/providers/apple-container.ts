@@ -20,7 +20,7 @@ import { createCliProvider } from "./cli-provider";
 
 const DEFAULT_IMAGE = process.env.APPLE_CONTAINER_IMAGE ?? "node:22";
 
-export const appleProvider = createCliProvider({
+export const appleProvider = Object.assign(createCliProvider({
   name: "apple-container",
   binary: "container",
 
@@ -100,4 +100,4 @@ export const appleProvider = createCliProvider({
       };
     }
   },
-});
+}), { supportsWarmPool: true as const });

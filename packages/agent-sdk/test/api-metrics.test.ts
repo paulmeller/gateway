@@ -54,6 +54,7 @@ vi.mock("../src/containers/lifecycle", () => ({
   releaseSession: vi.fn(async () => {}),
   reconcileOrphanSandboxes: vi.fn(async () => ({ deleted: 0, kept: 0 })),
   reconcileDockerOrphanSandboxes: vi.fn(async () => ({ deleted: 0, kept: 0 })),
+  fillWarmPools: vi.fn(async () => {}),
 }));
 
 // ─────────────────────────────────────────────────────────────────────────

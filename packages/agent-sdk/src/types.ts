@@ -164,6 +164,8 @@ export interface EnvironmentConfig {
         allow_mcp_servers?: boolean;
         allow_package_managers?: boolean;
       };
+  /** Per-environment warm pool size override. Null/undefined = use global `WARM_POOL_SIZE`. */
+  warm_pool_size?: number;
 }
 
 export interface EnvironmentRow {

@@ -13,31 +13,34 @@ import { createCliProvider } from "./cli-provider";
 
 const DEFAULT_IMAGE = process.env.PODMAN_IMAGE ?? "node:22";
 
-export const podmanProvider = createCliProvider({
-  name: "podman",
-  binary: "podman",
+export const podmanProvider = Object.assign(
+  createCliProvider({
+    name: "podman",
+    binary: "podman",
 
-  createSteps: (name) => [
-    ["create", "--name", name, DEFAULT_IMAGE, "sleep", "infinity"],
-    ["start", name],
-  ],
+    createSteps: (name) => [
+      ["create", "--name", name, DEFAULT_IMAGE, "sleep", "infinity"],
+      ["start", name],
+    ],
 
-  deleteArgs: (name) => ["rm", "-f", name],
+    deleteArgs: (name) => ["rm", "-f", name],
 
-  execArgs: (name, argv) => ["exec", "-i", name, ...argv],
+    execArgs: (name, argv) => ["exec", "-i", name, ...argv],
 
-  listArgs: (prefix) => [
-    "ps", "-a",
-    "--filter", `name=${prefix}`,
-    "--format", "{{.Names}}",
-  ],
+    listArgs: (prefix) => [
+      "ps", "-a",
+      "--filter", `name=${prefix}`,
+      "--format", "{{.Names}}",
+    ],
 
-  parseList: (stdout) =>
-    stdout.trim().split("\n").filter(Boolean),
+    parseList: (stdout) =>
+      stdout.trim().split("\n").filter(Boolean),
 
-  checkCmd: ["version", "--format", "{{.Version}}"],
-  checkFailMsg: (msg) =>
-    msg.includes("ENOENT")
-      ? "Podman not installed. Run: brew install podman"
-      : "Podman not running — run: podman machine start",
-});
+    checkCmd: ["version", "--format", "{{.Version}}"],
+    checkFailMsg: (msg) =>
+      msg.includes("ENOENT")
+        ? "Podman not installed. Run: brew install podman"
+        : "Podman not running — run: podman machine start",
+  }),
+  { supportsWarmPool: true as const },
+);

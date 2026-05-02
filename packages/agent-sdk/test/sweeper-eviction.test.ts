@@ -27,6 +27,7 @@ vi.mock("../src/containers/lifecycle", () => ({
   reconcileOrphanSandboxes: reconcileOrphanSandboxesMock,
   reconcileDockerOrphanSandboxes: reconcileDockerOrphanSandboxesMock,
   acquireForFirstTurn: vi.fn(async () => "ca-sess-fake"),
+  fillWarmPools: vi.fn(async () => {}),
 }));
 
 function freshDbEnv(): void {

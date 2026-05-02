@@ -22,7 +22,7 @@ import { runSweep } from "./sessions/sweeper";
 import { getRuntime } from "./state";
 import { runTurn } from "./sessions/driver";
 import { enqueueTurn } from "./queue";
-import { reconcileOrphanSandboxes, reconcileDockerOrphanSandboxes } from "./containers/lifecycle";
+import { reconcileOrphanSandboxes, reconcileDockerOrphanSandboxes, fillWarmPools } from "./containers/lifecycle";
 import { installShutdownHandlers } from "./shutdown";
 import { nowMs } from "./util/clock";
 import { resolveContainerProvider } from "./providers/registry";
@@ -144,6 +144,11 @@ async function doInit(): Promise<void> {
 
   // 3c. Warm model registry cache (non-blocking)
   import("./lib/model-registry").then((m) => m.getModels().catch(() => {}));
+
+  // 3d. Pre-fill warm container pools (background, non-blocking).
+  fillWarmPools().catch((err) => {
+    console.warn("[init] warm pool fill failed:", err);
+  });
 
   // 4. Install the periodic sweeper (idle eviction + orphan reconcile).
   // HMR caveat: the globalThis guard prevents duplicate timers across dev

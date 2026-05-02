@@ -70,6 +70,7 @@ const ConfigSchema = z.object({
   provider: z.enum(["sprites", "docker", "apple-container", "apple-firecracker", "podman", "e2b", "vercel", "daytona", "fly", "modal", "mvm", "anthropic"]).optional(),
   packages: PackagesSchema,
   networking: NetworkingSchema.optional(),
+  warm_pool_size: z.number().int().min(0).optional(),
 });
 
 const CreateSchema = z.object({

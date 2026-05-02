@@ -39,6 +39,16 @@ export interface Config {
    * created or read. Default off.
    */
   anthropicPassthroughEnabled: boolean;
+  /**
+   * Number of warm containers to pre-create per environment. 0 = off (default).
+   * Override per-environment via `EnvironmentConfig.warm_pool_size`.
+   */
+  warmPoolSize: number;
+  /**
+   * TTL (ms) for warm containers before the sweeper evicts them.
+   * Default: 5 minutes (300_000 ms).
+   */
+  warmPoolTtlMs: number;
 }
 
 type GlobalCache = typeof globalThis & {
@@ -116,6 +126,8 @@ function loadConfig(): Config {
       process.env.ANTHROPIC_PASSTHROUGH_ENABLED ??
         readSetting("anthropic_passthrough_enabled"),
     ),
+    warmPoolSize: num(process.env.WARM_POOL_SIZE, 0),
+    warmPoolTtlMs: num(process.env.WARM_POOL_TTL_MS, 300_000),
   };
 }
 

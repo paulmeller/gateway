@@ -29,6 +29,9 @@ import {
   updateSessionStatus,
 } from "../db/sessions";
 import { releaseSession, reconcileOrphanSandboxes, reconcileDockerOrphanSandboxes } from "../containers/lifecycle";
+import { expireWarm } from "../containers/warm-pool";
+import { resolveContainerProvider } from "../providers/registry";
+import { getEnvironment } from "../db/environments";
 
 let sweeping = false;
 let stopping = false;
@@ -68,8 +71,35 @@ export async function runSweep(): Promise<void> {
         console.warn("[sweeper] reconcile docker failed:", e);
       }
     }
+    try {
+      await evictExpiredWarmContainers();
+    } catch (e) {
+      console.warn("[sweeper] warm pool eviction failed:", e);
+    }
   } finally {
     sweeping = false;
+  }
+}
+
+/**
+ * Evict warm containers that have passed their TTL.
+ * Calls `provider.delete` on each expired entry and logs the eviction.
+ */
+async function evictExpiredWarmContainers(): Promise<void> {
+  const expired = expireWarm(nowMs());
+  if (expired.length === 0) return;
+
+  console.log(`[sweeper] evicting ${expired.length} expired warm container(s)`);
+
+  for (const entry of expired) {
+    try {
+      const envObj = getEnvironment(entry.envId);
+      const provider = await resolveContainerProvider(envObj?.config?.provider);
+      await provider.delete(entry.sandboxName, entry.vaultSecrets);
+      console.log(`[sweeper] deleted expired warm container: ${entry.sandboxName}`);
+    } catch (err) {
+      console.warn(`[sweeper] failed to delete warm container ${entry.sandboxName}:`, err);
+    }
   }
 }
 

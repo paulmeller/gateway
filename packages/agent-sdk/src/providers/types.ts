@@ -45,6 +45,13 @@ export interface AvailabilityResult {
 export interface ContainerProvider {
   name: ProviderName;
 
+  /**
+   * Whether this provider supports the warm container pool.
+   * Warm pool creation is skipped silently when this is false/undefined.
+   * Set to true for local/persistent providers (docker, sprites, apple-container, podman).
+   */
+  supportsWarmPool?: boolean;
+
   /** Pre-flight check: is this provider usable right now?
    *  Secrets are available at turn-time (not env creation time).
    *  Returns { available: true } or { available: false, message: "..." }.
