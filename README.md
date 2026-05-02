@@ -1,7 +1,10 @@
 # AgentStep Gateway
 
-**Self-hosted, open-source, Anthropic Managed Agents-compatible.**
-Run AI coding agents in sandboxed environments — any engine, any sandbox, one API.
+**Same API, your infrastructure. Any agent/CLI engine.**
+
+Anthropic's [Managed Agents](https://platform.claude.com/docs/en/managed-agents/overview) run coding agents in cloud sandboxes through a clean REST API. But they're cloud-only, Claude-only, and Anthropic-hosted.
+
+AgentStep Gateway is a self-hosted, open-source drop-in. Same API endpoints, same event model, same SSE stream. But you choose the engine (Claude, Codex, OpenCode, Gemini) and the sandbox (Docker, Sprites, E2B, Fly, or 7 others). Your code and prompts never leave your infrastructure.
 
 [![npm](https://img.shields.io/npm/v/%40agentstep%2Fgateway)](https://www.npmjs.com/package/@agentstep/gateway)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
@@ -9,124 +12,132 @@ Run AI coding agents in sandboxed environments — any engine, any sandbox, one 
 <p align="center">
   <img src="assets/screenshot-home.png" alt="AgentStep Gateway — Home" width="800" />
 </p>
-<p align="center">
-  <img src="assets/screenshot-analytics.png" alt="Agent Activity Analytics" width="400" />
-  <img src="assets/screenshot-throughput.png" alt="API Throughput" width="400" />
-</p>
 
-## Why AgentStep Gateway?
-
-- **Drop-in alternative to Anthropic's Managed Agents API** — same resource model (agents, vaults, sessions, environments), same SSE event stream, same ID formats. Point any HTTP client at `http://localhost:4000/v1` and you get the same API surface.
-- **Runs on your infrastructure** — prompts, code, and outputs stay local. SQLite storage. No telemetry without consent.
-- **Any agent engine** — Claude, Codex, OpenCode, Gemini, Factory, or sync-and-proxy to Anthropic's hosted Managed Agents. One config change to switch.
-- **11 sandbox providers** — Docker, Podman, Apple Container, Apple Firecracker, Sprites, E2B, Vercel, Daytona, Fly, Modal.
-- **Custom tools** — define tools on your agent, the gateway handles the `agent.custom_tool_use` → `user.custom_tool_result` round-trip via an MCP bridge inside the container.
-- **Ships with a web UI** — React dashboard at `localhost:4000` for chat, observability, vault management. Same API as the CLI, nothing hidden.
-- **Vault-encrypted secrets at rest** — AES-256-GCM per-instance key, stored in `.env`, never returned over the API in plaintext.
-
-## Quick Start
-
-### Try it now (zero install)
+## 30-Second Demo
 
 ```bash
 npx @agentstep/gateway quickstart
 ```
 
-### Install globally
+Or with curl:
 
 ```bash
-npm install -g @agentstep/gateway
-gateway serve                # UI + API at http://localhost:4000
-# or
-gateway quickstart           # interactive: create agent, env, session, chat
+# Start the server
+npm install -g @agentstep/gateway && gateway serve
+
+# Create an agent
+curl -X POST http://localhost:4000/v1/agents \
+  -H "x-api-key: $(cat data/.api-key)" \
+  -H "content-type: application/json" \
+  -d '{"name": "fixer", "model": "claude-sonnet-4-6", "tools": [{"type": "agent_toolset_20260401"}]}'
+
+# Create an environment (Docker sandbox)
+curl -X POST http://localhost:4000/v1/environments \
+  -H "x-api-key: $(cat data/.api-key)" \
+  -H "content-type: application/json" \
+  -d '{"name": "dev", "config": {"provider": "docker"}}'
+
+# Start a session and send a message
+curl -X POST http://localhost:4000/v1/sessions \
+  -H "x-api-key: $(cat data/.api-key)" \
+  -H "content-type: application/json" \
+  -d '{"agent": "<agent_id>", "environment_id": "<env_id>"}'
+
+curl -X POST http://localhost:4000/v1/sessions/<session_id>/events \
+  -H "x-api-key: $(cat data/.api-key)" \
+  -H "content-type: application/json" \
+  -d '{"events": [{"type": "user.message", "content": [{"type": "text", "text": "Fix the lint errors in src/utils.js"}]}]}'
 ```
 
-### Docker
+The agent spins up a container, runs the CLI, streams tool calls and messages back as SSE events. Same API shape as Anthropic's hosted service.
+
+## What You Get
+
+- **Any agent engine** -- Claude Code, OpenAI Codex, OpenCode, Gemini CLI, Factory, Pi. Switch with one field.
+- **11 sandbox providers** -- Docker, Podman, Apple Container, Sprites, E2B, Vercel, Daytona, Fly, Modal, and more.
+- **Custom tools** -- define tools on your agent, callers execute them server-side. Full `agent.custom_tool_use` / `user.custom_tool_result` round-trip.
+- **Vault-encrypted secrets** -- AES-256-GCM at rest. API keys, tokens, and credentials never returned in plaintext.
+- **Web UI included** -- React dashboard for chat, session replay, analytics. Embedded in the CLI binary, zero extra setup.
+- **Sync-and-proxy mode** -- point at Anthropic's hosted Managed Agents and get the best of both: their sandbox, your config and observability.
+
+<p align="center">
+  <img src="assets/screenshot-analytics.png" alt="Agent Activity Analytics" width="400" />
+  <img src="assets/screenshot-throughput.png" alt="API Throughput" width="400" />
+</p>
+
+## Install
 
 ```bash
-docker run -p 4000:4000 ghcr.io/agentstep/gateway
+npx @agentstep/gateway quickstart         # zero install, interactive setup
+
+npm install -g @agentstep/gateway          # global install
+gateway serve                              # server at http://localhost:4000
+
+docker run -p 4000:4000 ghcr.io/agentstep/gateway   # Docker
 ```
 
-### From source
+From source:
 
 ```bash
 git clone https://github.com/agentstep/gateway.git
-cd gateway
-npm install
-npm run dev                  # Hono server on :4000 with hot reload
+cd gateway && npm install && npm run dev
 ```
-
-### With Claude Code
-
-```bash
-git clone https://github.com/agentstep/gateway.git
-cd gateway
-claude
-> /setup-gateway
-```
-
-The `/setup-gateway` skill walks through prerequisites, secrets, server boot, and your first session.
 
 Prerequisites: Node.js 22+, and at least one of `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`.
 
-## Anthropic Managed Agents compatibility
+## How It Works
 
-The gateway implements the public Anthropic Managed Agents API shape — `/v1/agents`, `/v1/vaults`, `/v1/environments`, `/v1/sessions`, `/v1/sessions/:id/events`, and the SSE `/stream` endpoint. You can:
+1. **Create an agent** -- name, model, engine, system prompt, tools, MCP servers.
+2. **Create an environment** -- pick a sandbox provider (Docker, Sprites, E2B, ...).
+3. **Start a session** -- the gateway lazy-acquires a container on first turn.
+4. **Send messages** -- `POST /v1/sessions/:id/events` with `user.message`.
+5. **Stream results** -- `GET /v1/sessions/:id/stream` returns SSE events: `agent.message`, `agent.tool_use`, `session.status_idle`.
 
-1. **Run agents entirely locally.** Pick a container provider (docker, apple-container, …), a claude / codex / gemini / … engine, and the gateway manages sandboxes + turns.
-2. **Sync-and-proxy to Anthropic's hosted managed agents.** Create an environment with `provider: "anthropic"` — the gateway syncs your agent config (tools, MCP servers, model) to Anthropic, creates a hosted session, and proxies execution traffic. Best of both worlds: Anthropic manages the sandbox; your config lives locally.
-3. **Anthropic API key passthrough.** Set `ANTHROPIC_PASSTHROUGH_ENABLED=true` (or write the `anthropic_passthrough_enabled` setting). Callers presenting their own `sk-ant-api*` key in `x-api-key` are forwarded to Anthropic transparently — no gateway-issued key required, no local sessions/sync rows created. Same URLs, so any Anthropic SDK works as a drop-in. Requests are still recorded in `/v1/metrics/api` (aggregated by route) so you get observability for free. Gateway-only routes (`/v1/api-keys`, `/v1/settings`, `/v1/tenants`, …) reject `sk-ant-api*` keys with 401.
+Each turn drives the agent CLI inside the container. NDJSON output is translated into the Managed Agents event model and streamed to your client.
 
-See [`docs/guides/anthropic-integration.mdx`](docs/guides/anthropic-integration.mdx) for the sync protocol details.
+## Anthropic Compatibility
+
+The gateway implements the Anthropic Managed Agents API: `/v1/agents`, `/v1/vaults`, `/v1/environments`, `/v1/sessions`, `/v1/sessions/:id/events`, and SSE streaming. Three modes:
+
+1. **Local** -- agent runs in your sandbox. No data leaves your machine.
+2. **Sync-and-proxy** -- set `provider: "anthropic"`. The gateway syncs your agent config to Anthropic, creates a hosted session, and proxies traffic. Anthropic runs the sandbox; you keep the config and observability.
+3. **Passthrough** -- set `ANTHROPIC_PASSTHROUGH_ENABLED=true`. Callers with their own `sk-ant-api*` keys are forwarded to Anthropic transparently. Same URLs, so any Anthropic SDK works as a drop-in.
+
+See [`docs/guides/anthropic-integration.mdx`](docs/guides/anthropic-integration.mdx) for details.
 
 ## CLI
 
 ```bash
-gateway quickstart                     # one-command agent + env + session + chat
-gateway serve [--host 127.0.0.1]       # start the server (loopback by default)
+gateway quickstart                     # interactive setup
+gateway serve [--host 0.0.0.0]        # start server
 gateway agents create --name bot --model claude-sonnet-4-6
 gateway environments create --name dev --provider docker
 gateway sessions create --agent <id> --environment <id>
-gateway chat <session-id>              # interactive chat (markdown, tool output)
-gateway db reset                       # wipe local SQLite (with safety checks)
-gateway config set <key> <value>       # CLI config
+gateway chat <session-id>              # interactive chat with markdown rendering
 ```
 
-All commands accept `--remote <url>` (talk to a remote gateway) and `-o json` (structured output).
+All commands accept `--remote <url>` and `-o json`.
 
-## Security posture
+## Architecture
 
-- **Loopback bind by default.** `gateway serve` binds `127.0.0.1`. Use `--host 0.0.0.0` to expose on the network — the server prints a warning, and the UI refuses to inject the auto-login API key for non-loopback clients.
-- **Vault encryption.** Values are AES-256-GCM encrypted with a per-instance key in `.env`. The API never returns plaintext vault entries.
-- **Settings masking.** `/v1/settings/:key` returns `sk-ant••••••••••Leak`-style masks for secret-shaped keys.
-- **OAuth-token handling.** `sk-ant-oat*` tokens are detected and routed to the correct auth env var for each engine. OAuth tokens are blocked when using the Anthropic provider, which requires a real API key.
-- **Passthrough auth isolation.** When `ANTHROPIC_PASSTHROUGH_ENABLED=true`, `sk-ant-api*` keys are routed by *shape* — never compared against the local `api_keys` table — and intercepted before any handler runs. Passthrough requests can never reach gateway-only routes or write any local row. Random strings 401 locally and are never forwarded upstream.
+| Package | Description |
+|---------|-------------|
+| [`@agentstep/agent-sdk`](https://www.npmjs.com/package/@agentstep/agent-sdk) | Core engine -- backends, providers, DB, session orchestration, vault crypto |
+| [`@agentstep/gateway`](https://www.npmjs.com/package/@agentstep/gateway) | CLI binary -- single-file bundle with web UI embedded |
+| `@agentstep/gateway-hono` | Hono server adapter (powers `gateway serve`) |
+| `@agentstep/gateway-ui` | React + shadcn/ui web app (inlined into CLI) |
 
-Found a security issue? See [`SECURITY.md`](SECURITY.md).
-
-## Packages
-
-| Package | Published | Description |
-|---------|-----------|-------------|
-| [`@agentstep/agent-sdk`](https://www.npmjs.com/package/@agentstep/agent-sdk) | npm | Core engine — backends, providers, DB, session orchestration, vault crypto |
-| [`@agentstep/gateway`](https://www.npmjs.com/package/@agentstep/gateway) | npm | CLI (`gateway`) — single-file bundle with UI embedded |
-| `@agentstep/gateway-ui` | source only | React + shadcn/ui web app (inlined into the CLI bundle) |
-| `@agentstep/gateway-hono` | source only | Hono server adapter (powers `gateway serve`) |
-| `@agentstep/gateway-fastify` | source only | Fastify server adapter (reference implementation) |
-| `@agentstep/gateway-next` | source only | Next.js integration (reference implementation) |
-
-The server packages are reference implementations. The hosted product ([agentstep.com](https://www.agentstep.com)) uses `@agentstep/agent-sdk` directly — same handler functions, same event model.
+The hosted product ([agentstep.com](https://www.agentstep.com)) uses `@agentstep/agent-sdk` directly -- same handler functions, same event model.
 
 ## Development
 
 ```bash
-npm install          # install deps
-npm run dev          # Hono dev server on :4000, hot reload
-npm test             # 800+ tests across agent-sdk + gateway
-npm run typecheck    # tsc --noEmit
-npm run build:ui     # rebuild React UI → inline into CLI bundle
+npm install && npm run dev     # Hono server on :4000, hot reload
+npm test                       # 800+ tests
+npm run typecheck              # tsc --noEmit
+npm run build:ui               # rebuild React UI into CLI bundle
 ```
 
 ## License
 
-[Apache 2.0](LICENSE). See [`CONTRIBUTING.md`](CONTRIBUTING.md) if you want to send a patch.
+[Apache 2.0](LICENSE)
