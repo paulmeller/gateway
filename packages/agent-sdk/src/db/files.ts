@@ -44,7 +44,9 @@ function hydrate(row: FileRow): FileRecord {
     filename: row.filename,
     mime_type: row.content_type,
     size_bytes: row.size,
-    downloadable: true, // local files are always downloadable; remote: files are proxy-downloadable
+    // All local files are downloadable. Anthropic sets downloadable: false
+    // for user-uploaded inputs, but we always serve them (UI needs access).
+    downloadable: true,
     scope: row.scope_type && row.scope_id ? { type: row.scope_type as "session", id: row.scope_id } : null,
     created_at: toIso(row.created_at),
   };
