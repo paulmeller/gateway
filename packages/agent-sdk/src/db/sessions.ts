@@ -333,19 +333,36 @@ export function listSessions(opts: {
   if (opts.createdLt != null) conditions.push(lt(schema.sessions.created_at, opts.createdLt));
   if (opts.createdLte != null) conditions.push(lte(schema.sessions.created_at, opts.createdLte));
   if (opts.cursor) {
-    conditions.push(
-      orderDir === "desc"
-        ? lt(schema.sessions.id, opts.cursor)
-        : gt(schema.sessions.id, opts.cursor),
-    );
+    // Cursor is an ID — look up its created_at for timestamp-based pagination.
+    // Falls back to ID comparison if the cursor row doesn't exist.
+    const cursorRow = db
+      .select({ created_at: schema.sessions.created_at })
+      .from(schema.sessions)
+      .where(eq(schema.sessions.id, opts.cursor))
+      .get() as { created_at: number } | undefined;
+    if (cursorRow) {
+      conditions.push(
+        orderDir === "desc"
+          ? lt(schema.sessions.created_at, cursorRow.created_at)
+          : gt(schema.sessions.created_at, cursorRow.created_at),
+      );
+    } else {
+      conditions.push(
+        orderDir === "desc"
+          ? lt(schema.sessions.id, opts.cursor)
+          : gt(schema.sessions.id, opts.cursor),
+      );
+    }
   }
 
   const where = conditions.length ? and(...conditions) : undefined;
 
+  // Order by created_at (not id) so sessions with different ID prefixes
+  // (e.g. sess_ and sesn_) sort chronologically, not lexicographically.
   const orderClause =
     orderDir === "desc"
-      ? sql`${schema.sessions.id} DESC`
-      : sql`${schema.sessions.id} ASC`;
+      ? sql`${schema.sessions.created_at} DESC, ${schema.sessions.id} DESC`
+      : sql`${schema.sessions.created_at} ASC, ${schema.sessions.id} ASC`;
 
   const rows = (
     where
