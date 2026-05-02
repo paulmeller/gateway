@@ -133,7 +133,7 @@ describe("vault credentials API", () => {
     const body = (await res.json()) as Record<string, unknown>;
 
     expect(body.id).toBeDefined();
-    expect((body.id as string).startsWith("vcrd_")).toBe(true);
+    expect((body.id as string).startsWith("cred_")).toBe(true);
     expect(body.display_name).toBe("GitHub Token");
     expect(body.vault_id).toBe(vaultId);
     expect((body.auth as Record<string, unknown>).type).toBe("static_bearer");

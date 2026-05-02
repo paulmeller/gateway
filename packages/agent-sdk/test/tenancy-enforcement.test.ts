@@ -706,7 +706,7 @@ describe("v0.5 tenant enforcement — session-scoped subresources", () => {
     const { nowMs } = await import("../src/util/clock");
     const db = getDb();
     const now = nowMs();
-    const id = newId("sess");
+    const id = newId("sesn");
     const aid = newId("agent");
     const eid = newId("env");
     db.prepare(

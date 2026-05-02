@@ -40,7 +40,7 @@ export function createMemoryStore(input: {
   agent_id?: string | null;
 }): MemoryStore {
   const db = getDrizzle();
-  const id = newId("ms");
+  const id = newId("memstore");
   const now = nowMs();
   db.insert(schema.memoryStores)
     .values({

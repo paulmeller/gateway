@@ -115,7 +115,7 @@ describe("assignNullRowsToTenant (migrate-legacy semantics)", () => {
     db.prepare(
       `INSERT INTO environments (id, name, config_json, state, created_at) VALUES (?, ?, ?, 'ready', ?)`,
     ).run(envId, "legacy-env", "{}", Date.now());
-    const sessId = newId("sess");
+    const sessId = newId("sesn");
     db.prepare(
       `INSERT INTO sessions (id, agent_id, agent_version, environment_id, status, metadata_json, created_at, updated_at) VALUES (?, ?, 1, ?, 'idle', '{}', ?, ?)`,
     ).run(sessId, agent.id, envId, Date.now(), Date.now());

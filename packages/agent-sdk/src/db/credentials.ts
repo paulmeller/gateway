@@ -35,7 +35,7 @@ export function createCredential(input: {
   mcp_server_url?: string | null;
 }): VaultCredential {
   const db = getDb();
-  const id = newId("vcrd");
+  const id = newId("cred");
   const now = nowMs();
   const encrypted = encryptValue(input.token);
   db.prepare(

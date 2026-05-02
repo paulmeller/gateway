@@ -30,7 +30,7 @@ export function createVault(input: {
   tenant_id?: string | null;
 }): Vault {
   const db = getDrizzle();
-  const id = newId("vault");
+  const id = newId("vlt");
   const now = nowMs();
 
   db.insert(schema.vaults).values({

@@ -98,7 +98,7 @@ export function createSession(input: {
   tenant_id?: string | null;
 }): Session {
   const db = getDrizzle();
-  const id = newId("sess");
+  const id = newId("sesn");
   const now = nowMs();
 
   db.insert(schema.sessions).values({

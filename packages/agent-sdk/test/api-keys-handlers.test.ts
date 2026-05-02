@@ -321,8 +321,8 @@ describe("Per-key cost dashboard (PR2)", () => {
 
     // Seed two sessions: one with api_key_id = adminId, one with null (legacy).
     const now = Date.now();
-    const s1 = newId("sess");
-    const s2 = newId("sess");
+    const s1 = newId("sesn");
+    const s2 = newId("sesn");
     db.prepare(
       `INSERT INTO sessions (id, agent_id, agent_version, environment_id, status, metadata_json, usage_cost_usd, api_key_id, turn_count, created_at, updated_at)
        VALUES (?, ?, 1, ?, 'idle', '{}', 1.23, ?, 2, ?, ?)`,
@@ -364,7 +364,7 @@ describe("Per-key cost dashboard (PR2)", () => {
 
     // Two sessions for the admin key
     for (let i = 0; i < 2; i++) {
-      const id = newId("sess");
+      const id = newId("sesn");
       db.prepare(
         `INSERT INTO sessions (id, agent_id, agent_version, environment_id, status, metadata_json, usage_cost_usd, api_key_id, turn_count, created_at, updated_at)
          VALUES (?, ?, 1, ?, 'idle', '{}', ?, ?, ?, ?, ?)`,
@@ -435,7 +435,7 @@ describe("Metrics time-series per key (PR2.5)", () => {
     const now = Date.now();
     // Two sessions 2 days apart, both owned by adminId.
     for (const daysAgo of [0, 2]) {
-      const id = newId("sess");
+      const id = newId("sesn");
       const at = now - daysAgo * dayMs;
       db.prepare(
         `INSERT INTO sessions (id, agent_id, agent_version, environment_id, status, metadata_json, usage_cost_usd, api_key_id, turn_count, created_at, updated_at)
@@ -493,7 +493,7 @@ describe("Metrics time-series per key (PR2.5)", () => {
         permissions: { admin: false, scope: null },
         rawKey: `ck_topn_${i}_padding_padding_x`,
       });
-      const sessId = newId("sess");
+      const sessId = newId("sesn");
       db.prepare(
         `INSERT INTO sessions (id, agent_id, agent_version, environment_id, status, metadata_json, usage_cost_usd, api_key_id, turn_count, created_at, updated_at)
          VALUES (?, ?, 1, ?, 'idle', '{}', ?, ?, 1, ?, ?)`,
@@ -531,7 +531,7 @@ describe("Metrics time-series per key (PR2.5)", () => {
     const db = getDb();
     const now = Date.now();
 
-    const sessId = newId("sess");
+    const sessId = newId("sesn");
     db.prepare(
       `INSERT INTO sessions (id, agent_id, agent_version, environment_id, status, metadata_json, usage_cost_usd, api_key_id, turn_count, created_at, updated_at)
        VALUES (?, ?, 1, ?, 'idle', '{}', 0.75, NULL, 1, ?, ?)`,

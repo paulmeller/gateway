@@ -181,7 +181,7 @@ describe("M6 SDK compat smoke", () => {
     expect(sessRes.ok).toBe(true);
     const session = (await sessRes.json()) as { id: string; agent: { id: string; version: number } };
     const sid = session.id;
-    expect(sid).toMatch(/^sess_/);
+    expect(sid).toMatch(/^sesn_/);
 
     // 5. Open stream, collect events
     const sseLines: string[] = [];
