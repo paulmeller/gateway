@@ -94,12 +94,18 @@ export async function installSkills(
     return true;
   });
 
+  // Resolve the container's home directory (sprites = /home/sprite,
+  // docker = /root or /home/agent). Skills must be written to $HOME
+  // so Claude Code and other engines can discover them.
+  const homeResult = await provider.exec(sandboxName, ["sh", "-c", "echo $HOME"]);
+  const homeDir = homeResult.stdout.replace(/[\x00-\x1f]/g, "").trim() || "/home/agent";
+
   if (engine === "claude") {
-    // Claude Code reads from .claude/skills/ directory
-    await provider.exec(sandboxName, ["mkdir", "-p", "/home/agent/.claude/skills"]);
+    // Claude Code reads from $HOME/.claude/skills/ directory
+    await provider.exec(sandboxName, ["mkdir", "-p", `${homeDir}/.claude/skills`]);
 
     for (const skill of safeSkills) {
-      const dirPath = `/home/agent/.claude/skills/${skill.name}`;
+      const dirPath = `${homeDir}/.claude/skills/${skill.name}`;
       const filePath = `${dirPath}/SKILL.md`;
       await provider.exec(sandboxName, ["mkdir", "-p", dirPath]);
       await provider.exec(sandboxName, ["sh", "-c", "cat > \"$1\"", "sh", filePath], {
@@ -108,10 +114,10 @@ export async function installSkills(
     }
   }
 
-  // Also write to .agents/skills/ for universal agent compatibility
-  await provider.exec(sandboxName, ["mkdir", "-p", "/home/agent/.agents/skills"]);
+  // Also write to $HOME/.agents/skills/ for universal agent compatibility
+  await provider.exec(sandboxName, ["mkdir", "-p", `${homeDir}/.agents/skills`]);
   for (const skill of safeSkills) {
-    const dirPath = `/home/agent/.agents/skills/${skill.name}`;
+    const dirPath = `${homeDir}/.agents/skills/${skill.name}`;
     const filePath = `${dirPath}/SKILL.md`;
     await provider.exec(sandboxName, ["mkdir", "-p", dirPath]);
     await provider.exec(sandboxName, ["sh", "-c", "cat > \"$1\"", "sh", filePath], {
