@@ -164,17 +164,26 @@ export async function syncContainerFiles(opts: {
   const extracted = extractFilePaths(sessionId);
   let allPaths = extracted.paths;
 
+  console.log(`[container-file-sync] ${sessionId}: extracted ${allPaths.length} paths, sawFileTools=${extracted.sawFileTools}, sawBash=${extracted.sawBash}`);
+  if (allPaths.length > 0) {
+    console.log(`[container-file-sync] ${sessionId}: tracked paths: ${allPaths.join(", ")}`);
+  }
+
   // Fallback: discover changed files on the container when:
   // 1. File tools were used but paths were empty (Codex v0.120+ bug)
   // 2. Bash tool was used (scripts may produce output files like .docx)
   // Merges discovered files with any explicitly tracked paths.
   if (extracted.sawFileTools || extracted.sawBash) {
     const discovered = await discoverChangedFiles(sandboxName, provider, secrets);
+    console.log(`[container-file-sync] ${sessionId}: discovered ${discovered.length} files on container: ${discovered.join(", ")}`);
     for (const p of discovered) {
       if (!allPaths.includes(p)) allPaths.push(p);
     }
   }
-  if (allPaths.length === 0) return { synced: 0, skipped: 0 };
+  if (allPaths.length === 0) {
+    console.log(`[container-file-sync] ${sessionId}: no paths to sync`);
+    return { synced: 0, skipped: 0 };
+  }
 
   // Filter paths
   const validPaths: string[] = [];
@@ -182,15 +191,19 @@ export async function syncContainerFiles(opts: {
 
   for (const p of allPaths) {
     if (!isPathSafe(p)) {
+      console.log(`[container-file-sync] ${sessionId}: skip unsafe: ${p}`);
       skipped++;
       continue;
     }
     if (isBinaryExtension(p)) {
+      console.log(`[container-file-sync] ${sessionId}: skip binary ext: ${p}`);
       skipped++;
       continue;
     }
     validPaths.push(p);
   }
+
+  console.log(`[container-file-sync] ${sessionId}: ${validPaths.length} valid paths, ${skipped} skipped`);
 
   if (validPaths.length === 0) return { synced: 0, skipped };
 
