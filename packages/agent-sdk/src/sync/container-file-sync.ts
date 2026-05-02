@@ -153,12 +153,20 @@ async function discoverChangedFiles(
  * Called by the turn driver between `bumpSessionStats()` and
  * `emit("session.status_idle", ...)` so the container is still alive.
  */
+export interface SyncedFile {
+  id: string;
+  filename: string;
+  size_bytes: number;
+  mime_type: string;
+  container_path: string;
+}
+
 export async function syncContainerFiles(opts: {
   sessionId: string;
   sandboxName: string;
   provider: ContainerProvider;
   secrets?: ProviderSecrets;
-}): Promise<{ synced: number; skipped: number }> {
+}): Promise<{ synced: number; skipped: number; files: SyncedFile[] }> {
   const { sessionId, sandboxName, provider, secrets } = opts;
 
   const extracted = extractFilePaths(sessionId);
@@ -182,7 +190,7 @@ export async function syncContainerFiles(opts: {
   }
   if (allPaths.length === 0) {
     console.log(`[container-file-sync] ${sessionId}: no paths to sync`);
-    return { synced: 0, skipped: 0 };
+    return { synced: 0, skipped: 0, files: [] };
   }
 
   // Filter paths
@@ -205,7 +213,7 @@ export async function syncContainerFiles(opts: {
 
   console.log(`[container-file-sync] ${sessionId}: ${validPaths.length} valid paths, ${skipped} skipped`);
 
-  if (validPaths.length === 0) return { synced: 0, skipped };
+  if (validPaths.length === 0) return { synced: 0, skipped, files: [] };
 
   // Cap at MAX_FILES_PER_SYNC
   if (validPaths.length > MAX_FILES_PER_SYNC) {
@@ -217,6 +225,7 @@ export async function syncContainerFiles(opts: {
   }
 
   let synced = 0;
+  const syncedFiles: SyncedFile[] = [];
 
   // Extensions that must be read as binary (base64) to avoid corruption.
   const BINARY_READ_EXTS = new Set([
@@ -280,6 +289,7 @@ export async function syncContainerFiles(opts: {
         content_hash: hash,
       });
 
+      syncedFiles.push({ id: fileId, filename, size_bytes: data.length, mime_type: contentType, container_path: filePath });
       synced++;
     } catch (err) {
       console.warn(`[container-file-sync] failed to sync ${filePath}:`, err);
@@ -287,7 +297,7 @@ export async function syncContainerFiles(opts: {
     }
   }
 
-  return { synced, skipped };
+  return { synced, skipped, files: syncedFiles };
 }
 
 /** Simple extension-to-MIME map for common code/config file types. */

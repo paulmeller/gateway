@@ -744,6 +744,19 @@ export async function runTurn(
       });
       if (syncResult.synced > 0) {
         console.log(`[driver] synced ${syncResult.synced} files from container (${syncResult.skipped} skipped)`);
+        // Emit session.file_synced for each extracted file so SSE clients
+        // know deliverables are available without polling GET /v1/files.
+        for (const f of syncResult.files) {
+          emit("session.file_synced", {
+            file: {
+              id: f.id,
+              filename: f.filename,
+              size_bytes: f.size_bytes,
+              mime_type: f.mime_type,
+              container_path: f.container_path,
+            },
+          });
+        }
       }
     } catch (err) {
       console.warn("[driver] container file sync failed:", (err as Error)?.stack ?? err);
