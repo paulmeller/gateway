@@ -173,6 +173,40 @@ export async function syncContainerFiles(opts: {
   let allPaths = extracted.paths;
 
   console.log(`[container-file-sync] ${sessionId}: extracted ${allPaths.length} paths, sawFileTools=${extracted.sawFileTools}, sawBash=${extracted.sawBash}`);
+
+  // Auto-execute: if the agent wrote a .js/.mjs script that imports a document
+  // generation library (docx, pdfkit, exceljs, etc.) but never ran it via Bash,
+  // execute it now so the output file exists for sync. This fixes the common
+  // pattern where the model writes a script but skips the "node script.js" step.
+  if (extracted.sawFileTools && !extracted.sawBash) {
+    const scriptPaths = allPaths.filter(p => /\.(js|mjs)$/.test(p));
+    for (const scriptPath of scriptPaths) {
+      try {
+        const peek = await provider.exec(sandboxName, ["head", "-5", scriptPath], { secrets, timeoutMs: 5000 });
+        const head = (peek.stdout ?? "").replace(/[\x00-\x1f]/g, "");
+        const DOC_LIBS = /require\(["']docx["']\)|from\s+["']docx["']|require\(["']pdfkit["']\)|require\(["']exceljs["']\)/;
+        if (DOC_LIBS.test(head)) {
+          console.log(`[container-file-sync] ${sessionId}: auto-executing document script: ${scriptPath}`);
+          const dir = scriptPath.replace(/\/[^/]+$/, "") || "/tmp";
+          // Install the library if needed, then run the script
+          const run = await provider.exec(
+            sandboxName,
+            ["sh", "-c", `cd "${dir}" && npm list docx 2>/dev/null || npm install docx 2>/dev/null; node "${scriptPath}"`],
+            { secrets, timeoutMs: 30000 },
+          );
+          if (run.exit_code === 0) {
+            console.log(`[container-file-sync] ${sessionId}: script executed successfully`);
+            // Mark as if Bash was used so discovery picks up the output
+            extracted.sawBash = true;
+          } else {
+            console.warn(`[container-file-sync] ${sessionId}: script failed (exit ${run.exit_code}): ${(run.stderr ?? "").slice(0, 200)}`);
+          }
+        }
+      } catch (err) {
+        console.warn(`[container-file-sync] ${sessionId}: auto-execute check failed for ${scriptPath}:`, err);
+      }
+    }
+  }
   if (allPaths.length > 0) {
     console.log(`[container-file-sync] ${sessionId}: tracked paths: ${allPaths.join(", ")}`);
   }
