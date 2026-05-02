@@ -2391,9 +2391,10 @@ describe("Provider Status", () => {
       const { handleGetProviderStatus } = await import("../src/handlers/providers");
       const res = await handleGetProviderStatus(req("/v1/providers/status"));
       const body = await res.json() as { data: Record<string, { available: boolean; message?: string }> };
-      expect(body.data.sprites.available).toBe(false);
+      // Cloud providers without env keys are still available (via vault at session time)
+      expect(body.data.sprites.available).toBe(true);
       expect(body.data.sprites.message).toContain("SPRITE_TOKEN");
-      expect(body.data.e2b.available).toBe(false);
+      expect(body.data.e2b.available).toBe(true);
       expect(body.data.e2b.message).toContain("E2B_API_KEY");
     } finally {
       Object.assign(process.env, saved);

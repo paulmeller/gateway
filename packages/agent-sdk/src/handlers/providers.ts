@@ -31,16 +31,18 @@ function checkCloudProvider(name: string): AvailabilityResult {
   const envVar = CLOUD_KEY_MAP[name];
   if (!envVar) return { available: true };
 
+  // Check env var and config (for sprites)
   if (process.env[envVar]) return { available: true };
-
   if (name === "sprites") {
     const config = getConfig();
     if (config.spriteToken) return { available: true };
   }
 
+  // Token not in env/settings — still available if provided via vault at session time.
+  // Mark as available with a note, not as unavailable.
   return {
-    available: false,
-    message: `Requires ${envVar} — add it in Settings > Vaults`,
+    available: true,
+    message: `${envVar} not found in env or settings. Provide via vault_ids at session creation.`,
   };
 }
 
