@@ -45,7 +45,7 @@ export function EventRow({ event, prevEvent }: Props) {
         {delta > 0 && <span className="shrink-0 font-mono text-xs text-muted-foreground/50">+{delta}ms</span>}
       </button>
       {expanded && (
-        <div className="relative border-t border-border bg-muted px-4 py-3">
+        <div className="relative border-t border-border bg-muted px-4 py-3 overflow-hidden min-w-0">
           <Button
             variant="ghost"
             size="icon"

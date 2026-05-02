@@ -18,7 +18,7 @@ export function EventStream() {
   if (!sessionId) return <p className="p-3 text-xs text-muted-foreground/50">No session selected</p>;
 
   return (
-    <div className="flex flex-col overflow-hidden">
+    <div className="flex flex-col overflow-hidden min-w-0">
       <div className="flex items-center justify-between border-b border-border px-3 py-1.5">
         <span className="font-mono text-xs text-muted-foreground">{list.length} events</span>
         <Button
@@ -30,7 +30,7 @@ export function EventStream() {
           <Copy className="size-3" />
         </Button>
       </div>
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {list.map((event, i) => <EventRow key={event.id} event={event} prevEvent={list[i - 1]} />)}
         <div ref={bottomRef} />
       </div>
