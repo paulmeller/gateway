@@ -425,10 +425,12 @@ describe("Agent CLI Operations", () => {
     const { handleListAgents } = await import("../src/handlers/agents");
     const res = await handleListAgents(req("/v1/agents"));
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { data: unknown[]; next_page: string | null };
+    const body = (await res.json()) as { data: unknown[]; has_more: boolean; first_id: string | null; last_id: string | null };
     expect(Array.isArray(body.data)).toBe(true);
     expect(body.data.length).toBe(2);
-    expect("next_page" in body).toBe(true);
+    expect("has_more" in body).toBe(true);
+    expect("first_id" in body).toBe(true);
+    expect("last_id" in body).toBe(true);
   });
 
   it("agents get returns agent by id", async () => {
@@ -548,10 +550,12 @@ describe("Environment CLI Operations", () => {
     const { handleListEnvironments } = await import("../src/handlers/environments");
     const res = await handleListEnvironments(req("/v1/environments"));
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { data: unknown[]; next_page: string | null };
+    const body = (await res.json()) as { data: unknown[]; has_more: boolean; first_id: string | null; last_id: string | null };
     expect(Array.isArray(body.data)).toBe(true);
     expect(body.data.length).toBe(2);
-    expect("next_page" in body).toBe(true);
+    expect("has_more" in body).toBe(true);
+    expect("first_id" in body).toBe(true);
+    expect("last_id" in body).toBe(true);
   });
 
   it("environments get returns env by id", async () => {
@@ -670,10 +674,12 @@ describe("Session CLI Operations", () => {
     const { handleListSessions } = await import("../src/handlers/sessions");
     const res = await handleListSessions(req("/v1/sessions"));
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { data: unknown[]; next_page: string | null };
+    const body = (await res.json()) as { data: unknown[]; has_more: boolean; first_id: string | null; last_id: string | null };
     expect(Array.isArray(body.data)).toBe(true);
     expect(body.data.length).toBe(2);
-    expect("next_page" in body).toBe(true);
+    expect("has_more" in body).toBe(true);
+    expect("first_id" in body).toBe(true);
+    expect("last_id" in body).toBe(true);
   });
 
   it("sessions get returns session by id", async () => {

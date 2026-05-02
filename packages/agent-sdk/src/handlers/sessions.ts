@@ -573,12 +573,13 @@ export function handleListSessions(request: Request): Promise<Response> {
       status = statusRaw as SessionStatus;
     }
 
+    const requestedLimit = limit ? Number(limit) : 50;
     const data = listSessions({
       agent_id: agentId,
       agent_version: agentVersion ? Number(agentVersion) : undefined,
       environmentId,
       status,
-      limit: limit ? Number(limit) : undefined,
+      limit: requestedLimit,
       order: order ?? undefined,
       includeArchived,
       cursor,
@@ -590,7 +591,9 @@ export function handleListSessions(request: Request): Promise<Response> {
     });
     return jsonOk({
       data,
-      next_page: data.length > 0 ? data[data.length - 1].id : null,
+      has_more: data.length === requestedLimit,
+      first_id: data.length > 0 ? data[0].id : null,
+      last_id: data.length > 0 ? data[data.length - 1].id : null,
     });
   });
 }

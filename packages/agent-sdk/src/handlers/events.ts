@@ -714,9 +714,12 @@ export function handleListEvents(request: Request, sessionId: string): Promise<R
     const afterSeq = Number(url.searchParams.get("after_seq") ?? url.searchParams.get("page") ?? "0");
 
     const rows = listEvents(sessionId, { limit, order, afterSeq });
+    const data = rows.map(rowToManagedEvent);
     return jsonOk({
-      data: rows.map(rowToManagedEvent),
-      next_page: rows.length > 0 ? String(rows[rows.length - 1].seq) : null,
+      data,
+      has_more: rows.length === limit,
+      first_id: data.length > 0 ? data[0].id : null,
+      last_id: data.length > 0 ? data[data.length - 1].id : null,
     });
   });
 }

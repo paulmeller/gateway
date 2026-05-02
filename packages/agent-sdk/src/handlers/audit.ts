@@ -46,8 +46,9 @@ export function handleListAudit(request: Request): Promise<Response> {
       outcome = outcomeRaw as AuditOutcome;
     }
 
+    const requestedLimit = limit ? Number(limit) : 100;
     const data = listAudit({
-      limit: limit ? Number(limit) : undefined,
+      limit: requestedLimit,
       cursor,
       action,
       actor_key_id: actorKeyId,
@@ -61,7 +62,9 @@ export function handleListAudit(request: Request): Promise<Response> {
 
     return jsonOk({
       data,
-      next_page: data.length > 0 ? data[data.length - 1].id : null,
+      has_more: data.length === requestedLimit,
+      first_id: data.length > 0 ? data[0].id : null,
+      last_id: data.length > 0 ? data[data.length - 1].id : null,
     });
   });
 }

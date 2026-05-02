@@ -18,9 +18,10 @@ export function handleListThreads(request: Request, sessionId: string): Promise<
     const limit = url.searchParams.get("limit");
     const order = url.searchParams.get("order") as "asc" | "desc" | null;
 
+    const requestedLimit = limit ? Number(limit) : 50;
     const data = listSessions({
       parent_session_id: sessionId,
-      limit: limit ? Number(limit) : undefined,
+      limit: requestedLimit,
       order: order ?? undefined,
       includeArchived: true, // show all threads including completed ones
       tenantFilter: tenantFilter(auth),
@@ -28,7 +29,9 @@ export function handleListThreads(request: Request, sessionId: string): Promise<
 
     return jsonOk({
       data,
-      next_page: data.length > 0 ? data[data.length - 1].id : null,
+      has_more: data.length === requestedLimit,
+      first_id: data.length > 0 ? data[0].id : null,
+      last_id: data.length > 0 ? data[data.length - 1].id : null,
     });
   });
 }

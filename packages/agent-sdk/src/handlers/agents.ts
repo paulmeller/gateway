@@ -224,8 +224,9 @@ export function handleListAgents(request: Request): Promise<Response> {
     const includeArchived = url.searchParams.get("include_archived") === "true";
     const cursor = url.searchParams.get("page") ?? undefined;
 
+    const requestedLimit = limit ? Number(limit) : 20;
     const data = listAgents({
-      limit: limit ? Number(limit) : undefined,
+      limit: requestedLimit,
       order: order ?? undefined,
       includeArchived,
       cursor,
@@ -233,7 +234,9 @@ export function handleListAgents(request: Request): Promise<Response> {
     });
     return jsonOk({
       data,
-      next_page: data.length > 0 ? data[data.length - 1].id : null,
+      has_more: data.length === requestedLimit,
+      first_id: data.length > 0 ? data[0].id : null,
+      last_id: data.length > 0 ? data[data.length - 1].id : null,
     });
   });
 }
