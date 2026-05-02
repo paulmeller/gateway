@@ -227,6 +227,32 @@ An error occurred during processing.
 }
 ```
 
+### `session.file_synced`
+
+A file was auto-extracted from the container after the turn completed.
+Emitted for each file, just before `session.status_idle`. Clients should
+listen for this event to know when deliverables (`.docx`, `.pdf`, etc.)
+are ready to download — no polling required.
+
+```json
+{
+  "type": "session.file_synced",
+  "file": {
+    "id": "file_01ABC...",
+    "filename": "report.docx",
+    "size_bytes": 8492,
+    "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "container_path": "/home/sprite/report.docx"
+  }
+}
+```
+
+Download the file: `GET /v1/files/file_01ABC.../content`
+
+The gateway extracts binary files automatically — agents do **not**
+need to base64-encode files or call `save_output`. Just create the
+file on disk and the gateway handles extraction.
+
 ## Span events
 
 Span events carry OpenTelemetry-style trace context. Each event carries `trace_id`, `span_id`, and `parent_span_id` fields.

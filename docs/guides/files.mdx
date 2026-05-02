@@ -150,16 +150,63 @@ Parameters:
 
 When an agent creates or modifies files during a turn, the gateway
 automatically extracts them from the container after the turn completes.
+This includes **binary files** like `.docx`, `.pdf`, `.xlsx`, `.png`,
+and `.zip` — the gateway reads them via base64 from the container to
+avoid corruption.
 
-Supported tool names:
-- Claude: `Write`, `Edit`
-- Codex: `file_edit` (falls back to `find -mmin` discovery)
-- Gemini: `write_file`, `edit_file`
-- OpenCode: `apply_patch`
-- Pi: `write`, `edit`
+### How it works
 
-Files are deduplicated by content hash (SHA-256) across turns. Only the
-latest version of each file path is returned by `listFiles`.
+1. The agent creates files using any tool (Write, Edit, Bash, etc.)
+2. After the turn, the gateway discovers modified files on the container
+3. Files are extracted, stored in the gateway file store, and a
+   `session.file_synced` event is emitted on the SSE stream
+4. Clients can download via `GET /v1/files/:id/content`
+
+### Discovery methods
+
+- **Tracked tools**: `Write`, `Edit`, `file_edit`, `write_file`,
+  `edit_file`, `apply_patch` — the gateway reads the file path from
+  the tool input
+- **Bash discovery**: when the agent uses `Bash` (e.g. running a
+  script that produces output files), the gateway runs `find` on
+  the container to discover recently modified files in `/home`,
+  `/workspace`, `/mnt`, and `/tmp`
+
+### `session.file_synced` event
+
+Emitted on the SSE stream for each auto-extracted file, just before
+`session.status_idle`:
+
+```json
+{
+  "type": "session.file_synced",
+  "file": {
+    "id": "file_01ABC...",
+    "filename": "report.docx",
+    "size_bytes": 8492,
+    "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "container_path": "/home/sprite/report.docx"
+  }
+}
+```
+
+Clients should listen for this event instead of polling `GET /v1/files`.
+
+### Binary file support
+
+The gateway handles binary files automatically. Agents do **not** need
+to base64-encode files or pass them through `save_output`. Just create
+the file on disk (via a script, tool, or command) and the gateway
+extracts it.
+
+Supported binary formats: `.docx`, `.xlsx`, `.pptx`, `.pdf`, `.zip`,
+`.png`, `.jpg`, `.gif`, `.svg`, `.tar`, `.gz`, and more.
+
+### Limits
+
+- **20 files** synced per turn (configurable)
+- **50 MB** max per file
+- Files are deduplicated by content hash (SHA-256) across turns
 
 ## Anthropic provider (proxy)
 
