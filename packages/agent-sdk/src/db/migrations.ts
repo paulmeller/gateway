@@ -656,4 +656,15 @@ export function runMigrations(db: InstanceType<typeof Database>): void {
   if (envCols3.some((c) => c.name === "template_sprite")) {
     db.exec(`ALTER TABLE environments RENAME COLUMN template_sprite TO template_sandbox`);
   }
+
+  // Per-session quotas: max_tokens + max_wall_duration_ms
+  const sessColsQuota = db
+    .prepare(`PRAGMA table_info(sessions)`)
+    .all() as Array<{ name: string }>;
+  if (!sessColsQuota.some((c) => c.name === "max_tokens")) {
+    db.exec(`ALTER TABLE sessions ADD COLUMN max_tokens INTEGER DEFAULT NULL`);
+  }
+  if (!sessColsQuota.some((c) => c.name === "max_wall_duration_ms")) {
+    db.exec(`ALTER TABLE sessions ADD COLUMN max_wall_duration_ms INTEGER DEFAULT NULL`);
+  }
 }

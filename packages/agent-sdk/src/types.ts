@@ -225,6 +225,8 @@ export interface SessionRow {
   parked_checkpoint_id: string | null;
   provider_name: string;
   max_budget_usd: number | null;
+  max_tokens: number | null;
+  max_wall_duration_ms: number | null;
   outcome_criteria_json: string | null;
   resources_json: string | null;
   vault_ids_json: string | null;
@@ -263,6 +265,8 @@ export interface Session {
   title: string | null;
   metadata: Record<string, unknown>;
   max_budget_usd: number | null;
+  max_tokens: number | null;
+  max_wall_duration_ms: number | null;
   outcome: Record<string, unknown> | null;
   resources: SessionResource[];
   vault_ids: string[];

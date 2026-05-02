@@ -178,6 +178,40 @@ export async function runTurn(
     }
   }
 
+  // Token quota: refuse turn if session has consumed >= max_tokens
+  if (budgetRow != null) {
+    const totalTokens = (budgetRow.usage_input_tokens ?? 0) + (budgetRow.usage_output_tokens ?? 0);
+    if (budgetRow.max_tokens != null && totalTokens >= budgetRow.max_tokens) {
+      emit("session.error", {
+        error: {
+          type: "quota_exceeded",
+          scope: "session",
+          message: `tokens used ${totalTokens} >= session token limit ${budgetRow.max_tokens}`,
+        },
+      });
+      emit("session.status_idle", { stop_reason: formatStopReason("error") });
+      updateSessionStatus(sessionId, "idle", "error");
+      return;
+    }
+  }
+
+  // Wall-duration quota: refuse turn if session age >= max_wall_duration_ms
+  if (budgetRow != null && budgetRow.max_wall_duration_ms != null) {
+    const ageMs = nowMs() - budgetRow.created_at;
+    if (ageMs >= budgetRow.max_wall_duration_ms) {
+      emit("session.error", {
+        error: {
+          type: "quota_exceeded",
+          scope: "session",
+          message: `session age ${ageMs}ms >= wall limit ${budgetRow.max_wall_duration_ms}ms`,
+        },
+      });
+      emit("session.status_idle", { stop_reason: formatStopReason("error") });
+      updateSessionStatus(sessionId, "idle", "error");
+      return;
+    }
+  }
+
   // Mark each pending input as processed-now
   for (const p of inputs) markUserEventProcessed(p.eventId, nowMs());
 

@@ -57,6 +57,8 @@ export function hydrateSession(row: SessionRow): Session {
     title: row.title,
     metadata: JSON.parse(row.metadata_json) as Record<string, unknown>,
     max_budget_usd: row.max_budget_usd ?? null,
+    max_tokens: row.max_tokens ?? null,
+    max_wall_duration_ms: row.max_wall_duration_ms ?? null,
     outcome: row.outcome_criteria_json ? (JSON.parse(row.outcome_criteria_json) as Record<string, unknown>) : null,
     resources,
     vault_ids: row.vault_ids_json ? (JSON.parse(row.vault_ids_json) as string[]) : [],
@@ -88,6 +90,8 @@ export function createSession(input: {
   title?: string | null;
   metadata?: Record<string, unknown>;
   max_budget_usd?: number | null;
+  max_tokens?: number | null;
+  max_wall_duration_ms?: number | null;
   resources?: SessionResource[] | null;
   vault_ids?: string[] | null;
   parent_session_id?: string | null;
@@ -110,6 +114,8 @@ export function createSession(input: {
     title: input.title ?? null,
     metadata_json: JSON.stringify(input.metadata ?? {}),
     max_budget_usd: input.max_budget_usd ?? null,
+    max_tokens: input.max_tokens ?? null,
+    max_wall_duration_ms: input.max_wall_duration_ms ?? null,
     resources_json: input.resources ? JSON.stringify(input.resources) : null,
     vault_ids_json: input.vault_ids ? JSON.stringify(input.vault_ids) : null,
     parent_session_id: input.parent_session_id ?? null,

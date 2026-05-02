@@ -130,6 +130,8 @@ export const sessions = sqliteTable("sessions", {
   parked_checkpoint_id: text("parked_checkpoint_id"),
   provider_name: text("provider_name").notNull().default("sprites"),
   max_budget_usd: real("max_budget_usd"),
+  max_tokens: integer("max_tokens"),
+  max_wall_duration_ms: integer("max_wall_duration_ms"),
   outcome_criteria_json: text("outcome_criteria_json"),
   resources_json: text("resources_json"),
   vault_ids_json: text("vault_ids_json"),
