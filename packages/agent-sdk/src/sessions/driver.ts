@@ -66,11 +66,8 @@ import {
  * DB columns continue to store the plain string; only event payloads use the object shape.
  */
 function formatStopReason(reason: string, eventIds?: string[]): Record<string, unknown> {
-  if (reason === "custom_tool_call" && eventIds?.length) {
-    return { type: "requires_action", event_ids: eventIds };
-  }
   if (reason === "custom_tool_call") {
-    return { type: "requires_action" };
+    return { type: "requires_action", event_ids: eventIds ?? [] };
   }
   return { type: reason };
 }
