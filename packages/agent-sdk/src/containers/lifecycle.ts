@@ -121,8 +121,11 @@ export async function installSkills(
 }
 
 function deriveSandboxName(sessionId: string): string {
-  // Stable prefix + ULID tail, lowercased (sprites.dev requires lowercase names).
-  return `${SANDBOX_NAME_PREFIX}${sessionId.replace(/^sess_/, "").toLowerCase()}`;
+  // Stable prefix + ULID tail, lowercased. Sprites.dev requires lowercase
+  // names with hyphens only (no underscores). Replace all underscores with
+  // hyphens after stripping the ID prefix.
+  const tail = sessionId.replace(/^[a-z]+_/, "").toLowerCase();
+  return `${SANDBOX_NAME_PREFIX}${tail}`;
 }
 
 /**
