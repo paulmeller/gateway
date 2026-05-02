@@ -82,10 +82,17 @@ export function handleListCredentials(
   request: Request,
   vaultId: string,
 ): Promise<Response> {
-  return routeWrap(request, async ({ auth }) => {
+  return routeWrap(request, async ({ auth, request: req }) => {
     loadVaultForCaller(auth, vaultId); // tenant guard
+    const url = new URL(req.url);
+    const requestedLimit = Number(url.searchParams.get("limit") || "100");
     const data = listCredentials(vaultId);
-    return jsonOk({ data });
+    return jsonOk({
+      data,
+      has_more: data.length === requestedLimit,
+      first_id: data.length > 0 ? data[0].id : null,
+      last_id: data.length > 0 ? data[data.length - 1].id : null,
+    });
   });
 }
 

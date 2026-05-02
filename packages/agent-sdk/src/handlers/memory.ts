@@ -76,11 +76,17 @@ export function handleListMemoryStores(request: Request): Promise<Response> {
   return routeWrap(request, async ({ auth, request: req }) => {
     const url = new URL(req.url);
     const agentId = url.searchParams.get("agent_id") ?? undefined;
+    const requestedLimit = Number(url.searchParams.get("limit") || "100");
     const data = listMemoryStores({
       agent_id: agentId,
       tenantFilter: tenantFilter(auth),
     });
-    return jsonOk({ data });
+    return jsonOk({
+      data,
+      has_more: data.length === requestedLimit,
+      first_id: data.length > 0 ? data[0].id : null,
+      last_id: data.length > 0 ? data[data.length - 1].id : null,
+    });
   });
 }
 
@@ -126,10 +132,17 @@ export function handleCreateMemory(request: Request, storeId: string): Promise<R
 }
 
 export function handleListMemories(request: Request, storeId: string): Promise<Response> {
-  return routeWrap(request, async ({ auth }) => {
+  return routeWrap(request, async ({ auth, request: req }) => {
     loadStoreForCaller(auth, storeId); // tenant guard
+    const url = new URL(req.url);
+    const requestedLimit = Number(url.searchParams.get("limit") || "100");
     const data = listMemories(storeId);
-    return jsonOk({ data });
+    return jsonOk({
+      data,
+      has_more: data.length === requestedLimit,
+      first_id: data.length > 0 ? data[0].id : null,
+      last_id: data.length > 0 ? data[data.length - 1].id : null,
+    });
   });
 }
 
