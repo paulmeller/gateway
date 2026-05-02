@@ -141,7 +141,9 @@ async function discoverChangedFiles(
       { secrets, timeoutMs: 10000 },
     );
     if (result.exit_code !== 0 || !result.stdout.trim()) return [];
-    return result.stdout.trim().split("\n").filter(Boolean);
+    // Strip sprites HTTP exec control chars before parsing paths
+    const clean = result.stdout.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+    return clean.trim().split("\n").map(l => l.trim()).filter(Boolean);
   } catch {
     return [];
   }
