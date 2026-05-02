@@ -1162,6 +1162,23 @@ async function checkToolBridgeSentinel(
     return;
   }
 
+  // Guard: if save_output is called with a script file (.js, .py, .sh, .ts),
+  // auto-respond with an error telling the agent to run the script first.
+  // This prevents the model from short-circuiting (Write → save_output)
+  // when it should be (Write → Bash run → save_output with result).
+  const input = request.input as Record<string, unknown> | undefined;
+  const filename = (input?.filename as string) ?? "";
+  const SCRIPT_EXTS = /\.(js|ts|py|sh|mjs|cjs)$/i;
+  if (request.name === "save_output" && SCRIPT_EXTS.test(filename)) {
+    console.log(`[driver] ${sessionId} rejecting save_output for script file: ${filename}`);
+    pendingToolBridgeCalls.add(sessionId);
+    await writeToolBridgeResponse(sessionId, [{
+      type: "text",
+      text: `Error: "${filename}" is a script file, not a deliverable. Run the script first (e.g. "node ${filename}" or "python3 ${filename}"), then call save_output with the OUTPUT file (e.g. the .docx, .pdf, or .csv that the script produces).`,
+    }]);
+    return;
+  }
+
   // Mark as pending to avoid duplicate events
   pendingToolBridgeCalls.add(sessionId);
 
