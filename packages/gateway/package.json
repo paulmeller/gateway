@@ -1,6 +1,6 @@
 {
   "name": "@agentstep/gateway",
-  "version": "0.4.30",
+  "version": "0.4.31",
   "description": "Self-hosted, open-source, Anthropic Managed Agents-compatible. CLI + web UI for running AI agents in sandboxed environments.",
   "keywords": [
     "anthropic",
