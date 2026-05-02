@@ -17,11 +17,10 @@ import { storeFile } from "../files/storage";
 import { newId } from "../util/ids";
 import type { ContainerProvider, ProviderSecrets } from "../providers/types";
 
-/** Known binary extensions to skip (no point syncing these as text). */
+/** Extensions to skip entirely (build artifacts, not deliverables). */
 const BINARY_EXTENSIONS = new Set([
   ".o", ".pyc", ".so", ".dylib", ".bin", ".wasm",
-  ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg",
-  ".mp3", ".mp4", ".zip", ".tar", ".gz", ".pdf",
+  ".mp3", ".mp4",
 ]);
 
 /** Blocked path prefixes — system directories that should never be synced. */
@@ -43,6 +42,7 @@ const MAX_FILES_PER_SYNC = 20;
 interface ExtractResult {
   paths: string[];
   sawFileTools: boolean;
+  sawBash: boolean;
 }
 
 function extractFilePaths(sessionId: string): ExtractResult {
@@ -50,6 +50,7 @@ function extractFilePaths(sessionId: string): ExtractResult {
   const seen = new Set<string>();
   const paths: string[] = [];
   let sawFileTools = false;
+  let sawBash = false;
 
   for (const evt of events) {
     if (evt.type !== "agent.tool_use") continue;
@@ -68,6 +69,8 @@ function extractFilePaths(sessionId: string): ExtractResult {
     if (FILE_TOOLS.has(toolName ?? "") && payload.input) {
       sawFileTools = true;
       filePath = (payload.input.file_path ?? payload.input.filePath ?? payload.input.path) as string | undefined;
+    } else if (toolName === "Bash" || toolName === "bash") {
+      sawBash = true;
     } else if (toolName === "apply_patch" && payload.input) {
       sawFileTools = true;
       // OpenCode apply_patch: extract path from patchText "*** Add File: /path" or "*** Update File: /path"
@@ -85,7 +88,7 @@ function extractFilePaths(sessionId: string): ExtractResult {
     paths.push(resolved);
   }
 
-  return { paths, sawFileTools };
+  return { paths, sawFileTools, sawBash };
 }
 
 /**
@@ -125,7 +128,7 @@ async function discoverChangedFiles(
     const result = await provider.exec(
       sandboxName,
       ["sh", "-c", [
-        "find /home /root /workspace /mnt",
+        "find /home /root /workspace /mnt /tmp",
         "-maxdepth 4 -type f -mmin -30 -size +0c",
         "! -path '*/.git/*' ! -path '*/node_modules/*' ! -path '*/.npm/*'",
         "! -path '*/.config/*' ! -path '*/.local/*' ! -path '*/.cache/*'",
@@ -160,12 +163,15 @@ export async function syncContainerFiles(opts: {
   const extracted = extractFilePaths(sessionId);
   let allPaths = extracted.paths;
 
-  // Fallback: if file tools were used but paths were empty (e.g. Codex
-  // v0.120+ emits file_edit with empty path), discover changed files on
-  // the container. Only runs when file tools were actually invoked —
-  // prevents syncing stale files from reused containers.
-  if (allPaths.length === 0 && extracted.sawFileTools) {
-    allPaths = await discoverChangedFiles(sandboxName, provider, secrets);
+  // Fallback: discover changed files on the container when:
+  // 1. File tools were used but paths were empty (Codex v0.120+ bug)
+  // 2. Bash tool was used (scripts may produce output files like .docx)
+  // Merges discovered files with any explicitly tracked paths.
+  if (extracted.sawFileTools || extracted.sawBash) {
+    const discovered = await discoverChangedFiles(sandboxName, provider, secrets);
+    for (const p of discovered) {
+      if (!allPaths.includes(p)) allPaths.push(p);
+    }
   }
   if (allPaths.length === 0) return { synced: 0, skipped: 0 };
 
@@ -198,30 +204,40 @@ export async function syncContainerFiles(opts: {
 
   let synced = 0;
 
+  // Extensions that must be read as binary (base64) to avoid corruption.
+  const BINARY_READ_EXTS = new Set([
+    ".docx", ".xlsx", ".pptx", ".pdf", ".zip", ".tar", ".gz",
+    ".png", ".jpg", ".jpeg", ".gif", ".ico", ".webp",
+    ".woff", ".woff2", ".ttf", ".otf", ".eot",
+  ]);
+
   for (const filePath of validPaths) {
     try {
-      const result = await provider.exec(
-        sandboxName,
-        ["cat", "--", filePath],
-        { secrets, timeoutMs: 15000 },
-      );
+      const ext = path.extname(filePath).toLowerCase();
+      const isBinary = BINARY_READ_EXTS.has(ext);
+
+      const result = isBinary
+        ? await provider.exec(sandboxName, ["base64", "-w", "0", "--", filePath], { secrets, timeoutMs: 15000 })
+        : await provider.exec(sandboxName, ["cat", "--", filePath], { secrets, timeoutMs: 15000 });
 
       if (result.exit_code !== 0 || !result.stdout) {
         skipped++;
         continue;
       }
 
-      const content = result.stdout;
+      // Strip sprites control chars from output
+      const raw = result.stdout.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+
+      const data = isBinary ? Buffer.from(raw.trim(), "base64") : Buffer.from(raw, "utf8");
 
       // Size check
-      const byteLength = Buffer.byteLength(content, "utf8");
-      if (byteLength > MAX_FILE_SIZE) {
+      if (data.length > MAX_FILE_SIZE) {
         skipped++;
         continue;
       }
 
       // Compute SHA-256 hash
-      const hash = createHash("sha256").update(content).digest("hex");
+      const hash = createHash("sha256").update(data).digest("hex");
 
       // Dedup check
       const existing = findFileByContainerPath(sessionId, filePath, hash);
@@ -233,12 +249,11 @@ export async function syncContainerFiles(opts: {
       // Store on disk
       const fileId = newId("file");
       const filename = path.basename(filePath);
-      const data = Buffer.from(content, "utf8");
       const storagePath = storeFile(fileId, filename, data);
 
       // Determine content type from extension
-      const ext = path.extname(filename).toLowerCase();
-      const contentType = MIME_MAP[ext] ?? "text/plain";
+      const fileExt = path.extname(filename).toLowerCase();
+      const contentType = MIME_MAP[fileExt] ?? "text/plain";
 
       // Insert DB row
       createFile({
