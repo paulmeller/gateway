@@ -366,8 +366,8 @@ export async function runTurn(
     turnBuild.env.RESOURCES_DIR = "/tmp/resources";
   }
 
-  // Give MCP servers more time to connect on Firecracker VMs where
-  // Node.js cold-start takes ~1.2s. Default is 5s which is too tight.
+  // Give agent-configured MCP servers more time to connect on Firecracker VMs
+  // where Node.js cold-start takes ~1.2s. Default is 5s which is too tight.
   if (agent.engine === "claude" && !turnBuild.env.MCP_TIMEOUT) {
     turnBuild.env.MCP_TIMEOUT = "30000";
   }
@@ -495,7 +495,7 @@ export async function runTurn(
         const responseJson = JSON.stringify({ content: r.content });
         await provider.exec(
           sandboxName,
-          ["bash", "-c", `cat > ${TOOL_BRIDGE_RESPONSE_PATH}`],
+          ["sh", "-c", `cat > ${TOOL_BRIDGE_RESPONSE_PATH}`],
           { stdin: responseJson, secrets },
         ).catch((err: unknown) => {
           console.warn(`[driver] failed to write tool bridge response:`, err);
@@ -566,9 +566,8 @@ export async function runTurn(
   // loop. When found, read request.json, emit agent.custom_tool_use, and wait
   // for the client to respond with user.custom_tool_result (which calls
   // writeToolBridgeResponse to unblock the bridge inside the container).
-  const customToolNames = resolveToolset(agent.tools).customToolNames;
   let toolBridgePollTimer: ReturnType<typeof setInterval> | null = null;
-  if (agent.engine === "claude" && customToolNames.size > 0) {
+  if (agent.engine === "claude" && tools.customToolNames.size > 0) {
     toolBridgePollTimer = setInterval(() => {
       void checkToolBridgeSentinel(sessionId, sandboxName, provider, secrets, trace).catch(
         (err: unknown) => {
@@ -785,7 +784,7 @@ export async function runTurn(
         const reentrySecrets = pool.getBySession(sessionId)?.vaultSecrets;
         await providerForReentry.exec(
           sprName,
-          ["bash", "-c", `cat > ${TOOL_BRIDGE_RESPONSE_PATH}`],
+          ["sh", "-c", `cat > ${TOOL_BRIDGE_RESPONSE_PATH}`],
           { stdin: responseJson, secrets: reentrySecrets },
         ).catch((err: unknown) => {
           console.warn(`[driver] failed to write spawn_agent response:`, err);
@@ -1033,6 +1032,7 @@ async function checkPermissionSentinel(
     const result = await provider.exec(
       sandboxName,
       ["test", "-f", PERMISSION_BRIDGE_PENDING_PATH],
+      { timeoutMs: 5000 },
     );
     if (result.exit_code !== 0) return; // No pending sentinel
   } catch {
@@ -1045,6 +1045,7 @@ async function checkPermissionSentinel(
     const result = await provider.exec(
       sandboxName,
       ["cat", PERMISSION_BRIDGE_REQUEST_PATH],
+      { timeoutMs: 5000 },
     );
     request = JSON.parse(result.stdout) as typeof request;
   } catch (err) {
@@ -1096,7 +1097,7 @@ export async function writePermissionResponse(
   try {
     await provider.exec(
       row.sandbox_name,
-      ["bash", "-c", `cat > ${PERMISSION_BRIDGE_RESPONSE_PATH}`],
+      ["sh", "-c", `cat > ${PERMISSION_BRIDGE_RESPONSE_PATH}`],
       { stdin: response, secrets: permSecrets },
     );
   } catch (err) {
@@ -1139,7 +1140,7 @@ async function checkToolBridgeSentinel(
     const result = await provider.exec(
       sandboxName,
       ["test", "-f", TOOL_BRIDGE_PENDING_PATH],
-      { secrets },
+      { secrets, timeoutMs: 5000 },
     );
     if (result.exit_code !== 0) return; // No pending sentinel
   } catch {
@@ -1152,7 +1153,7 @@ async function checkToolBridgeSentinel(
     const result = await provider.exec(
       sandboxName,
       ["cat", TOOL_BRIDGE_REQUEST_PATH],
-      { secrets },
+      { secrets, timeoutMs: 5000 },
     );
     // Strip sprites HTTP exec control chars (stdout/stderr multiplexing)
     const clean = result.stdout.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");

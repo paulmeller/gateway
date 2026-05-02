@@ -140,7 +140,7 @@ async function installPermissionHook(
   // Write the hook script
   await provider.exec(
     sandboxName,
-    ["bash", "-c", `cat > ${PERMISSION_HOOK_SCRIPT_PATH}`],
+    ["sh", "-c", `cat > ${PERMISSION_HOOK_SCRIPT_PATH}`],
     { stdin: generatePermissionHookScript() },
   );
   await provider.exec(sandboxName, ["chmod", "+x", PERMISSION_HOOK_SCRIPT_PATH]);
@@ -149,7 +149,12 @@ async function installPermissionHook(
   // Claude Code reads hooks from the user's settings file at startup.
   // We need to merge with any existing settings (e.g. from prior setup).
   const hooksConfig = buildPermissionHooksConfig();
-  const settingsPath = "/home/sprite/.claude/settings.json";
+
+  // Resolve $HOME dynamically — avoids hardcoding /home/sprite which breaks
+  // on Docker (root) and other providers where the home dir differs.
+  const homeResult = await provider.exec(sandboxName, ["sh", "-c", "echo $HOME"]);
+  const homeDir = homeResult.stdout.replace(/[\x00-\x1f]/g, "").trim() || "/home/sprite";
+  const settingsPath = `${homeDir}/.claude/settings.json`;
 
   // Read existing settings if any, merge hooks config
   let existingSettings: Record<string, unknown> = {};
@@ -168,7 +173,7 @@ async function installPermissionHook(
   const merged = { ...existingSettings, ...hooksConfig };
   await provider.exec(
     sandboxName,
-    ["bash", "-c", `mkdir -p /home/sprite/.claude && cat > ${settingsPath}`],
+    ["sh", "-c", `mkdir -p "${homeDir}/.claude" && cat > "${settingsPath}"`],
     { stdin: JSON.stringify(merged, null, 2) },
   );
 }

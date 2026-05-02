@@ -68,7 +68,7 @@ The turn driver (`packages/agent-sdk/src/sessions/driver.ts`) orchestrates every
 
 **Event bus** (`sessions/bus.ts`): Append-only log. DB is authoritative; EventEmitter provides live tail.
 
-**Backend interface** (`backends/types.ts`): `buildTurn()`, `createTranslator()`, `prepareOnSprite()`, `validateAgentCreation()`. Six implementations: claude, opencode, codex, gemini, factory, pi.
+**Backend interface** (`backends/types.ts`): `buildTurn()`, `createTranslator()`, `prepareOnSandbox()`, `validateAgentCreation()`. Six implementations: claude, opencode, codex, gemini, factory, pi.
 
 **Provider interface** (`providers/types.ts`): `create()`, `delete()`, `exec()`, `startExec()`. Eleven implementations: sprites (default), docker, apple-container, apple-firecracker, podman, e2b, vercel, daytona, fly, modal, mvm. Lazy dynamic imports in `providers/registry.ts`.
 
@@ -97,7 +97,7 @@ libsql (SQLite) with WAL mode. Schema is idempotent (`CREATE TABLE IF NOT EXISTS
 
 ### Tests
 
-518 tests across 32 test files (480 agent-sdk + 38 gateway):
+800+ tests across 50+ test files:
 - `packages/agent-sdk/test/api-comprehensive.test.ts` (~200) — full API surface + settings masking
 - `packages/agent-sdk/test/cli-local-backend.test.ts` — CLI handler-based flow
 - `packages/agent-sdk/test/translator-*.test.ts` — all backend translators + error handling

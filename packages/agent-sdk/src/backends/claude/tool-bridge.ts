@@ -3,18 +3,21 @@
  * Managed Agents custom tools to claude inside the container.
  *
  * Architecture:
- *   - A Node.js script that implements the MCP stdio protocol (JSON-RPC on
- *     stdin/stdout)
+ *   - A pure-bash script that implements the MCP stdio protocol (JSON-RPC on
+ *     stdin/stdout) — no Node.js dependency, instant startup (~10ms vs ~1.2s
+ *     on Firecracker VMs)
  *   - Reads tool definitions from /tmp/tool-bridge/tools.json
  *   - On tool call: checks for pre-existing response.json (replay after
  *     --resume) and returns immediately. Otherwise writes request.json +
- *     creates pending sentinel, then watches for response.json via
- *     fs.watchFile and returns the result.
+ *     creates pending sentinel, then polls for response.json (200ms interval,
+ *     5-min timeout) and returns the result.
+ *   - Handles both raw JSON lines (Claude Code v2.1.83+) and Content-Length
+ *     framed JSON-RPC input; always responds with raw JSON lines.
  *
- * The driver detects custom_tool_use via the translator's sawCustomToolUse()
- * flag and stop_reason:"custom_tool_call". On user.custom_tool_result
- * re-entry, the driver writes response.json and removes the pending sentinel
- * before calling --resume.
+ * The driver polls for /tmp/tool-bridge/pending every 1s during the stream
+ * loop. When found, it reads request.json, emits agent.custom_tool_use, and
+ * waits for user.custom_tool_result to write response.json and remove the
+ * pending sentinel.
  */
 
 import type { CustomTool } from "../../types";
@@ -24,7 +27,6 @@ export const TOOL_BRIDGE_SCRIPT_PATH = `${TOOL_BRIDGE_DIR}/bridge.sh`;
 export const TOOL_BRIDGE_TOOLS_PATH = `${TOOL_BRIDGE_DIR}/tools.json`;
 export const TOOL_BRIDGE_REQUEST_PATH = `${TOOL_BRIDGE_DIR}/request.json`;
 export const TOOL_BRIDGE_RESPONSE_PATH = `${TOOL_BRIDGE_DIR}/response.json`;
-export const TOOL_BRIDGE_MCP_CONFIG_PATH = `${TOOL_BRIDGE_DIR}/mcp.json`;
 export const TOOL_BRIDGE_PENDING_PATH = `${TOOL_BRIDGE_DIR}/pending`;
 
 /**

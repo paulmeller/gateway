@@ -495,10 +495,13 @@ export async function replenishWarmPool(
  */
 export async function fillWarmPools(): Promise<void> {
   const cfg = getConfig();
-  if (cfg.warmPoolSize <= 0) return; // fast exit when warm pool is globally off
 
   const envs = listEnvironments({ includeArchived: false, limit: 100 });
   const readyEnvs = envs.filter((e) => e.state === "ready");
+
+  // Fast exit only when the global setting is off AND no environment has a
+  // per-env warm_pool_size override that might enable it locally.
+  if (cfg.warmPoolSize <= 0 && !readyEnvs.some((e) => (e.config?.warm_pool_size ?? 0) > 0)) return;
   if (readyEnvs.length === 0) return;
 
   // Simple semaphore — at most 3 concurrent environment fills

@@ -133,6 +133,7 @@ async function discoverChangedFiles(
         "! -path '*/.git/*' ! -path '*/node_modules/*' ! -path '*/.npm/*'",
         "! -path '*/.config/*' ! -path '*/.local/*' ! -path '*/.cache/*'",
         "! -path '*/cache/*' ! -path '*-debug-*.log'",
+        "! -path '*/tool-bridge/*' ! -path '*/permission-bridge/*' ! -path '*/v8-cache/*'",
         "! -name '.*' ! -name '*.sqlite' ! -name '*.sqlite-*'",
         "! -name 'installation_id' ! -name 'plugins.sha'",
         "2>/dev/null | head -30",
