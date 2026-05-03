@@ -1,6 +1,6 @@
 {
   "name": "@agentstep/gateway",
-  "version": "0.4.40",
+  "version": "0.4.41",
   "description": "Self-hosted, open-source, Anthropic Managed Agents-compatible. CLI + web UI for running AI agents in sandboxed environments.",
   "keywords": [
     "anthropic",
@@ -33,7 +33,7 @@
   "author": "AgentStep",
   "repository": {
     "type": "git",
-    "url": "https://github.com/agentstep/gateway.git",
+    "url": "https://github.com/paulmeller/gateway.git",
     "directory": "packages/gateway"
   },
   "license": "Apache-2.0",
