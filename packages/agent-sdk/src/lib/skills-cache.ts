@@ -109,6 +109,46 @@ function buildSortedViews(items: IndexSkill[]) {
 
 // --- Feed ---
 
+/**
+ * Normalize raw feed JSON into FeedData. Accepts two shapes:
+ *   1. Native: { topAllTime, topTrending, topHot, updatedAt }
+ *   2. learn-skills.dev: { allTime: [{source, skillId, name, installs}], updatedAt, providerId }
+ */
+function normalizeFeed(raw: unknown): FeedData {
+  const r = raw as Record<string, unknown>;
+  const updatedAt = typeof r.updatedAt === "string" ? r.updatedAt : new Date().toISOString();
+
+  // Native format — already has topAllTime
+  if (Array.isArray(r.topAllTime)) {
+    return {
+      title: typeof r.title === "string" ? r.title : "Skills",
+      updatedAt,
+      topAllTime: r.topAllTime as FeedSkill[],
+      topTrending: (r.topTrending ?? r.topAllTime) as FeedSkill[],
+      topHot: (r.topHot ?? r.topAllTime) as FeedSkill[],
+    };
+  }
+
+  // learn-skills.dev format — { allTime: [{source, skillId, name, installs}] }
+  const allTime = (r.allTime ?? r.items ?? r.skills) as Array<Record<string, unknown>> | undefined;
+  const providerId = typeof r.providerId === "string" ? r.providerId : "skills.sh";
+  if (Array.isArray(allTime) && allTime.length > 0) {
+    const mapped: FeedSkill[] = allTime.slice(0, 50).map((s) => ({
+      id: (s.skillId ?? s.id ?? `${s.source}/${s.name}`) as string,
+      title: (s.name ?? s.title ?? s.skillId) as string,
+      source: (s.source ?? "") as string,
+      installs: (s.installs ?? s.installsAllTime ?? 0) as number,
+      link: (s.link ?? `https://github.com/${s.source}`) as string,
+      providerId: (s.providerId ?? providerId) as string,
+      description: (s.description ?? "") as string,
+    }));
+    return { title: "Skills", updatedAt, topAllTime: mapped, topTrending: mapped, topHot: mapped };
+  }
+
+  // Empty / unknown — return empty feed
+  return { title: "Skills", updatedAt, topAllTime: [], topTrending: [], topHot: [] };
+}
+
 async function fetchFeed(): Promise<FeedData> {
   const headers: Record<string, string> = {};
   if (feedCache.etag) headers["If-None-Match"] = feedCache.etag;
@@ -119,7 +159,7 @@ async function fetchFeed(): Promise<FeedData> {
     return feedCache.data;
   }
   const etag = res.headers.get("etag");
-  const data = (await res.json()) as FeedData;
+  const data = normalizeFeed(await res.json());
   feedCache.data = data;
   feedCache.fetchedAt = Date.now();
   feedCache.etag = etag;
@@ -148,20 +188,43 @@ export function getFeed(): Promise<FeedData> {
 // --- Full index ---
 
 /**
- * Normalize the index response into the IndexData shape. The agentstep.com
- * endpoint currently returns `{updatedAt, totalSkills, skills}` while the
- * historical static JSON uses `{updatedAt, count, items}`. Accept either
- * so the default URL can move without a code change.
+ * Normalize the index response into IndexData. Accepts three shapes:
+ *   1. Native: { updatedAt, count, items: IndexSkill[] }
+ *   2. Agentstep: { updatedAt, totalSkills, skills: IndexSkill[] }
+ *   3. learn-skills.dev: { updatedAt, providerId, allTime: [{source, skillId, name, installs}] }
  */
 function normalizeIndex(raw: unknown): IndexData {
   const r = raw as Record<string, unknown>;
+  const updatedAt = typeof r.updatedAt === "string" ? r.updatedAt : new Date(0).toISOString();
+
+  // Native or agentstep format
   const items = (r.items ?? r.skills) as IndexSkill[] | undefined;
-  const count = (r.count ?? r.totalSkills) as number | undefined;
-  return {
-    updatedAt: typeof r.updatedAt === "string" ? r.updatedAt : new Date(0).toISOString(),
-    count: typeof count === "number" ? count : items?.length ?? 0,
-    items: Array.isArray(items) ? items : [],
-  };
+  if (Array.isArray(items) && items.length > 0 && typeof items[0] === "object" && "installsAllTime" in (items[0] as object)) {
+    const count = (r.count ?? r.totalSkills) as number | undefined;
+    return { updatedAt, count: typeof count === "number" ? count : items.length, items };
+  }
+
+  // learn-skills.dev format
+  const allTime = (r.allTime ?? items) as Array<Record<string, unknown>> | undefined;
+  const providerId = typeof r.providerId === "string" ? r.providerId : "skills.sh";
+  if (Array.isArray(allTime) && allTime.length > 0) {
+    const mapped: IndexSkill[] = allTime.map((s) => ({
+      id: (s.skillId ?? s.id ?? `${s.source}/${s.name}`) as string,
+      providerId: (s.providerId ?? providerId) as string,
+      source: (s.source ?? "") as string,
+      skillId: (s.skillId ?? s.name ?? s.id) as string,
+      title: (s.name ?? s.title ?? s.skillId) as string,
+      link: (s.link ?? `https://github.com/${s.source}`) as string,
+      installsAllTime: (s.installs ?? s.installsAllTime ?? 0) as number,
+      installsTrending: (s.installs ?? s.installsTrending ?? 0) as number,
+      installsHot: (s.installs ?? s.installsHot ?? 0) as number,
+      firstSeenAt: (s.firstSeenAt ?? "") as string,
+      description: (s.description ?? "") as string,
+    }));
+    return { updatedAt, count: mapped.length, items: mapped };
+  }
+
+  return { updatedAt, count: 0, items: [] };
 }
 
 async function fetchIndex(): Promise<IndexData> {
