@@ -12,8 +12,8 @@ export interface CliConfig {
 
 function configDir(): string {
   const xdg = process.env.XDG_CONFIG_HOME;
-  if (xdg) return join(xdg, "managed-agents");
-  return join(homedir(), ".config", "managed-agents");
+  if (xdg) return join(xdg, "agentstep");
+  return join(homedir(), ".config", "agentstep");
 }
 
 export function configPath(): string {
