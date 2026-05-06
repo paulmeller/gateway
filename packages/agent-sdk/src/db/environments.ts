@@ -7,6 +7,7 @@ import type { Environment, EnvironmentConfig, EnvironmentRow, EnvironmentState }
 
 function hydrate(row: EnvironmentRow): Environment {
   return {
+    type: "environment" as const,
     id: row.id,
     name: row.name,
     description: row.description ?? null,

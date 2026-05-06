@@ -191,6 +191,7 @@ export interface EnvironmentRow {
 }
 
 export interface Environment {
+  type: "environment";
   id: string;
   name: string;
   description: string | null;
