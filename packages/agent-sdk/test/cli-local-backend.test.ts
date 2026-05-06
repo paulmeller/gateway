@@ -281,7 +281,7 @@ describe("Quickstart Flow", () => {
     await bootDb();
     const agent = await createAgent({ name: "CodexAgent", engine: "codex", model: "codex-mini-latest" });
     expect(agent.engine).toBe("codex");
-    expect(agent.model).toBe("codex-mini-latest");
+    expect(agent.model).toEqual({ id: "codex-mini-latest" });
   });
 
   it("agent creation returns id, name, model, engine", async () => {
@@ -289,7 +289,7 @@ describe("Quickstart Flow", () => {
     const agent = await createAgent({ name: "FieldsAgent", model: "claude-sonnet-4-6" });
     expect(agent).toHaveProperty("id");
     expect(agent).toHaveProperty("name", "FieldsAgent");
-    expect(agent).toHaveProperty("model", "claude-sonnet-4-6");
+    expect(agent).toHaveProperty("model", { id: "claude-sonnet-4-6" });
     expect(agent).toHaveProperty("engine", "claude");
   });
 

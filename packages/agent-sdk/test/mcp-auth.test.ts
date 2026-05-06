@@ -2,16 +2,36 @@ import { describe, it, expect } from "vitest";
 import { injectMcpAuthHeaders } from "../src/sessions/mcp-auth";
 import type { Agent } from "../src/types";
 
+/** Convert a name → config record into the array format used by Agent.mcp_servers. */
+function toMcpArray(
+  record: Record<string, { type?: string; url?: string; headers?: Record<string, string> }>,
+): Agent["mcp_servers"] {
+  return Object.entries(record).map(([name, cfg]) => ({
+    name,
+    type: cfg.type ?? "url",
+    url: cfg.url,
+    ...(cfg.headers ? { headers: cfg.headers } : {}),
+  }));
+}
+
+/** Find an MCP server by name in the array. */
+function findMcp(agent: Agent, name: string) {
+  return agent.mcp_servers.find((s) => s.name === name);
+}
+
 function makeAgent(mcpServers: Record<string, { type?: string; url?: string; headers?: Record<string, string> }>): Agent {
   return {
+    type: "agent" as const,
     id: "agent_test",
     version: 1,
     name: "test",
-    model: "claude-sonnet-4-6",
+    model: { id: "claude-sonnet-4-6" },
+    description: "",
+    metadata: {},
     engine: "claude",
     system: null,
     tools: [],
-    mcp_servers: mcpServers as Agent["mcp_servers"],
+    mcp_servers: toMcpArray(mcpServers),
     webhook_url: null,
     webhook_events: [],
     webhook_signing_enabled: false,
@@ -23,6 +43,7 @@ function makeAgent(mcpServers: Record<string, { type?: string; url?: string; hea
     fallback_json: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
+    archived_at: null,
   } as Agent;
 }
 
@@ -34,7 +55,7 @@ describe("injectMcpAuthHeaders", () => {
     const result = injectMcpAuthHeaders(agent, [
       { key: "MCP_AUTH_GITHUB", value: "ghp_abc123" },
     ]);
-    expect(result.mcp_servers.github.headers).toEqual({
+    expect(findMcp(result, "github")?.headers).toEqual({
       Authorization: "Bearer ghp_abc123",
     });
   });
@@ -46,7 +67,7 @@ describe("injectMcpAuthHeaders", () => {
     const result = injectMcpAuthHeaders(agent, [
       { key: "MCP_AUTH_MY_SERVER", value: "token123" },
     ]);
-    expect(result.mcp_servers["My-Server"].headers).toEqual({
+    expect(findMcp(result, "My-Server")?.headers).toEqual({
       Authorization: "Bearer token123",
     });
   });
@@ -58,7 +79,7 @@ describe("injectMcpAuthHeaders", () => {
     const result = injectMcpAuthHeaders(agent, [
       { key: "MCP_AUTH_SLACK_BOT", value: "xoxb-token" },
     ]);
-    expect(result.mcp_servers["slack-bot"].headers).toEqual({
+    expect(findMcp(result, "slack-bot")?.headers).toEqual({
       Authorization: "Bearer xoxb-token",
     });
   });
@@ -71,7 +92,8 @@ describe("injectMcpAuthHeaders", () => {
       { key: "MCP_HEADER_NOTION_X-API-KEY", value: "ntn_abc" },
     ]);
     // X-API-KEY splits as NOTION + X-API-KEY
-    expect(result.mcp_servers.notion.headers?.["X-API-KEY"]).toBe("ntn_abc");
+    const headers = findMcp(result, "notion")?.headers as Record<string, string> | undefined;
+    expect(headers?.["X-API-KEY"]).toBe("ntn_abc");
   });
 
   it("merges with existing headers without overwriting", () => {
@@ -85,7 +107,7 @@ describe("injectMcpAuthHeaders", () => {
     const result = injectMcpAuthHeaders(agent, [
       { key: "MCP_AUTH_GITHUB", value: "ghp_abc123" },
     ]);
-    expect(result.mcp_servers.github.headers).toEqual({
+    expect(findMcp(result, "github")?.headers).toEqual({
       "X-Custom": "existing",
       Authorization: "Bearer ghp_abc123",
     });
@@ -98,7 +120,7 @@ describe("injectMcpAuthHeaders", () => {
     injectMcpAuthHeaders(agent, [
       { key: "MCP_AUTH_GITHUB", value: "ghp_abc123" },
     ]);
-    expect(agent.mcp_servers.github.headers).toBeUndefined();
+    expect(findMcp(agent, "github")?.headers).toBeUndefined();
   });
 
   it("returns same agent if no MCP servers", () => {
@@ -139,9 +161,9 @@ describe("injectMcpAuthHeaders", () => {
       { key: "MCP_AUTH_SLACK", value: "xoxb-123" },
       { key: "ANTHROPIC_API_KEY", value: "sk-ant-123" }, // should be ignored
     ]);
-    expect(result.mcp_servers.github.headers).toEqual({ Authorization: "Bearer ghp_abc" });
-    expect(result.mcp_servers.slack.headers).toEqual({ Authorization: "Bearer xoxb-123" });
-    expect(result.mcp_servers.notion.headers).toBeUndefined();
+    expect(findMcp(result, "github")?.headers).toEqual({ Authorization: "Bearer ghp_abc" });
+    expect(findMcp(result, "slack")?.headers).toEqual({ Authorization: "Bearer xoxb-123" });
+    expect(findMcp(result, "notion")?.headers).toBeUndefined();
   });
 
   it("longest server name wins for ambiguous MCP_HEADER matches", () => {
@@ -153,8 +175,9 @@ describe("injectMcpAuthHeaders", () => {
       { key: "MCP_HEADER_MY_API_TOKEN", value: "secret" },
     ]);
     // Should match "my_api" (longer) with header "TOKEN", not "my" with header "API-TOKEN"
-    expect(result.mcp_servers.my_api.headers).toEqual({ TOKEN: "secret" });
-    expect(result.mcp_servers.my.headers).toBeUndefined();
+    const myApiHeaders = findMcp(result, "my_api")?.headers as Record<string, string> | undefined;
+    expect(myApiHeaders).toEqual({ TOKEN: "secret" });
+    expect(findMcp(result, "my")?.headers).toBeUndefined();
   });
 
   it("MCP_HEADER with underscored header name joins with hyphens", () => {
@@ -164,7 +187,8 @@ describe("injectMcpAuthHeaders", () => {
     const result = injectMcpAuthHeaders(agent, [
       { key: "MCP_HEADER_NOTION_X_API_VERSION", value: "2024-01-01" },
     ]);
-    expect(result.mcp_servers.notion.headers).toEqual({ "X-API-VERSION": "2024-01-01" });
+    const headers = findMcp(result, "notion")?.headers as Record<string, string> | undefined;
+    expect(headers).toEqual({ "X-API-VERSION": "2024-01-01" });
   });
 
   it("MCP_AUTH for unknown server is ignored", () => {

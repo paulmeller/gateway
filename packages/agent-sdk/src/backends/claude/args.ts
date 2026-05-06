@@ -59,7 +59,7 @@ export function buildClaudeArgs(input: BuildArgsInput): string[] {
   argv.push("--system-prompt", systemPrompt);
 
   if (input.agent.model) {
-    argv.push("--model", input.agent.model);
+    argv.push("--model", input.agent.model.id);
   }
 
   // Add MCP-namespaced custom tool names so Claude Code's ToolSearch
@@ -79,10 +79,16 @@ export function buildClaudeArgs(input: BuildArgsInput): string[] {
     argv.push("--fast");
   }
 
-  if (input.agent.mcp_servers && Object.keys(input.agent.mcp_servers).length > 0) {
+  if (input.agent.mcp_servers && input.agent.mcp_servers.length > 0) {
+    // Convert array format back to record format for Claude CLI's --mcp-config
+    const mcpRecord: Record<string, McpServerConfig> = {};
+    for (const s of input.agent.mcp_servers) {
+      const { name, ...rest } = s;
+      mcpRecord[name] = rest as McpServerConfig;
+    }
     argv.push(
       "--mcp-config",
-      JSON.stringify({ mcpServers: input.agent.mcp_servers satisfies Record<string, McpServerConfig> }),
+      JSON.stringify({ mcpServers: mcpRecord }),
     );
   }
 

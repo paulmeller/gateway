@@ -287,7 +287,7 @@ export async function runTurn(
   // The span_start event is the formal open of this turn's root span. After
   // this point every error path MUST emit a matching span_end (status=error
   // or status=interrupted) or the trace tree is left dangling.
-  emit("span.model_request_start", { model: agent.model }, { at: turnStartMs });
+  emit("span.model_request_start", { model: agent.model.id }, { at: turnStartMs });
 
   // Build argv + env + stdin via the backend. buildTurn may throw an
   // ApiError (e.g. opencode rejects tool_result re-entry) — catch, surface
@@ -327,7 +327,7 @@ export async function runTurn(
     // Close the open turn span before returning. Without this, the
     // span.model_request_start emitted above would leave a dangling open
     // span in the trace.
-    emit("span.model_request_end", { model: agent.model, model_usage: null, status: "error" });
+    emit("span.model_request_end", { model: agent.model.id, model_usage: null, status: "error" });
     emit("session.error", { error: { type, message: msg } });
     emit("session.status_idle", { stop_reason: formatStopReason("error") });
     updateSessionStatus(sessionId, "idle", "error");
@@ -357,7 +357,7 @@ export async function runTurn(
     }
   }
 
-  console.log(`[driver] ${sessionId} executing turn (engine: ${agent.engine}, model: ${agent.model})`);
+  console.log(`[driver] ${sessionId} executing turn (engine: ${agent.engine}, model: ${agent.model.id})`);
   const argv = [backend.wrapperPath, ...turnBuild.argv];
 
   // Inject RESOURCES_DIR if the session has resources
@@ -405,7 +405,7 @@ export async function runTurn(
   // - CODEX_OSS_BASE_URL: used by Codex --local-provider ollama (http://host:port/v1)
   // - OPENCODE_CONFIG_CONTENT: patched with the correct baseURL for opencode
   const ollamaCloudPrefixes = ["claude-", "gpt-", "o1-", "o3-", "o4-", "codex-", "chatgpt-", "gemini-"];
-  const isOllamaModel = !agent.model.includes("/") && !ollamaCloudPrefixes.some(p => agent.model.startsWith(p));
+  const isOllamaModel = !agent.model.id.includes("/") && !ollamaCloudPrefixes.some(p => agent.model.id.startsWith(p));
   if (isOllamaModel) {
     let ollamaHostPort: string | undefined;
     if (!turnBuild.env.OLLAMA_HOST) {
@@ -529,7 +529,7 @@ export async function runTurn(
     runtime.inFlightRuns.delete(sessionId);
     const msg = err instanceof Error ? err.message : String(err);
     // Close the open turn span before returning — see buildTurn catch above.
-    emit("span.model_request_end", { model: agent.model, model_usage: null, status: "error" });
+    emit("span.model_request_end", { model: agent.model.id, model_usage: null, status: "error" });
     emit("session.error", { error: { type: "server_error", message: `exec failed: ${msg}` } });
     emit("session.status_idle", { stop_reason: formatStopReason("error") });
     updateSessionStatus(sessionId, "idle", "error");
@@ -682,7 +682,7 @@ export async function runTurn(
       // Not retryable or exhausted — close the open turn span before returning.
       // This path is reached when the NDJSON stream itself fails (translator
       // throw, read error, or exhausted retries).
-      emit("span.model_request_end", { model: agent.model, model_usage: null, status: "error" });
+      emit("span.model_request_end", { model: agent.model.id, model_usage: null, status: "error" });
       const retryStatus = classified.retryable ? "exhausted" : "terminal";
       emit("session.error", { error: buildErrorPayload(classified, retryStatus) });
       emit("session.status_idle", { stop_reason: formatStopReason("error") });
@@ -702,7 +702,7 @@ export async function runTurn(
     // doesn't hang forever waiting for an end boundary.
     const partial = translator.getTurnResult();
     emit("span.model_request_end", {
-      model: agent.model,
+      model: agent.model.id,
       model_usage: partial?.usage ?? null,
       status: "interrupted",
     });
@@ -789,7 +789,7 @@ export async function runTurn(
       // result back. Re-run the turn with the tool result to continue.
       emit(
         "span.model_request_end",
-        { model: agent.model, model_usage: result?.usage ?? null, status: "ok" },
+        { model: agent.model.id, model_usage: result?.usage ?? null, status: "ok" },
         { at: now },
       );
       emit("session.status_idle", { stop_reason: formatStopReason("custom_tool_call", customToolEventIds) }, { at: now });
@@ -832,7 +832,7 @@ export async function runTurn(
 
   emit(
     "span.model_request_end",
-    { model: agent.model, model_usage: result?.usage ?? null, status: "ok" },
+    { model: agent.model.id, model_usage: result?.usage ?? null, status: "ok" },
     { at: now },
   );
   // For custom_tool_call that wasn't handled server-side, collect event IDs for the stop_reason
@@ -883,7 +883,7 @@ export async function runTurn(
         const evaluation = await runGraderEvaluation(
           criteria.rubric,
           lastAgentText,
-          agent.model,
+          agent.model.id,
         );
 
         // Track grader token usage in session stats

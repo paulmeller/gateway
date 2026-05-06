@@ -282,7 +282,7 @@ describe("buildPiArgs", () => {
   it("includes --model when agent has model", async () => {
     const { buildPiArgs } = await import("../src/backends/pi/args");
     const args = buildPiArgs({
-      agent: { model: "openai/gpt-4o-mini" } as any,
+      agent: { model: { id: "openai/gpt-4o-mini" } } as any,
       backendSessionId: null,
       prompt: "hi",
     });

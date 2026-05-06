@@ -657,6 +657,18 @@ export function runMigrations(db: InstanceType<typeof Database>): void {
     db.exec(`ALTER TABLE environments RENAME COLUMN template_sprite TO template_sandbox`);
   }
 
+  // Agent description and metadata
+  {
+    const cols = db.prepare("PRAGMA table_info(agents)").all() as Array<{ name: string }>;
+    const names = new Set(cols.map((c) => c.name));
+    if (!names.has("description")) {
+      db.exec("ALTER TABLE agents ADD COLUMN description TEXT");
+    }
+    if (!names.has("metadata_json")) {
+      db.exec("ALTER TABLE agents ADD COLUMN metadata_json TEXT NOT NULL DEFAULT '{}'");
+    }
+  }
+
   // Per-session quotas: max_tokens + max_wall_duration_ms
   const sessColsQuota = db
     .prepare(`PRAGMA table_info(sessions)`)

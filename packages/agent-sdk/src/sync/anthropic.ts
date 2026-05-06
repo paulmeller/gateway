@@ -76,13 +76,8 @@ export async function syncAgent(
   // Inject MCP auth headers from vault before syncing
   const agentWithAuth = injectMcpAuthHeaders(agent, vaultEntries);
 
-  // Convert mcp_servers from Record to array format for Anthropic API
-  const mcpArray = agentWithAuth.mcp_servers
-    ? Object.entries(agentWithAuth.mcp_servers).map(([name, config]) => ({
-        name,
-        ...config,
-      }))
-    : [];
+  // mcp_servers is already in array format
+  const mcpArray = agentWithAuth.mcp_servers ?? [];
 
   // Tools — our local Agent.tools is already in Anthropic's shape
   // (agent_toolset_20260401 + custom). If the agent has no tools, default

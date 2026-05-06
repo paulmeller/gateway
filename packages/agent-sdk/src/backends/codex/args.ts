@@ -31,12 +31,13 @@ export function buildCodexArgs(input: BuildCodexArgsInput): string[] {
   ];
 
   if (input.agent.model) {
-    args.push("--model", input.agent.model);
+    const modelId = input.agent.model.id;
+    args.push("--model", modelId);
 
     // Ollama models: add --oss --local-provider ollama flags.
     // Ollama model names don't start with known cloud prefixes.
     const cloudPrefixes = ["claude-", "gpt-", "o1-", "o3-", "o4-", "codex-", "chatgpt-"];
-    const isOllama = !input.agent.model.includes("/") && !cloudPrefixes.some(p => input.agent.model.startsWith(p));
+    const isOllama = !modelId.includes("/") && !cloudPrefixes.some(p => modelId.startsWith(p));
     if (isOllama) {
       args.push("--oss", "--local-provider", "ollama");
     }
@@ -44,24 +45,28 @@ export function buildCodexArgs(input: BuildCodexArgsInput): string[] {
 
   // MCP config via -c flags (/lib/oc/cli-providers.ts:219-235)
   if (input.agent.mcp_servers) {
-    for (const [name, server] of Object.entries(input.agent.mcp_servers)) {
+    for (const server of input.agent.mcp_servers) {
+      const name = server.name;
       if (server.type) {
         args.push("-c", `mcp_servers.${name}.type="${server.type}"`);
       }
       if (server.url) {
         args.push("-c", `mcp_servers.${name}.url="${server.url}"`);
       }
-      if (typeof server.command === "string") {
-        args.push("-c", `mcp_servers.${name}.command="${server.command}"`);
+      const command = server.command as string | string[] | undefined;
+      if (typeof command === "string") {
+        args.push("-c", `mcp_servers.${name}.command="${command}"`);
       }
-      if (server.args && server.args.length > 0) {
+      const sArgs = server.args as string[] | undefined;
+      if (sArgs && sArgs.length > 0) {
         args.push(
           "-c",
-          `mcp_servers.${name}.args=${JSON.stringify(server.args)}`,
+          `mcp_servers.${name}.args=${JSON.stringify(sArgs)}`,
         );
       }
-      if (server.headers) {
-        for (const [hk, hv] of Object.entries(server.headers)) {
+      const headers = server.headers as Record<string, string> | undefined;
+      if (headers) {
+        for (const [hk, hv] of Object.entries(headers)) {
           args.push("-c", `mcp_servers.${name}.http_headers.${hk}="${hv}"`);
         }
       }

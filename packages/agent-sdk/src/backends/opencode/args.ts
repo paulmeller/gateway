@@ -27,9 +27,10 @@ export function buildOpencodeArgs(input: BuildOpencodeArgsInput): string[] {
   }
   if (input.agent.model) {
     // Ollama models need ollama/ prefix for opencode to route to the Ollama provider
+    const modelId = input.agent.model.id;
     const cloudPrefixes = ["claude-", "gpt-", "o1-", "o3-", "o4-", "codex-", "chatgpt-", "gemini-"];
-    const isOllama = !input.agent.model.includes("/") && !cloudPrefixes.some(p => input.agent.model.startsWith(p));
-    const modelArg = isOllama ? `ollama/${input.agent.model}` : input.agent.model;
+    const isOllama = !modelId.includes("/") && !cloudPrefixes.some(p => modelId.startsWith(p));
+    const modelArg = isOllama ? `ollama/${modelId}` : modelId;
     args.push("--model", modelArg);
   }
   return args;

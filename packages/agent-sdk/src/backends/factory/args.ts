@@ -34,7 +34,7 @@ export function buildFactoryArgs(input: BuildFactoryArgsInput): string[] {
   }
 
   if (input.agent.model) {
-    args.push("--model", input.agent.model);
+    args.push("--model", input.agent.model.id);
   }
 
   // NOTE: No trailing `-` or positional prompt here. The factory wrapper

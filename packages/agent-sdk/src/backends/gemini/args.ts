@@ -35,7 +35,7 @@ export function buildGeminiArgs(input: BuildGeminiArgsInput): string[] {
   }
 
   if (input.agent.model) {
-    args.push("--model", input.agent.model);
+    args.push("--model", input.agent.model.id);
   }
 
   return args;

@@ -152,7 +152,7 @@ describe("Agents", () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.name).toBe("My Agent");
-    expect(body.model).toBe("claude-sonnet-4-6");
+    expect(body.model).toEqual({ id: "claude-sonnet-4-6" });
   });
 
   it("creates an agent with empty name -> 400", async () => {
@@ -248,7 +248,7 @@ describe("Agents", () => {
     );
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.model).toBe("claude-opus-4-6");
+    expect(body.model).toEqual({ id: "claude-opus-4-6" });
     expect(body.version).toBe(2);
   });
 
@@ -307,7 +307,7 @@ describe("Agents", () => {
     const agent = await createTestAgent({ name: "Fields", model: "claude-sonnet-4-6" });
     expect(agent).toHaveProperty("id");
     expect(agent).toHaveProperty("name", "Fields");
-    expect(agent).toHaveProperty("model", "claude-sonnet-4-6");
+    expect(agent).toHaveProperty("model", { id: "claude-sonnet-4-6" });
     expect(agent).toHaveProperty("engine", "claude");
     expect(agent).toHaveProperty("version", 1);
     expect(agent).toHaveProperty("created_at");
@@ -2966,7 +2966,7 @@ describe("Agents — Additional Coverage", () => {
     expect(res.status).toBe(200);
     const updated = await res.json() as Record<string, unknown>;
     expect(updated.name).toBe("NewName");
-    expect(updated.model).toBe("claude-opus-4-6");
+    expect(updated.model).toEqual({ id: "claude-opus-4-6" });
     expect(updated.version).toBe(2);
   });
 

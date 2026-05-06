@@ -15,14 +15,29 @@ import type {
 } from "../types";
 
 function hydrate(row: AgentRow, ver: AgentVersionRow): Agent {
+  const modelConfig: ModelConfig = ver.model_config_json ? (JSON.parse(ver.model_config_json) as ModelConfig) : {};
+
+  // Normalize mcp_servers: DB stores as record, API returns as array
+  const rawMcp = ver.mcp_servers_json ? JSON.parse(ver.mcp_servers_json) : {};
+  const mcpServers = Array.isArray(rawMcp)
+    ? rawMcp
+    : Object.entries(rawMcp).map(([name, cfg]) => ({
+        name,
+        type: "url",
+        ...(typeof cfg === "string" ? { url: cfg } : (cfg as Record<string, unknown>)),
+      }));
+
   return {
+    type: "agent" as const,
     id: row.id,
     version: ver.version,
     name: row.name,
-    model: ver.model,
+    description: row.description ?? "",
+    model: { id: ver.model, ...(modelConfig.speed ? { speed: modelConfig.speed } : {}) },
     system: ver.system,
     tools: JSON.parse(ver.tools_json) as ToolConfig[],
-    mcp_servers: JSON.parse(ver.mcp_servers_json) as Record<string, McpServerConfig>,
+    mcp_servers: mcpServers,
+    metadata: row.metadata_json ? JSON.parse(row.metadata_json) : {},
     engine: (ver.backend ?? "claude") as BackendName,
     webhook_url: ver.webhook_url ?? null,
     webhook_events: ver.webhook_events_json ? (JSON.parse(ver.webhook_events_json) as string[]) : ["session.status_idle", "session.status_running", "session.error"],
@@ -31,16 +46,19 @@ function hydrate(row: AgentRow, ver: AgentVersionRow): Agent {
     confirmation_mode: Boolean(ver.confirmation_mode),
     callable_agents: ver.callable_agents_json ? JSON.parse(ver.callable_agents_json) : [],
     skills: ver.skills_json ? (JSON.parse(ver.skills_json) as AgentSkill[]) : [],
-    model_config: ver.model_config_json ? (JSON.parse(ver.model_config_json) as ModelConfig) : {},
+    model_config: modelConfig,
     fallback_json: row.fallback_json ?? null,
     created_at: toIso(row.created_at),
     updated_at: toIso(row.updated_at),
+    archived_at: row.archived_at ? new Date(row.archived_at).toISOString() : null,
   };
 }
 
 export function createAgent(input: {
   name: string;
   model: string;
+  description?: string;
+  metadata?: Record<string, string>;
   system?: string | null;
   tools?: ToolConfig[];
   mcp_servers?: Record<string, McpServerConfig>;
@@ -66,6 +84,8 @@ export function createAgent(input: {
       id,
       current_version: 1,
       name: input.name,
+      description: input.description ?? null,
+      metadata_json: JSON.stringify(input.metadata ?? {}),
       tenant_id: input.tenant_id ?? DEFAULT_TENANT_ID,
       created_at: now,
       updated_at: now,
@@ -124,6 +144,8 @@ export function updateAgent(
   input: {
     name?: string;
     model?: string;
+    description?: string;
+    metadata?: Record<string, string>;
     system?: string | null;
     tools?: ToolConfig[];
     mcp_servers?: Record<string, McpServerConfig>;
@@ -146,9 +168,13 @@ export function updateAgent(
   const existing = getAgent(id);
   if (!existing) return null;
 
-  // Need the raw existing secret — it's not surfaced via getAgent/hydrate.
+  // Need the raw existing version row for fields not surfaced via hydrate
+  // (webhook_secret, raw mcp_servers_json for carry-forward).
   const existingVer = db
-    .select({ webhook_secret: schema.agentVersions.webhook_secret })
+    .select({
+      webhook_secret: schema.agentVersions.webhook_secret,
+      mcp_servers_json: schema.agentVersions.mcp_servers_json,
+    })
     .from(schema.agentVersions)
     .where(
       and(
@@ -156,7 +182,7 @@ export function updateAgent(
         eq(schema.agentVersions.version, existing.version),
       ),
     )
-    .get() as { webhook_secret: string | null } | undefined;
+    .get() as { webhook_secret: string | null; mcp_servers_json: string } | undefined;
   const carriedSecret = existingVer?.webhook_secret ?? null;
 
   const newVersion = existing.version + 1;
@@ -166,10 +192,10 @@ export function updateAgent(
     tx.insert(schema.agentVersions).values({
       agent_id: id,
       version: newVersion,
-      model: input.model ?? existing.model,
+      model: input.model ?? existing.model.id,
       system: input.system ?? existing.system,
       tools_json: JSON.stringify(input.tools ?? existing.tools),
-      mcp_servers_json: JSON.stringify(input.mcp_servers ?? existing.mcp_servers),
+      mcp_servers_json: input.mcp_servers ? JSON.stringify(input.mcp_servers) : (existingVer?.mcp_servers_json ?? "{}"),
       backend: existing.engine,
       webhook_url: input.webhook_url !== undefined ? input.webhook_url : existing.webhook_url,
       webhook_events_json: JSON.stringify(input.webhook_events ?? existing.webhook_events),
@@ -186,6 +212,8 @@ export function updateAgent(
       .set({
         current_version: newVersion,
         name: input.name ?? existing.name,
+        description: input.description !== undefined ? (input.description ?? null) : (existing.description || null),
+        metadata_json: input.metadata !== undefined ? JSON.stringify(input.metadata) : JSON.stringify(existing.metadata),
         updated_at: now,
       })
       .where(eq(schema.agents.id, id))

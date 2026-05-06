@@ -25,7 +25,8 @@ export async function runChatLoop(
     let agentLine = "";
     if (agentObj) {
       const backendName = agentObj.backend ?? agentObj.engine ?? "";
-      const model = agentObj.model ?? "";
+      const modelRaw = agentObj.model;
+      const model = typeof modelRaw === "object" && modelRaw ? (modelRaw as Record<string, unknown>).id ?? "" : modelRaw ?? "";
       const agentDisplay = backendName && model ? `${agentObj.name} (${backendName} / ${model})` : agentObj.name;
       agentLine = `Agent: ${agentDisplay}`;
     }

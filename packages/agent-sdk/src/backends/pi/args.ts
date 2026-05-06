@@ -38,7 +38,7 @@ export function buildPiArgs(input: BuildPiArgsInput): string[] {
   }
 
   if (input.agent.model) {
-    args.push("--model", input.agent.model);
+    args.push("--model", input.agent.model.id);
   }
 
   // Positional prompt argument — pi treats the first non-flag arg as the prompt.

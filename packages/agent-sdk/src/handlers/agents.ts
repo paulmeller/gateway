@@ -81,12 +81,28 @@ const ModelConfigSchema = z.object({
   speed: z.enum(["standard", "fast"]).optional(),
 });
 
+const McpServerArraySchema = z.array(
+  z.object({
+    name: z.string(),
+    type: z.string().optional(),
+    url: z.string().optional(),
+  }).passthrough(),
+);
+
 const CreateSchema = z.object({
   name: z.string().min(1),
-  model: z.string().min(1),
+  model: z.union([
+    z.string().min(1),
+    z.object({ id: z.string().min(1), speed: z.enum(["standard", "fast"]).optional() }),
+  ]),
+  description: z.string().max(2048).optional(),
+  metadata: z.record(z.string(), z.string().max(512)).optional(),
   system: z.string().nullish(),
   tools: z.array(ToolSchema).optional(),
-  mcp_servers: McpServerSchema.optional(),
+  mcp_servers: z.union([
+    McpServerSchema,
+    McpServerArraySchema,
+  ]).optional(),
   engine: z.enum(["claude", "opencode", "codex", "anthropic", "gemini", "factory", "pi"]).optional(),
   webhook_url: z.string().url().optional(),
   webhook_events: z.array(z.string()).optional(),
@@ -108,6 +124,9 @@ const CreateSchema = z.object({
   /** v0.5: required for global admin, ignored for tenant users. */
   tenant_id: z.string().optional(),
 }).refine(data => {
+  if (!data.metadata) return true;
+  return Object.keys(data.metadata).length <= 16;
+}, "metadata exceeds 16 key limit").refine(data => {
   if (!data.skills) return true;
   const total = data.skills.reduce((sum, s) => sum + s.content.length, 0);
   return total <= 1024 * 1024; // 1MB total
@@ -115,10 +134,18 @@ const CreateSchema = z.object({
 
 const UpdateSchema = z.object({
   name: z.string().min(1).optional(),
-  model: z.string().min(1).optional(),
+  model: z.union([
+    z.string().min(1),
+    z.object({ id: z.string().min(1), speed: z.enum(["standard", "fast"]).optional() }),
+  ]).optional(),
+  description: z.string().max(2048).optional(),
+  metadata: z.record(z.string(), z.string().max(512)).optional(),
   system: z.string().nullish(),
   tools: z.array(z.unknown()).optional(),
-  mcp_servers: z.record(z.unknown()).optional(),
+  mcp_servers: z.union([
+    z.record(z.unknown()),
+    McpServerArraySchema,
+  ]).optional(),
   webhook_url: z.string().url().nullish(),
   webhook_events: z.array(z.string()).optional(),
   /** Null clears the secret (unsigned webhooks); string rotates it. */
@@ -132,6 +159,9 @@ const UpdateSchema = z.object({
   skills: z.array(SkillSchema).max(20).optional(),
   model_config: ModelConfigSchema.optional(),
 }).refine(data => {
+  if (!data.metadata) return true;
+  return Object.keys(data.metadata).length <= 16;
+}, "metadata exceeds 16 key limit").refine(data => {
   if (!data.skills) return true;
   const total = data.skills.reduce((sum, s) => sum + s.content.length, 0);
   return total <= 1024 * 1024; // 1MB total
@@ -173,11 +203,16 @@ export function handleCreateAgent(request: Request): Promise<Response> {
 
     const backend = resolveBackend(backendName);
 
+    // Normalize model input: accept string or { id, speed? }
+    const modelInput = parsed.data.model;
+    const modelId = typeof modelInput === "string" ? modelInput : modelInput.id;
+    const modelSpeed = typeof modelInput === "object" ? modelInput.speed : parsed.data.model_config?.speed;
+
     // Validate model is supported by this engine
     const { isValidModelForEngine, FALLBACK_MODELS } = await import("../backends/models");
-    if (!isValidModelForEngine(backendName, parsed.data.model)) {
+    if (!isValidModelForEngine(backendName, modelId)) {
       throw badRequest(
-        `Model "${parsed.data.model}" is not supported by the ${backendName} engine. ` +
+        `Model "${modelId}" is not supported by the ${backendName} engine. ` +
         `Supported models: ${(FALLBACK_MODELS[backendName] ?? []).join(", ")}`,
       );
     }
@@ -191,13 +226,33 @@ export function handleCreateAgent(request: Request): Promise<Response> {
     const createErr = backend.validateAgentCreation?.();
     if (createErr) throw badRequest(createErr);
 
+    // Normalize mcp_servers input: accept array or record
+    const mcpInput = parsed.data.mcp_servers;
+    let mcpRecord: Record<string, unknown> = {};
+    if (Array.isArray(mcpInput)) {
+      for (const s of mcpInput) {
+        const { name, ...rest } = s;
+        mcpRecord[name] = { type: rest.type ?? "url", ...rest };
+      }
+    } else if (mcpInput) {
+      mcpRecord = mcpInput;
+    }
+
+    // Merge model_config with speed from model object input
+    const mergedModelConfig = {
+      ...(parsed.data.model_config ?? {}),
+      ...(modelSpeed ? { speed: modelSpeed } : {}),
+    };
+
     const nowIso = new Date().toISOString();
     const agent = createAgent({
       name: parsed.data.name,
-      model: parsed.data.model,
+      model: modelId,
+      description: parsed.data.description,
+      metadata: parsed.data.metadata,
       system: parsed.data.system ?? null,
       tools: parsed.data.tools ?? [{ type: "agent_toolset_20260401" }],
-      mcp_servers: parsed.data.mcp_servers ?? {},
+      mcp_servers: mcpRecord as Record<string, import("../types").McpServerConfig>,
       backend: backendName,
       webhook_url: parsed.data.webhook_url ?? null,
       webhook_events: parsed.data.webhook_events,
@@ -209,7 +264,7 @@ export function handleCreateAgent(request: Request): Promise<Response> {
         ...s,
         installed_at: s.installed_at ?? nowIso,
       })),
-      model_config: parsed.data.model_config,
+      model_config: mergedModelConfig,
       tenant_id: createTenantId,
     });
     return jsonOk(agent, 201);
@@ -266,13 +321,44 @@ export function handleUpdateAgent(request: Request, id: string): Promise<Respons
     const parsed = UpdateSchema.safeParse(body);
     if (!parsed.success) throw badRequest(parsed.error.message);
 
+    // Normalize model input: accept string or { id, speed? }
+    let modelId: string | undefined;
+    let modelSpeed: "standard" | "fast" | undefined;
+    if (parsed.data.model !== undefined) {
+      const modelInput = parsed.data.model;
+      modelId = typeof modelInput === "string" ? modelInput : modelInput.id;
+      modelSpeed = typeof modelInput === "object" ? modelInput.speed : undefined;
+    }
+
+    // Normalize mcp_servers input: accept array or record
+    let mcpRecord: Record<string, unknown> | undefined;
+    if (parsed.data.mcp_servers !== undefined) {
+      const mcpInput = parsed.data.mcp_servers;
+      if (Array.isArray(mcpInput)) {
+        mcpRecord = {};
+        for (const s of mcpInput) {
+          const { name, ...rest } = s;
+          mcpRecord[name] = { type: rest.type ?? "url", ...rest };
+        }
+      } else {
+        mcpRecord = mcpInput;
+      }
+    }
+
+    // Merge model_config with speed from model object input
+    const mergedModelConfig = parsed.data.model_config || modelSpeed
+      ? { ...(parsed.data.model_config ?? {}), ...(modelSpeed ? { speed: modelSpeed } : {}) }
+      : undefined;
+
     const nowIso = new Date().toISOString();
     const updated = updateAgent(id, {
       name: parsed.data.name,
-      model: parsed.data.model,
+      model: modelId,
+      description: parsed.data.description,
+      metadata: parsed.data.metadata,
       system: parsed.data.system,
       tools: parsed.data.tools as never,
-      mcp_servers: parsed.data.mcp_servers as never,
+      mcp_servers: mcpRecord as never,
       webhook_url: parsed.data.webhook_url,
       webhook_events: parsed.data.webhook_events,
       webhook_secret: parsed.data.webhook_secret,
@@ -282,7 +368,7 @@ export function handleUpdateAgent(request: Request, id: string): Promise<Respons
         ...s,
         installed_at: s.installed_at ?? nowIso,
       })),
-      model_config: parsed.data.model_config,
+      model_config: mergedModelConfig,
     });
     if (!updated) throw notFound(`agent ${id} not found`);
     return jsonOk(updated);

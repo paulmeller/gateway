@@ -192,7 +192,7 @@ describe("buildGeminiArgs", () => {
   it("includes --model when agent has model", async () => {
     const { buildGeminiArgs } = await import("../src/backends/gemini/args");
     const args = buildGeminiArgs({
-      agent: { model: "gemini-2.5-flash" } as any,
+      agent: { model: { id: "gemini-2.5-flash" } } as any,
       backendSessionId: null,
     });
     expect(args).toContain("--model");

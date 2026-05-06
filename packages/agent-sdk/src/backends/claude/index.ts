@@ -46,7 +46,7 @@ function buildTurn(input: BuildTurnInput): BuildTurnResult {
   // agent-level mcp_servers into a single --mcp-config JSON blob.
   const customTools = agent.tools.filter((t): t is CustomTool => t.type === "custom");
   const hasBridgeTools = customTools.length > 0 || agent.threads_enabled;
-  if (hasBridgeTools || (agent.mcp_servers && Object.keys(agent.mcp_servers).length > 0)) {
+  if (hasBridgeTools || (agent.mcp_servers && agent.mcp_servers.length > 0)) {
     const mcpIdx = argsBase.indexOf("--mcp-config");
     let existingServers: Record<string, unknown> = {};
     if (mcpIdx >= 0 && mcpIdx + 1 < argsBase.length) {

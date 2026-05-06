@@ -19,27 +19,28 @@ export function injectMcpAuthHeaders(
   vaultEntries: Array<{ key: string; value: string }>,
 ): Agent {
   const mcpServers = agent.mcp_servers;
-  if (!mcpServers || Object.keys(mcpServers).length === 0) return agent;
+  if (!mcpServers || mcpServers.length === 0) return agent;
   if (vaultEntries.length === 0) return agent;
 
-  // Build a lookup: normalized server name → original key
-  const serverLookup = new Map<string, string>();
-  for (const name of Object.keys(mcpServers)) {
-    serverLookup.set(name.toUpperCase().replace(/-/g, "_"), name);
+  // Build a lookup: normalized server name → index in the array
+  const serverLookup = new Map<string, number>();
+  for (let i = 0; i < mcpServers.length; i++) {
+    const name = mcpServers[i].name;
+    serverLookup.set(name.toUpperCase().replace(/-/g, "_"), i);
   }
 
   let mutated = false;
-  const merged: Record<string, Record<string, string>> = {};
+  const merged: Record<number, Record<string, string>> = {};
 
   for (const { key, value } of vaultEntries) {
     // MCP_AUTH_{SERVER} → Authorization: Bearer
     const authMatch = /^MCP_AUTH_(.+)$/i.exec(key);
     if (authMatch) {
       const norm = authMatch[1].toUpperCase();
-      const serverName = serverLookup.get(norm);
-      if (serverName) {
-        merged[serverName] = merged[serverName] ?? {};
-        merged[serverName]["Authorization"] = `Bearer ${value}`;
+      const idx = serverLookup.get(norm);
+      if (idx !== undefined) {
+        merged[idx] = merged[idx] ?? {};
+        merged[idx]["Authorization"] = `Bearer ${value}`;
         mutated = true;
       }
       continue;
@@ -54,10 +55,10 @@ export function injectMcpAuthHeaders(
       for (let i = parts.length - 1; i >= 1; i--) {
         const serverPart = parts.slice(0, i).join("_").toUpperCase();
         const headerPart = parts.slice(i).join("-");
-        const serverName = serverLookup.get(serverPart);
-        if (serverName) {
-          merged[serverName] = merged[serverName] ?? {};
-          merged[serverName][headerPart] = value;
+        const idx = serverLookup.get(serverPart);
+        if (idx !== undefined) {
+          merged[idx] = merged[idx] ?? {};
+          merged[idx][headerPart] = value;
           mutated = true;
           break;
         }
@@ -67,14 +68,15 @@ export function injectMcpAuthHeaders(
 
   if (!mutated) return agent;
 
-  // Shallow-copy agent and mcp_servers, merging headers
-  const newServers = { ...mcpServers };
-  for (const [name, headers] of Object.entries(merged)) {
-    newServers[name] = {
-      ...newServers[name],
-      headers: { ...newServers[name].headers, ...headers },
+  // Shallow-copy agent and mcp_servers array, merging headers
+  const newServers = mcpServers.map((server, idx) => {
+    const headers = merged[idx];
+    if (!headers) return server;
+    return {
+      ...server,
+      headers: { ...(server.headers as Record<string, string> | undefined), ...headers },
     };
-  }
+  });
 
   return { ...agent, mcp_servers: newServers };
 }

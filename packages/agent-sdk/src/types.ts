@@ -64,6 +64,8 @@ export interface AgentRow {
   id: string;
   current_version: number;
   name: string;
+  description: string | null;
+  metadata_json: string;
   /**
    * v0.4+: JSON array of FallbackTuple {agent_id, environment_id} tuples
    * tried when the primary session-creation fails with a classifiable
@@ -113,13 +115,16 @@ export interface AgentSkill {
 }
 
 export interface Agent {
+  type: "agent";
   id: string;
   version: number;
   name: string;
-  model: string;
+  description: string;
+  model: { id: string; speed?: "standard" | "fast" };
   system: string | null;
   tools: ToolConfig[];
-  mcp_servers: Record<string, McpServerConfig>;
+  mcp_servers: Array<{ name: string; type: string; url?: string; [key: string]: unknown }>;
+  metadata: Record<string, string>;
   engine: EngineName;
   webhook_url: string | null;
   webhook_events: string[];
@@ -137,6 +142,7 @@ export interface Agent {
   fallback_json: string | null;
   created_at: string;
   updated_at: string;
+  archived_at: string | null;
 }
 
 // ---------------------------------------------------------------------------

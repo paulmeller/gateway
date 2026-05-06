@@ -52,6 +52,8 @@ export const agents = sqliteTable("agents", {
   id: text("id").primaryKey(),
   current_version: integer("current_version").notNull(),
   name: text("name").notNull(),
+  description: text("description"),
+  metadata_json: text("metadata_json").notNull().default("{}"),
   // v0.4 ALTER TABLE addition:
   fallback_json: text("fallback_json"),
   // v0.5 ALTER TABLE addition:

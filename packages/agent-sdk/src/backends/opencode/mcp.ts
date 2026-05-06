@@ -68,25 +68,30 @@ function isOllamaModel(model: string): boolean {
  */
 export function buildOpencodeConfigEnv(agent: Agent, ollamaBaseUrl?: string | undefined): Record<string, string> {
   // Default Ollama URL — the driver overrides OLLAMA_HOST per-provider later
-  if (ollamaBaseUrl === undefined && isOllamaModel(agent.model)) {
+  if (ollamaBaseUrl === undefined && isOllamaModel(agent.model.id)) {
     ollamaBaseUrl = "http://localhost:11434/v1";
   }
   const config: Record<string, unknown> = {};
 
-  // MCP servers
-  if (agent.mcp_servers && Object.keys(agent.mcp_servers).length > 0) {
-    config.mcp = mcpConfigToOpencode(agent.mcp_servers);
+  // MCP servers — convert array format to record for mcpConfigToOpencode
+  if (agent.mcp_servers && agent.mcp_servers.length > 0) {
+    const mcpRecord: Record<string, McpServerConfig> = {};
+    for (const s of agent.mcp_servers) {
+      const { name, ...rest } = s;
+      mcpRecord[name] = rest as McpServerConfig;
+    }
+    config.mcp = mcpConfigToOpencode(mcpRecord);
   }
 
   // Ollama provider — register the model so opencode can route to it
-  if (isOllamaModel(agent.model) && ollamaBaseUrl) {
+  if (isOllamaModel(agent.model.id) && ollamaBaseUrl) {
     config.provider = {
       ollama: {
         npm: "@ai-sdk/openai-compatible",
         name: "Ollama (local)",
         options: { baseURL: ollamaBaseUrl },
         models: {
-          [agent.model]: { name: agent.model },
+          [agent.model.id]: { name: agent.model.id },
         },
       },
     };
