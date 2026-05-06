@@ -6,7 +6,7 @@
  * triggered). Tenant users without admin see 403 — nothing here is
  * meant for end-users.
  */
-import { routeWrap, jsonOk } from "../http";
+import { routeWrap, jsonOk, paginatedOk } from "../http";
 import { badRequest } from "../errors";
 import { requireAdmin, tenantFilter } from "../auth/scope";
 import { listAudit } from "../db/audit";
@@ -60,11 +60,6 @@ export function handleListAudit(request: Request): Promise<Response> {
       tenantFilter: tenantFilter(auth),
     });
 
-    return jsonOk({
-      data,
-      has_more: data.length === requestedLimit,
-      first_id: data.length > 0 ? data[0].id : null,
-      last_id: data.length > 0 ? data[data.length - 1].id : null,
-    });
+    return paginatedOk(data, requestedLimit);
   });
 }

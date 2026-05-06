@@ -92,7 +92,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
           expect(eventsRes.status).toBe(200);
           const events = (await eventsRes.json()) as {
             data: Array<{ type: string }>;
-            has_more: boolean;
+            next_page: string | null;
           };
           expect(Array.isArray(events.data)).toBe(true);
           const types = events.data.map((e) => e.type);
@@ -247,7 +247,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
   // ---------------------------------------------------------------------------
   // 3. Pagination
   // ---------------------------------------------------------------------------
-  it("pagination: create 3 agents, list with limit=2, verify has_more + second page", async () => {
+  it("pagination: create 3 agents, list with limit=2, verify next_page + second page", async () => {
     const suffix = Date.now();
     const agentIds: string[] = [];
 
@@ -267,26 +267,18 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
       expect(page1Res.status).toBe(200);
       const page1 = (await page1Res.json()) as {
         data: Array<{ id: string }>;
-        has_more: boolean;
-        first_id: string | null;
-        last_id: string | null;
+        next_page: string | null;
       };
 
       expect(page1.data.length).toBeGreaterThanOrEqual(1);
-      expect(page1.has_more).toBe(true);
-      expect(page1.first_id).toBeTruthy();
-      expect(page1.last_id).toBeTruthy();
-      expect("next_page" in page1).toBe(false);
+      expect(page1.next_page).toBeTypeOf("string");
 
-      // Paginate using after_id=last_id
-      const afterId = page1.last_id!;
-      const page2Res = await api(`/v1/agents?limit=2&after_id=${afterId}`);
+      // Paginate using next_page cursor
+      const page2Res = await api(`/v1/agents?limit=2&page=${page1.next_page}`);
       expect(page2Res.status).toBe(200);
       const page2 = (await page2Res.json()) as {
         data: Array<{ id: string }>;
-        has_more: boolean;
-        first_id: string | null;
-        last_id: string | null;
+        next_page: string | null;
       };
 
       expect(Array.isArray(page2.data)).toBe(true);
@@ -449,7 +441,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
   // ---------------------------------------------------------------------------
   // 6. Events pagination
   // ---------------------------------------------------------------------------
-  it("events pagination: create session, post 3 events, list with limit=2, verify has_more", async () => {
+  it("events pagination: create session, post 3 events, list with limit=2, verify next_page", async () => {
     // Create agent + session for events pagination test
     const createAgentRes = await api("/v1/agents", {
       body: { name: `live-evt-pag-${Date.now()}`, engine: "claude", model: "claude-sonnet-4-6" },
@@ -488,29 +480,21 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
         expect(eventsRes.status).toBe(200);
         const events = (await eventsRes.json()) as {
           data: Array<{ id: string; type: string }>;
-          has_more: boolean;
-          first_id: string | null;
-          last_id: string | null;
+          next_page: string | null;
         };
 
         expect(Array.isArray(events.data)).toBe(true);
         expect(events.data.length).toBe(2);
-        expect(events.has_more).toBe(true);
-        expect(events.first_id).toBeTruthy();
-        expect(events.last_id).toBeTruthy();
-        expect("next_page" in events).toBe(false);
+        expect(events.next_page).toBeTypeOf("string");
 
-        // Paginate to second page
-        const afterId = events.last_id!;
+        // Paginate to second page using next_page cursor
         const page2Res = await api(
-          `/v1/sessions/${sessionId}/events?limit=2&after_id=${afterId}`,
+          `/v1/sessions/${sessionId}/events?limit=2&page=${events.next_page}`,
         );
         expect(page2Res.status).toBe(200);
         const page2 = (await page2Res.json()) as {
           data: Array<{ id: string; type: string }>;
-          has_more: boolean;
-          first_id: string | null;
-          last_id: string | null;
+          next_page: string | null;
         };
         expect(Array.isArray(page2.data)).toBe(true);
         expect(page2.data.length).toBeGreaterThanOrEqual(1);

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { routeWrap, jsonOk } from "../http";
+import { routeWrap, jsonOk, paginatedOk } from "../http";
 import { getDb } from "../db/client";
 import {
   createMemoryStore,
@@ -81,12 +81,7 @@ export function handleListMemoryStores(request: Request): Promise<Response> {
       agent_id: agentId,
       tenantFilter: tenantFilter(auth),
     });
-    return jsonOk({
-      data,
-      has_more: data.length === requestedLimit,
-      first_id: data.length > 0 ? data[0].id : null,
-      last_id: data.length > 0 ? data[data.length - 1].id : null,
-    });
+    return paginatedOk(data, requestedLimit);
   });
 }
 
@@ -137,12 +132,7 @@ export function handleListMemories(request: Request, storeId: string): Promise<R
     const url = new URL(req.url);
     const requestedLimit = Number(url.searchParams.get("limit") || "100");
     const data = listMemories(storeId);
-    return jsonOk({
-      data,
-      has_more: data.length === requestedLimit,
-      first_id: data.length > 0 ? data[0].id : null,
-      last_id: data.length > 0 ? data[data.length - 1].id : null,
-    });
+    return paginatedOk(data, requestedLimit);
   });
 }
 

@@ -730,9 +730,7 @@ export const FileListResponseSchema = registry.register(
   "FileListResponse",
   z.object({
     data: z.array(FileRecordSchema),
-    has_more: z.boolean().openapi({ description: "Whether there are more results beyond this page." }),
-    first_id: z.string().nullable().openapi({ description: "ID of the first item in this page." }),
-    last_id: z.string().nullable().openapi({ description: "ID of the last item in this page." }),
+    next_page: z.string().nullable().openapi({ description: "Opaque cursor for the next page, or null if no more results." }),
   }),
 );
 

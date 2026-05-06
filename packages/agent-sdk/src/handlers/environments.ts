@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { routeWrap, jsonOk } from "../http";
+import { routeWrap, jsonOk, paginatedOk, decodeCursor } from "../http";
 import { getDb } from "../db/client";
 import {
   createEnvironment,
@@ -156,7 +156,7 @@ export function handleListEnvironments(request: Request): Promise<Response> {
     const limit = url.searchParams.get("limit");
     const order = url.searchParams.get("order") as "asc" | "desc" | null;
     const includeArchived = url.searchParams.get("include_archived") === "true";
-    const cursor = url.searchParams.get("page") ?? undefined;
+    const cursor = decodeCursor(url.searchParams.get("page"));
 
     const requestedLimit = limit ? Number(limit) : 20;
     const data = listEnvironments({
@@ -166,12 +166,7 @@ export function handleListEnvironments(request: Request): Promise<Response> {
       cursor,
       tenantFilter: tenantFilter(auth),
     });
-    return jsonOk({
-      data,
-      has_more: data.length === requestedLimit,
-      first_id: data.length > 0 ? data[0].id : null,
-      last_id: data.length > 0 ? data[data.length - 1].id : null,
-    });
+    return paginatedOk(data, requestedLimit);
   });
 }
 

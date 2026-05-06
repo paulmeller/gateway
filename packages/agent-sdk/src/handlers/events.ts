@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { routeWrap, jsonOk } from "../http";
+import { routeWrap, jsonOk, paginatedOk } from "../http";
 import { getDb } from "../db/client";
 import { getSession, getSessionRow, setOutcomeCriteria, bumpSessionStats, updateSessionMutable } from "../db/sessions";
 import { listEvents, rowToManagedEvent } from "../db/events";
@@ -715,11 +715,6 @@ export function handleListEvents(request: Request, sessionId: string): Promise<R
 
     const rows = listEvents(sessionId, { limit, order, afterSeq });
     const data = rows.map(rowToManagedEvent);
-    return jsonOk({
-      data,
-      has_more: rows.length === limit,
-      first_id: data.length > 0 ? data[0].id : null,
-      last_id: data.length > 0 ? data[data.length - 1].id : null,
-    });
+    return paginatedOk(data, limit);
   });
 }

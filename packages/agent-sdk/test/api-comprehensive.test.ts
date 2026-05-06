@@ -707,7 +707,7 @@ describe("Sessions", () => {
     expect(session.vault_ids).toEqual([vault.id]);
   });
 
-  it("lists sessions with pagination (has_more)", async () => {
+  it("lists sessions with pagination (next_page)", async () => {
     await bootDb();
     const agent = await createTestAgent({ name: "PaginateAgent" });
     const env = await createTestEnv({ name: "PaginateEnv" });
@@ -716,11 +716,9 @@ describe("Sessions", () => {
     await createTestSession(agent.id as string, env.id as string);
     const { handleListSessions } = await import("../src/handlers/sessions");
     const res = await handleListSessions(req("/v1/sessions?limit=2"));
-    const body = (await res.json()) as { data: Array<{ id: string }>; has_more: boolean; first_id: string | null; last_id: string | null };
+    const body = (await res.json()) as { data: Array<{ id: string }>; next_page: string | null };
     expect(body.data.length).toBe(2);
-    expect(body.has_more).toBe(true);
-    expect(body.first_id).toBeTruthy();
-    expect(body.last_id).toBeTruthy();
+    expect(body.next_page).toBeTypeOf("string");
   });
 
   it("creates session with title", async () => {
@@ -2087,17 +2085,15 @@ describe("Threads", () => {
 describe("Pagination & Ordering", () => {
   beforeEach(() => freshDbEnv());
 
-  it("agents list returns has_more cursor", async () => {
+  it("agents list returns next_page cursor", async () => {
     await bootDb();
     await createTestAgent({ name: "P1" });
     await createTestAgent({ name: "P2" });
     const { handleListAgents } = await import("../src/handlers/agents");
     const res = await handleListAgents(req("/v1/agents?limit=1"));
-    const body = (await res.json()) as { data: Array<{ id: string }>; has_more: boolean; first_id: string | null; last_id: string | null };
+    const body = (await res.json()) as { data: Array<{ id: string }>; next_page: string | null };
     expect(body.data.length).toBe(1);
-    expect(body.has_more).toBe(true);
-    expect(body.first_id).toBeTruthy();
-    expect(body.last_id).toBeTruthy();
+    expect(body.next_page).toBeTypeOf("string");
   });
 
   it("agents list order=asc works", async () => {
@@ -2112,17 +2108,15 @@ describe("Pagination & Ordering", () => {
     expect(body.data[0].id < body.data[1].id).toBe(true);
   });
 
-  it("environments list returns has_more cursor", async () => {
+  it("environments list returns next_page cursor", async () => {
     await bootDb();
     await createTestEnv({ name: "EP1" });
     await createTestEnv({ name: "EP2" });
     const { handleListEnvironments } = await import("../src/handlers/environments");
     const res = await handleListEnvironments(req("/v1/environments?limit=1"));
-    const body = (await res.json()) as { data: unknown[]; has_more: boolean; first_id: string | null; last_id: string | null };
+    const body = (await res.json()) as { data: unknown[]; next_page: string | null };
     expect(body.data.length).toBe(1);
-    expect(body.has_more).toBe(true);
-    expect(body.first_id).toBeTruthy();
-    expect(body.last_id).toBeTruthy();
+    expect(body.next_page).toBeTypeOf("string");
   });
 
   it("sessions list order=asc works", async () => {
@@ -2138,7 +2132,7 @@ describe("Pagination & Ordering", () => {
     expect(body.data[0].id < body.data[1].id).toBe(true);
   });
 
-  it("events list has has_more", async () => {
+  it("events list has next_page", async () => {
     await bootDb();
     const agent = await createTestAgent({ name: "EvtPageAgent" });
     const env = await createTestEnv({ name: "EvtPageEnv" });
@@ -2159,11 +2153,9 @@ describe("Pagination & Ordering", () => {
       req(`/v1/sessions/${session.id}/events?limit=1`),
       session.id as string,
     );
-    const body = (await res.json()) as { data: Array<{ id: string }>; has_more: boolean; first_id: string | null; last_id: string | null };
+    const body = (await res.json()) as { data: Array<{ id: string }>; next_page: string | null };
     expect(body.data.length).toBe(1);
-    expect(body.has_more).toBe(true);
-    expect(body.first_id).toBeTruthy();
-    expect(body.last_id).toBeTruthy();
+    expect(body.next_page).toBeTypeOf("string");
   });
 });
 

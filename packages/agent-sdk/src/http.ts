@@ -85,3 +85,28 @@ export async function routeWrap(
 export function jsonOk<T>(body: T, status = 200): Response {
   return Response.json(body, { status });
 }
+
+/** Build a paginated list response matching Anthropic's shape. */
+export function paginatedOk<T extends { id: string }>(
+  data: T[],
+  requestedLimit: number,
+): Response {
+  const hasMore = data.length === requestedLimit;
+  const nextPage =
+    hasMore && data.length > 0
+      ? Buffer.from(data[data.length - 1].id).toString("base64url")
+      : null;
+  return jsonOk({ data, next_page: nextPage });
+}
+
+/** Decode an opaque page cursor back to the original ID. */
+export function decodeCursor(
+  page: string | null | undefined,
+): string | undefined {
+  if (!page) return undefined;
+  try {
+    return Buffer.from(page, "base64url").toString("utf8");
+  } catch {
+    return page; // Fall back to raw ID for backward compat
+  }
+}

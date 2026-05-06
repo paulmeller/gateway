@@ -1,4 +1,4 @@
-import { routeWrap, jsonOk } from "../http";
+import { routeWrap, paginatedOk } from "../http";
 import { getDb } from "../db/client";
 import { getSession, listSessions } from "../db/sessions";
 import { notFound } from "../errors";
@@ -27,11 +27,6 @@ export function handleListThreads(request: Request, sessionId: string): Promise<
       tenantFilter: tenantFilter(auth),
     });
 
-    return jsonOk({
-      data,
-      has_more: data.length === requestedLimit,
-      first_id: data.length > 0 ? data[0].id : null,
-      last_id: data.length > 0 ? data[data.length - 1].id : null,
-    });
+    return paginatedOk(data, requestedLimit);
   });
 }
