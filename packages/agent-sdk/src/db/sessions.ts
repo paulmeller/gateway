@@ -1,6 +1,7 @@
 import { DEFAULT_TENANT_ID } from "./tenants";
-import { eq, and, isNull, lt, gt, gte, lte, sql } from "drizzle-orm";
+import { eq, and, isNull, lt, gt, gte, lte, inArray, sql } from "drizzle-orm";
 import { getDrizzle, schema } from "./drizzle";
+import { getAgent } from "./agents";
 import { newId } from "../util/ids";
 import { nowMs, toIso } from "../util/clock";
 import type { Session, SessionResource, SessionRow, SessionStatus } from "../types";
@@ -47,10 +48,38 @@ export function hydrateSession(row: SessionRow): Session {
     resources = row.resources_json ? (JSON.parse(row.resources_json) as SessionResource[]) : [];
   }
 
+  // Look up the full agent snapshot for embedding in the session response.
+  const agentObj = getAgent(row.agent_id, row.agent_version);
+  const agentEmbed = agentObj
+    ? {
+        type: "agent" as const,
+        id: agentObj.id,
+        version: agentObj.version,
+        name: agentObj.name,
+        description: agentObj.description,
+        model: agentObj.model,
+        system: agentObj.system,
+        tools: agentObj.tools,
+        mcp_servers: agentObj.mcp_servers,
+        skills: agentObj.skills,
+      }
+    : {
+        type: "agent" as const,
+        id: row.agent_id,
+        version: row.agent_version,
+        name: "",
+        description: "",
+        model: { id: "" },
+        system: null,
+        tools: [] as Session["agent"]["tools"],
+        mcp_servers: [] as Session["agent"]["mcp_servers"],
+        skills: [] as Session["agent"]["skills"],
+      };
+
   return {
     id: row.id,
     type: "session" as const,
-    agent: { type: "agent" as const, id: row.agent_id, version: row.agent_version },
+    agent: agentEmbed,
     environment_id: row.environment_id,
     status: row.status,
     stop_reason: row.stop_reason,
@@ -74,7 +103,10 @@ export function hydrateSession(row: SessionRow): Session {
       input_tokens: row.usage_input_tokens,
       output_tokens: row.usage_output_tokens,
       cache_read_input_tokens: row.usage_cache_read_input_tokens,
-      cache_creation_input_tokens: row.usage_cache_creation_input_tokens,
+      cache_creation: {
+        ephemeral_5m_input_tokens: row.usage_cache_creation_input_tokens,
+        ephemeral_1h_input_tokens: 0,
+      },
       cost_usd: row.usage_cost_usd,
     },
     created_at: toIso(row.created_at),
@@ -303,6 +335,7 @@ export function listSessions(opts: {
   environmentId?: string;
   parent_session_id?: string;
   status?: SessionStatus;
+  statuses?: SessionStatus[];
   limit?: number;
   order?: "asc" | "desc";
   includeArchived?: boolean;
@@ -326,7 +359,11 @@ export function listSessions(opts: {
   if (opts.agent_version != null) conditions.push(eq(schema.sessions.agent_version, opts.agent_version));
   if (opts.environmentId) conditions.push(eq(schema.sessions.environment_id, opts.environmentId));
   if (opts.parent_session_id) conditions.push(eq(schema.sessions.parent_session_id, opts.parent_session_id));
-  if (opts.status) conditions.push(eq(schema.sessions.status, opts.status));
+  if (opts.statuses?.length) {
+    conditions.push(inArray(schema.sessions.status, opts.statuses));
+  } else if (opts.status) {
+    conditions.push(eq(schema.sessions.status, opts.status));
+  }
   if (!includeArchived) conditions.push(isNull(schema.sessions.archived_at));
   if (opts.createdGt != null) conditions.push(gt(schema.sessions.created_at, opts.createdGt));
   if (opts.createdGte != null) conditions.push(gte(schema.sessions.created_at, opts.createdGte));

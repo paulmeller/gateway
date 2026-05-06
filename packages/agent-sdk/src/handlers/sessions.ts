@@ -568,9 +568,24 @@ export function handleListSessions(request: Request): Promise<Response> {
     const agentVersion = url.searchParams.get("agent_version");
     const environmentId = url.searchParams.get("environment_id") ?? undefined;
 
+    // Accept `statuses` (plural, array) or `status` (singular) query param.
+    const statusesRaw = url.searchParams.getAll("statuses");
     const statusRaw = url.searchParams.get("status");
+    let statuses: SessionStatus[] | undefined;
     let status: SessionStatus | undefined;
-    if (statusRaw != null) {
+
+    if (statusesRaw.length > 0) {
+      // `statuses` can be passed as repeated params or comma-separated.
+      const values = statusesRaw.flatMap((v) => v.split(","));
+      for (const v of values) {
+        if (!ALLOWED_STATUSES.includes(v as SessionStatus)) {
+          throw badRequest(
+            `invalid statuses value: ${v} (allowed: ${ALLOWED_STATUSES.join(",")})`,
+          );
+        }
+      }
+      statuses = values as SessionStatus[];
+    } else if (statusRaw != null) {
       if (!ALLOWED_STATUSES.includes(statusRaw as SessionStatus)) {
         throw badRequest(
           `invalid status value: ${statusRaw} (allowed: ${ALLOWED_STATUSES.join(",")})`,
@@ -585,6 +600,7 @@ export function handleListSessions(request: Request): Promise<Response> {
       agent_version: agentVersion ? Number(agentVersion) : undefined,
       environmentId,
       status,
+      statuses,
       limit: requestedLimit,
       order: order ?? undefined,
       includeArchived,

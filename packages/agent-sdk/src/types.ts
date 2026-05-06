@@ -267,7 +267,18 @@ export interface SessionResource {
 export interface Session {
   id: string;
   type: "session";
-  agent: { type: "agent"; id: string; version: number };
+  agent: {
+    type: "agent";
+    id: string;
+    version: number;
+    name: string;
+    description: string;
+    model: { id: string; speed?: "standard" | "fast" };
+    system: string | null;
+    tools: ToolConfig[];
+    mcp_servers: Array<{ name: string; type: string; url?: string; [key: string]: unknown }>;
+    skills: AgentSkill[];
+  };
   environment_id: string;
   status: SessionStatus;
   stop_reason: string | null;
@@ -291,7 +302,10 @@ export interface Session {
     input_tokens: number;
     output_tokens: number;
     cache_read_input_tokens: number;
-    cache_creation_input_tokens: number;
+    cache_creation: {
+      ephemeral_5m_input_tokens: number;
+      ephemeral_1h_input_tokens: number;
+    };
     cost_usd: number;
   };
   created_at: string;

@@ -341,7 +341,10 @@ const SessionUsageSchema = z.object({
   input_tokens: z.number().int().nonnegative(),
   output_tokens: z.number().int().nonnegative(),
   cache_read_input_tokens: z.number().int().nonnegative(),
-  cache_creation_input_tokens: z.number().int().nonnegative(),
+  cache_creation: z.object({
+    ephemeral_5m_input_tokens: z.number().int().nonnegative(),
+    ephemeral_1h_input_tokens: z.number().int().nonnegative(),
+  }),
   cost_usd: z.number().nonnegative(),
 });
 
@@ -354,7 +357,18 @@ export const SessionSchema = registry.register(
   "Session",
   z.object({
     id: UlidId,
-    agent: z.object({ id: UlidId, version: z.number().int().positive() }),
+    agent: z.object({
+      type: z.literal("agent"),
+      id: UlidId,
+      version: z.number().int().positive(),
+      name: z.string(),
+      description: z.string(),
+      model: z.object({ id: z.string(), speed: z.enum(["standard", "fast"]).optional() }),
+      system: z.string().nullable(),
+      tools: z.array(z.record(z.unknown())),
+      mcp_servers: z.array(z.record(z.unknown())),
+      skills: z.array(z.record(z.unknown())),
+    }),
     environment_id: UlidId,
     status: SessionStatusSchema,
     stop_reason: z.union([
