@@ -83,7 +83,7 @@ async function createTestAgent(overrides: Record<string, unknown> = {}): Promise
   const { handleCreateAgent } = await import("../src/handlers/agents");
   const res = await handleCreateAgent(
     req("/v1/agents", {
-      body: { name: `Agent-${Date.now()}-${Math.random()}`, model: "claude-sonnet-4-6", ...overrides },
+      body: { name: `Agent-${Date.now()}-${Math.random()}`, model: { id: "claude-sonnet-4-6" }, ...overrides },
     }),
   );
   return (await res.json()) as Record<string, unknown>;
@@ -146,7 +146,7 @@ describe("Agents", () => {
     const { handleCreateAgent } = await import("../src/handlers/agents");
     const res = await handleCreateAgent(
       req("/v1/agents", {
-        body: { name: "My Agent", model: "claude-sonnet-4-6" },
+        body: { name: "My Agent", model: { id: "claude-sonnet-4-6" } },
       }),
     );
     expect(res.status).toBe(201);
@@ -160,7 +160,7 @@ describe("Agents", () => {
     const { handleCreateAgent } = await import("../src/handlers/agents");
     const res = await handleCreateAgent(
       req("/v1/agents", {
-        body: { name: "", model: "claude-sonnet-4-6" },
+        body: { name: "", model: { id: "claude-sonnet-4-6" } },
       }),
     );
     expect(res.status).toBe(400);
@@ -178,8 +178,8 @@ describe("Agents", () => {
   it("creates an agent with duplicate name -> 409", async () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
-    await handleCreateAgent(req("/v1/agents", { body: { name: "Dupe", model: "claude-sonnet-4-6" } }));
-    const res = await handleCreateAgent(req("/v1/agents", { body: { name: "Dupe", model: "claude-sonnet-4-6" } }));
+    await handleCreateAgent(req("/v1/agents", { body: { name: "Dupe", model: { id: "claude-sonnet-4-6" } } }));
+    const res = await handleCreateAgent(req("/v1/agents", { body: { name: "Dupe", model: { id: "claude-sonnet-4-6" } } }));
     expect(res.status).toBe(409);
   });
 
@@ -243,7 +243,7 @@ describe("Agents", () => {
     expect(agent.version).toBe(1);
     const { handleUpdateAgent } = await import("../src/handlers/agents");
     const res = await handleUpdateAgent(
-      req(`/v1/agents/${agent.id}`, { method: "PATCH", body: { version: 1, model: "claude-opus-4-6" } }),
+      req(`/v1/agents/${agent.id}`, { method: "PATCH", body: { version: 1, model: { id: "claude-opus-4-6" } } }),
       agent.id as string,
     );
     expect(res.status).toBe(200);
@@ -293,7 +293,7 @@ describe("Agents", () => {
       req("/v1/agents", {
         body: {
           name: "CodexTools",
-          model: "claude-sonnet-4-6",
+          model: { id: "claude-sonnet-4-6" },
           engine: "codex",
           tools: [{ type: "agent_toolset_20260401" }],
         },
@@ -304,7 +304,7 @@ describe("Agents", () => {
 
   it("agent has correct fields", async () => {
     await bootDb();
-    const agent = await createTestAgent({ name: "Fields", model: "claude-sonnet-4-6" });
+    const agent = await createTestAgent({ name: "Fields", model: { id: "claude-sonnet-4-6" } });
     expect(agent).toHaveProperty("id");
     expect(agent).toHaveProperty("name", "Fields");
     expect(agent).toHaveProperty("model", { id: "claude-sonnet-4-6" });
@@ -349,7 +349,7 @@ describe("Agents", () => {
 
   it("creates agent with custom engine", async () => {
     await bootDb();
-    const agent = await createTestAgent({ name: "GeminiAgent", engine: "gemini", model: "gemini-2.0-flash" });
+    const agent = await createTestAgent({ name: "GeminiAgent", engine: "gemini", model: { id: "gemini-2.0-flash" } });
     expect(agent.engine).toBe("gemini");
   });
 
@@ -1715,7 +1715,7 @@ describe("Batch", () => {
     const ops = Array.from({ length: 51 }, (_, i) => ({
       method: "POST",
       path: "/v1/agents",
-      body: { name: `BatchOverflow${i}`, model: "claude-sonnet-4-6" },
+      body: { name: `BatchOverflow${i}`, model: { id: "claude-sonnet-4-6" } },
     }));
     const res = await handleBatch(
       req("/v1/batch", { body: { operations: ops } }),
@@ -1987,9 +1987,9 @@ describe("Error Handling", () => {
   it("conflict has correct error type and status", async () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
-    await handleCreateAgent(req("/v1/agents", { body: { name: "Conflict", model: "claude-sonnet-4-6" } }));
+    await handleCreateAgent(req("/v1/agents", { body: { name: "Conflict", model: { id: "claude-sonnet-4-6" } } }));
     const res = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "Conflict", model: "claude-sonnet-4-6" } }),
+      req("/v1/agents", { body: { name: "Conflict", model: { id: "claude-sonnet-4-6" } } }),
     );
     expect(res.status).toBe(409);
     const body = (await res.json()) as { error: { type: string } };
@@ -2462,7 +2462,7 @@ describe("Agent Skills CRUD", () => {
       { name: "test-skill", source: "test/repo@test-skill", content: "# Test Skill\nContent here.", installed_at: new Date().toISOString() },
     ];
     const res = await handleCreateAgent(req("/v1/agents", {
-      body: { name: "Agent-Skills-Test", model: "claude-sonnet-4-6", skills },
+      body: { name: "Agent-Skills-Test", model: { id: "claude-sonnet-4-6" }, skills },
     }));
     expect(res.status).toBe(201);
     const body = await res.json() as Record<string, unknown>;
@@ -2481,7 +2481,7 @@ describe("Agent Skills CRUD", () => {
       { name: "s2", source: "a/b@s2", content: "content2", installed_at: new Date().toISOString() },
     ];
     const createRes = await handleCreateAgent(req("/v1/agents", {
-      body: { name: "Agent-Get-Skills", model: "claude-sonnet-4-6", skills },
+      body: { name: "Agent-Get-Skills", model: { id: "claude-sonnet-4-6" }, skills },
     }));
     const agent = await createRes.json() as Record<string, unknown>;
 
@@ -2495,7 +2495,7 @@ describe("Agent Skills CRUD", () => {
     await bootDb();
     const { handleCreateAgent, handleUpdateAgent, handleGetAgent } = await import("../src/handlers/agents");
     const createRes = await handleCreateAgent(req("/v1/agents", {
-      body: { name: "Agent-Add-Skills", model: "claude-sonnet-4-6" },
+      body: { name: "Agent-Add-Skills", model: { id: "claude-sonnet-4-6" } },
     }));
     const agent = await createRes.json() as Record<string, unknown>;
 
@@ -2524,7 +2524,7 @@ describe("Agent Skills CRUD", () => {
       { name: "remove", source: "a/b@remove", content: "remove", installed_at: new Date().toISOString() },
     ];
     const createRes = await handleCreateAgent(req("/v1/agents", {
-      body: { name: "Agent-Remove-Skills", model: "claude-sonnet-4-6", skills },
+      body: { name: "Agent-Remove-Skills", model: { id: "claude-sonnet-4-6" }, skills },
     }));
     const agent = await createRes.json() as Record<string, unknown>;
 
@@ -2548,7 +2548,7 @@ describe("Agent Skills CRUD", () => {
       { name: "big", source: "a/b@big", content: bigContent, installed_at: new Date().toISOString() },
     ];
     const res = await handleCreateAgent(req("/v1/agents", {
-      body: { name: "Agent-Big-Skill", model: "claude-sonnet-4-6", skills },
+      body: { name: "Agent-Big-Skill", model: { id: "claude-sonnet-4-6" }, skills },
     }));
     // Should reject or accept based on implementation — either 400 or 201
     const status = res.status;
@@ -2937,7 +2937,7 @@ describe("Agents — Additional Coverage", () => {
     await bootDb();
     const { handleCreateAgent, handleGetAgent } = await import("../src/handlers/agents");
     const res = await handleCreateAgent(req("/v1/agents", {
-      body: { name: "SystemAgent", model: "claude-sonnet-4-6", system: "You are a helpful assistant." },
+      body: { name: "SystemAgent", model: { id: "claude-sonnet-4-6" }, system: "You are a helpful assistant." },
     }));
     expect(res.status).toBe(201);
     const agent = await res.json() as Record<string, unknown>;
@@ -2952,7 +2952,7 @@ describe("Agents — Additional Coverage", () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
     const res = await handleCreateAgent(req("/v1/agents", {
-      body: { name: "ConfirmAgent", model: "claude-sonnet-4-6", confirmation_mode: true },
+      body: { name: "ConfirmAgent", model: { id: "claude-sonnet-4-6" }, confirmation_mode: true },
     }));
     expect(res.status).toBe(201);
     const agent = await res.json() as Record<string, unknown>;
@@ -2964,7 +2964,7 @@ describe("Agents — Additional Coverage", () => {
     const agent = await createTestAgent();
     const { handleUpdateAgent } = await import("../src/handlers/agents");
     const res = await handleUpdateAgent(
-      req(`/v1/agents/${agent.id}`, { body: { version: 1, name: "NewName", model: "claude-opus-4-6" } }),
+      req(`/v1/agents/${agent.id}`, { body: { version: 1, name: "NewName", model: { id: "claude-opus-4-6" } } }),
       agent.id as string,
     );
     expect(res.status).toBe(200);
@@ -3011,7 +3011,7 @@ describe("Agents — Additional Coverage", () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
     const res = await handleCreateAgent(req("/v1/agents", {
-      body: { name: "", model: "claude-sonnet-4-6" },
+      body: { name: "", model: { id: "claude-sonnet-4-6" } },
     }));
     expect(res.status).toBe(400);
   });
@@ -3263,12 +3263,12 @@ describe("Agent Duplicate Names", () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
     const res1 = await handleCreateAgent(req("/v1/agents", {
-      body: { name: "Coder", model: "claude-sonnet-4-6" },
+      body: { name: "Coder", model: { id: "claude-sonnet-4-6" } },
     }));
     expect(res1.status).toBe(201);
 
     const res2 = await handleCreateAgent(req("/v1/agents", {
-      body: { name: "Coder", model: "claude-sonnet-4-6" },
+      body: { name: "Coder", model: { id: "claude-sonnet-4-6" } },
     }));
     expect(res2.status).toBe(409);
     const body = await res2.json() as { error: { message: string } };

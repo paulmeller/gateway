@@ -66,43 +66,24 @@ const ToolSchema = z.union([
   }),
 ]);
 
-const McpServerSchema = z.record(
-  z.object({
-    type: z.enum(["stdio", "http", "sse"]).optional(),
-    url: z.string().optional(),
-    command: z.union([z.string(), z.array(z.string())]).optional(),
-    args: z.array(z.string()).optional(),
-    headers: z.record(z.string()).optional(),
-    env: z.record(z.string()).optional(),
-  }),
-);
-
 const ModelConfigSchema = z.object({
   speed: z.enum(["standard", "fast"]).optional(),
 });
 
-const McpServerArraySchema = z.array(
-  z.object({
-    name: z.string(),
-    type: z.string().optional(),
-    url: z.string().optional(),
-  }).passthrough(),
-);
-
 const CreateSchema = z.object({
   name: z.string().min(1),
-  model: z.union([
-    z.string().min(1),
-    z.object({ id: z.string().min(1), speed: z.enum(["standard", "fast"]).optional() }),
-  ]),
+  model: z.object({ id: z.string().min(1), speed: z.enum(["standard", "fast"]).optional() }),
   description: z.string().max(2048).optional(),
   metadata: z.record(z.string(), z.string().max(512)).optional(),
   system: z.string().nullish(),
   tools: z.array(ToolSchema).optional(),
-  mcp_servers: z.union([
-    McpServerSchema,
-    McpServerArraySchema,
-  ]).optional(),
+  mcp_servers: z.array(
+    z.object({
+      name: z.string(),
+      type: z.string().optional(),
+      url: z.string().optional(),
+    }).passthrough(),
+  ).optional(),
   engine: z.enum(["claude", "opencode", "codex", "anthropic", "gemini", "factory", "pi"]).optional(),
   webhook_url: z.string().url().optional(),
   webhook_events: z.array(z.string()).optional(),
@@ -135,18 +116,18 @@ const CreateSchema = z.object({
 const UpdateSchema = z.object({
   version: z.number().int().min(1),
   name: z.string().min(1).optional(),
-  model: z.union([
-    z.string().min(1),
-    z.object({ id: z.string().min(1), speed: z.enum(["standard", "fast"]).optional() }),
-  ]).optional(),
+  model: z.object({ id: z.string().min(1), speed: z.enum(["standard", "fast"]).optional() }).optional(),
   description: z.string().max(2048).optional(),
   metadata: z.record(z.string(), z.string().max(512)).optional(),
   system: z.string().nullish(),
   tools: z.array(z.unknown()).optional(),
-  mcp_servers: z.union([
-    z.record(z.unknown()),
-    McpServerArraySchema,
-  ]).optional(),
+  mcp_servers: z.array(
+    z.object({
+      name: z.string(),
+      type: z.string().optional(),
+      url: z.string().optional(),
+    }).passthrough(),
+  ).optional(),
   webhook_url: z.string().url().nullish(),
   webhook_events: z.array(z.string()).optional(),
   /** Null clears the secret (unsigned webhooks); string rotates it. */
@@ -204,10 +185,8 @@ export function handleCreateAgent(request: Request): Promise<Response> {
 
     const backend = resolveBackend(backendName);
 
-    // Normalize model input: accept string or { id, speed? }
-    const modelInput = parsed.data.model;
-    const modelId = typeof modelInput === "string" ? modelInput : modelInput.id;
-    const modelSpeed = typeof modelInput === "object" ? modelInput.speed : parsed.data.model_config?.speed;
+    const modelId = parsed.data.model.id;
+    const modelSpeed = parsed.data.model.speed;
 
     // Validate model is supported by this engine
     const { isValidModelForEngine, FALLBACK_MODELS } = await import("../backends/models");
@@ -227,16 +206,14 @@ export function handleCreateAgent(request: Request): Promise<Response> {
     const createErr = backend.validateAgentCreation?.();
     if (createErr) throw badRequest(createErr);
 
-    // Normalize mcp_servers input: accept array or record
+    // Convert array→record for DB storage
     const mcpInput = parsed.data.mcp_servers;
     let mcpRecord: Record<string, unknown> = {};
-    if (Array.isArray(mcpInput)) {
+    if (mcpInput) {
       for (const s of mcpInput) {
         const { name, ...rest } = s;
         mcpRecord[name] = { type: rest.type ?? "url", ...rest };
       }
-    } else if (mcpInput) {
-      mcpRecord = mcpInput;
     }
 
     // Merge model_config with speed from model object input
@@ -327,27 +304,16 @@ export function handleUpdateAgent(request: Request, id: string): Promise<Respons
       throw conflict(`Version mismatch: expected ${current.version}, got ${parsed.data.version}`);
     }
 
-    // Normalize model input: accept string or { id, speed? }
-    let modelId: string | undefined;
-    let modelSpeed: "standard" | "fast" | undefined;
-    if (parsed.data.model !== undefined) {
-      const modelInput = parsed.data.model;
-      modelId = typeof modelInput === "string" ? modelInput : modelInput.id;
-      modelSpeed = typeof modelInput === "object" ? modelInput.speed : undefined;
-    }
+    const modelId = parsed.data.model?.id;
+    const modelSpeed = parsed.data.model?.speed;
 
-    // Normalize mcp_servers input: accept array or record
+    // Convert array→record for DB storage
     let mcpRecord: Record<string, unknown> | undefined;
     if (parsed.data.mcp_servers !== undefined) {
-      const mcpInput = parsed.data.mcp_servers;
-      if (Array.isArray(mcpInput)) {
-        mcpRecord = {};
-        for (const s of mcpInput) {
-          const { name, ...rest } = s;
-          mcpRecord[name] = { type: rest.type ?? "url", ...rest };
-        }
-      } else {
-        mcpRecord = mcpInput;
+      mcpRecord = {};
+      for (const s of parsed.data.mcp_servers) {
+        const { name, ...rest } = s;
+        mcpRecord[name] = { type: rest.type ?? "url", ...rest };
       }
     }
 

@@ -95,7 +95,7 @@ describe("ID Prefixes", () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
     const res = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "PrefixAgent", model: "claude-sonnet-4-6" } }),
+      req("/v1/agents", { body: { name: "PrefixAgent", model: { id: "claude-sonnet-4-6" } } }),
     );
     expect(res.status).toBe(201);
     const body = await res.json();
@@ -107,7 +107,7 @@ describe("ID Prefixes", () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "SesnPrefixAgent", model: "claude-sonnet-4-6" } }),
+      req("/v1/agents", { body: { name: "SesnPrefixAgent", model: { id: "claude-sonnet-4-6" } } }),
     );
     const agent = await agentRes.json();
 
@@ -131,7 +131,7 @@ describe("ID Prefixes", () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "VltPrefixAgent", model: "claude-sonnet-4-6" } }),
+      req("/v1/agents", { body: { name: "VltPrefixAgent", model: { id: "claude-sonnet-4-6" } } }),
     );
     const agent = await agentRes.json();
 
@@ -149,7 +149,7 @@ describe("ID Prefixes", () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "CredPrefixAgent", model: "claude-sonnet-4-6" } }),
+      req("/v1/agents", { body: { name: "CredPrefixAgent", model: { id: "claude-sonnet-4-6" } } }),
     );
     const agent = await agentRes.json();
 
@@ -179,7 +179,7 @@ describe("ID Prefixes", () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "MemstorePrefixAgent", model: "claude-sonnet-4-6" } }),
+      req("/v1/agents", { body: { name: "MemstorePrefixAgent", model: { id: "claude-sonnet-4-6" } } }),
     );
     const agent = await agentRes.json();
 
@@ -204,7 +204,7 @@ describe("Pagination Shape", () => {
   it("list agents returns {data, next_page}", async () => {
     await bootDb();
     const { handleCreateAgent, handleListAgents } = await import("../src/handlers/agents");
-    await handleCreateAgent(req("/v1/agents", { body: { name: "Pag1", model: "claude-sonnet-4-6" } }));
+    await handleCreateAgent(req("/v1/agents", { body: { name: "Pag1", model: { id: "claude-sonnet-4-6" } } }));
     const res = await handleListAgents(req("/v1/agents"));
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -215,8 +215,8 @@ describe("Pagination Shape", () => {
   it("next_page is a string when more items exist beyond limit", async () => {
     await bootDb();
     const { handleCreateAgent, handleListAgents } = await import("../src/handlers/agents");
-    await handleCreateAgent(req("/v1/agents", { body: { name: "HasMore1", model: "claude-sonnet-4-6" } }));
-    await handleCreateAgent(req("/v1/agents", { body: { name: "HasMore2", model: "claude-sonnet-4-6" } }));
+    await handleCreateAgent(req("/v1/agents", { body: { name: "HasMore1", model: { id: "claude-sonnet-4-6" } } }));
+    await handleCreateAgent(req("/v1/agents", { body: { name: "HasMore2", model: { id: "claude-sonnet-4-6" } } }));
     const res = await handleListAgents(req("/v1/agents?limit=1"));
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -318,7 +318,7 @@ describe("Agent CRUD", () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
     const res = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "CrudAgent", model: "claude-sonnet-4-6" } }),
+      req("/v1/agents", { body: { name: "CrudAgent", model: { id: "claude-sonnet-4-6" } } }),
     );
     expect(res.status).toBe(201);
     const body = await res.json();
@@ -331,13 +331,13 @@ describe("Agent CRUD", () => {
     await bootDb();
     const { handleCreateAgent, handleUpdateAgent } = await import("../src/handlers/agents");
     const createRes = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "VersionAgent", model: "claude-sonnet-4-6" } }),
+      req("/v1/agents", { body: { name: "VersionAgent", model: { id: "claude-sonnet-4-6" } } }),
     );
     const agent = await createRes.json();
     expect(agent.version).toBe(1);
 
     const updateRes = await handleUpdateAgent(
-      req(`/v1/agents/${agent.id}`, { method: "PATCH", body: { version: 1, model: "claude-opus-4-5" } }),
+      req(`/v1/agents/${agent.id}`, { method: "PATCH", body: { version: 1, model: { id: "claude-opus-4-5" } } }),
       agent.id,
     );
     expect(updateRes.status).toBe(200);
@@ -348,8 +348,8 @@ describe("Agent CRUD", () => {
   it("list returns spec pagination shape with data array", async () => {
     await bootDb();
     const { handleCreateAgent, handleListAgents } = await import("../src/handlers/agents");
-    await handleCreateAgent(req("/v1/agents", { body: { name: "ListA1", model: "claude-sonnet-4-6" } }));
-    await handleCreateAgent(req("/v1/agents", { body: { name: "ListA2", model: "claude-sonnet-4-6" } }));
+    await handleCreateAgent(req("/v1/agents", { body: { name: "ListA1", model: { id: "claude-sonnet-4-6" } } }));
+    await handleCreateAgent(req("/v1/agents", { body: { name: "ListA2", model: { id: "claude-sonnet-4-6" } } }));
     const res = await handleListAgents(req("/v1/agents"));
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -362,7 +362,7 @@ describe("Agent CRUD", () => {
     await bootDb();
     const { handleCreateAgent, handleDeleteAgent } = await import("../src/handlers/agents");
     const createRes = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "DeleteAgent", model: "claude-sonnet-4-6" } }),
+      req("/v1/agents", { body: { name: "DeleteAgent", model: { id: "claude-sonnet-4-6" } } }),
     );
     const agent = await createRes.json();
     const res = await handleDeleteAgent(
@@ -379,7 +379,7 @@ describe("Agent CRUD", () => {
     await bootDb();
     const { handleCreateAgent, handleDeleteAgent, handleListAgents } = await import("../src/handlers/agents");
     const createRes = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "ArchiveCheck", model: "claude-sonnet-4-6" } }),
+      req("/v1/agents", { body: { name: "ArchiveCheck", model: { id: "claude-sonnet-4-6" } } }),
     );
     const agent = await createRes.json();
     await handleDeleteAgent(req(`/v1/agents/${agent.id}`, { method: "DELETE" }), agent.id);
@@ -408,7 +408,7 @@ describe("Sessions", () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "SessStringAgent", model: "claude-sonnet-4-6" } }),
+      req("/v1/agents", { body: { name: "SessStringAgent", model: { id: "claude-sonnet-4-6" } } }),
     );
     const agent = await agentRes.json();
 
@@ -432,7 +432,7 @@ describe("Sessions", () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "SessObjectAgent", model: "claude-sonnet-4-6" } }),
+      req("/v1/agents", { body: { name: "SessObjectAgent", model: { id: "claude-sonnet-4-6" } } }),
     );
     const agent = await agentRes.json();
 
@@ -458,7 +458,7 @@ describe("Sessions", () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "SessFieldsAgent", model: "claude-sonnet-4-6" } }),
+      req("/v1/agents", { body: { name: "SessFieldsAgent", model: { id: "claude-sonnet-4-6" } } }),
     );
     const agent = await agentRes.json();
 
@@ -483,7 +483,7 @@ describe("Sessions", () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "SessDelAgent", model: "claude-sonnet-4-6" } }),
+      req("/v1/agents", { body: { name: "SessDelAgent", model: { id: "claude-sonnet-4-6" } } }),
     );
     const agent = await agentRes.json();
 
@@ -521,7 +521,7 @@ describe("Vaults + Credentials", () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "VaultTypeAgent", model: "claude-sonnet-4-6" } }),
+      req("/v1/agents", { body: { name: "VaultTypeAgent", model: { id: "claude-sonnet-4-6" } } }),
     );
     const agent = await agentRes.json();
 
@@ -540,7 +540,7 @@ describe("Vaults + Credentials", () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "CredNoTokenAgent", model: "claude-sonnet-4-6" } }),
+      req("/v1/agents", { body: { name: "CredNoTokenAgent", model: { id: "claude-sonnet-4-6" } } }),
     );
     const agent = await agentRes.json();
 
@@ -587,7 +587,7 @@ describe("Vaults + Credentials", () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "OAuthNoSecretAgent", model: "claude-sonnet-4-6" } }),
+      req("/v1/agents", { body: { name: "OAuthNoSecretAgent", model: { id: "claude-sonnet-4-6" } } }),
     );
     const agent = await agentRes.json();
 
@@ -646,7 +646,7 @@ describe("Vaults + Credentials", () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "DupeCredAgent", model: "claude-sonnet-4-6" } }),
+      req("/v1/agents", { body: { name: "DupeCredAgent", model: { id: "claude-sonnet-4-6" } } }),
     );
     const agent = await agentRes.json();
 
@@ -693,7 +693,7 @@ describe("Events", () => {
   async function makeSession(): Promise<string> {
     const { handleCreateAgent } = await import("../src/handlers/agents");
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", { body: { name: `EvtAgent-${Date.now()}`, model: "claude-sonnet-4-6" } }),
+      req("/v1/agents", { body: { name: `EvtAgent-${Date.now()}`, model: { id: "claude-sonnet-4-6" } } }),
     );
     const agent = await agentRes.json();
 
@@ -770,7 +770,7 @@ describe("Memory", () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "MemTypeAgent", model: "claude-sonnet-4-6" } }),
+      req("/v1/agents", { body: { name: "MemTypeAgent", model: { id: "claude-sonnet-4-6" } } }),
     );
     const agent = await agentRes.json();
 
@@ -791,7 +791,7 @@ describe("Memory", () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "MemShaAgent", model: "claude-sonnet-4-6" } }),
+      req("/v1/agents", { body: { name: "MemShaAgent", model: { id: "claude-sonnet-4-6" } } }),
     );
     const agent = await agentRes.json();
 

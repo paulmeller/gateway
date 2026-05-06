@@ -142,7 +142,7 @@ describe("Anthropic API spec alignment", () => {
       const { handleCreateAgent } = await import("../src/handlers/agents");
       const res = await handleCreateAgent(
         req("/v1/agents", {
-          body: { name: "spec-test-agent", model: "claude-sonnet-4-6" },
+          body: { name: "spec-test-agent", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       expect(res.status).toBe(201);
@@ -158,7 +158,7 @@ describe("Anthropic API spec alignment", () => {
       const { handleCreateAgent } = await import("../src/handlers/agents");
       const res = await handleCreateAgent(
         req("/v1/agents", {
-          body: { name: "type-test", model: "claude-sonnet-4-6" },
+          body: { name: "type-test", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const body = await res.json();
@@ -170,7 +170,7 @@ describe("Anthropic API spec alignment", () => {
       const { handleCreateAgent } = await import("../src/handlers/agents");
       const res = await handleCreateAgent(
         req("/v1/agents", {
-          body: { name: "model-test", model: "claude-sonnet-4-6" },
+          body: { name: "model-test", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const body = await res.json();
@@ -185,7 +185,7 @@ describe("Anthropic API spec alignment", () => {
       const { handleCreateAgent } = await import("../src/handlers/agents");
       const res = await handleCreateAgent(
         req("/v1/agents", {
-          body: { name: "mcp-test", model: "claude-sonnet-4-6" },
+          body: { name: "mcp-test", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const body = await res.json();
@@ -197,7 +197,7 @@ describe("Anthropic API spec alignment", () => {
       const { handleCreateAgent } = await import("../src/handlers/agents");
       const res = await handleCreateAgent(
         req("/v1/agents", {
-          body: { name: "tools-test", model: "claude-sonnet-4-6" },
+          body: { name: "tools-test", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const body = await res.json();
@@ -209,7 +209,7 @@ describe("Anthropic API spec alignment", () => {
       const { handleCreateAgent } = await import("../src/handlers/agents");
       const res = await handleCreateAgent(
         req("/v1/agents", {
-          body: { name: "skills-test", model: "claude-sonnet-4-6" },
+          body: { name: "skills-test", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const body = await res.json();
@@ -221,7 +221,7 @@ describe("Anthropic API spec alignment", () => {
       const { handleCreateAgent } = await import("../src/handlers/agents");
       const res = await handleCreateAgent(
         req("/v1/agents", {
-          body: { name: "meta-test", model: "claude-sonnet-4-6" },
+          body: { name: "meta-test", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const body = await res.json();
@@ -234,7 +234,7 @@ describe("Anthropic API spec alignment", () => {
       const { handleCreateAgent } = await import("../src/handlers/agents");
       const res = await handleCreateAgent(
         req("/v1/agents", {
-          body: { name: "version-test", model: "claude-sonnet-4-6" },
+          body: { name: "version-test", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const body = await res.json();
@@ -248,7 +248,7 @@ describe("Anthropic API spec alignment", () => {
       const { handleCreateAgent } = await import("../src/handlers/agents");
       const res = await handleCreateAgent(
         req("/v1/agents", {
-          body: { name: "ts-test", model: "claude-sonnet-4-6" },
+          body: { name: "ts-test", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const body = await res.json();
@@ -271,7 +271,7 @@ describe("Anthropic API spec alignment", () => {
       const { handleCreateAgent } = await import("../src/handlers/agents");
       const agentRes = await handleCreateAgent(
         req("/v1/agents", {
-          body: { name: "session-agent", model: "claude-sonnet-4-6" },
+          body: { name: "session-agent", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const agent = await agentRes.json();
@@ -296,7 +296,7 @@ describe("Anthropic API spec alignment", () => {
       const { handleCreateAgent } = await import("../src/handlers/agents");
       const agentRes = await handleCreateAgent(
         req("/v1/agents", {
-          body: { name: "session-type-agent", model: "claude-sonnet-4-6" },
+          body: { name: "session-type-agent", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const agent = await agentRes.json();
@@ -317,7 +317,7 @@ describe("Anthropic API spec alignment", () => {
       const { handleCreateAgent } = await import("../src/handlers/agents");
       const agentRes = await handleCreateAgent(
         req("/v1/agents", {
-          body: { name: "embed-agent", model: "claude-sonnet-4-6" },
+          body: { name: "embed-agent", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const agent = await agentRes.json();
@@ -347,7 +347,7 @@ describe("Anthropic API spec alignment", () => {
       const { handleCreateAgent } = await import("../src/handlers/agents");
       const agentRes = await handleCreateAgent(
         req("/v1/agents", {
-          body: { name: "usage-agent", model: "claude-sonnet-4-6" },
+          body: { name: "usage-agent", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const agent = await agentRes.json();
@@ -377,7 +377,7 @@ describe("Anthropic API spec alignment", () => {
       const { handleCreateAgent } = await import("../src/handlers/agents");
       const agentRes = await handleCreateAgent(
         req("/v1/agents", {
-          body: { name: "stats-agent", model: "claude-sonnet-4-6" },
+          body: { name: "stats-agent", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const agent = await agentRes.json();
@@ -402,7 +402,7 @@ describe("Anthropic API spec alignment", () => {
       const { handleCreateAgent } = await import("../src/handlers/agents");
       const agentRes = await handleCreateAgent(
         req("/v1/agents", {
-          body: { name: "vault-agent", model: "claude-sonnet-4-6" },
+          body: { name: "vault-agent", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const agent = await agentRes.json();
@@ -423,7 +423,7 @@ describe("Anthropic API spec alignment", () => {
       const { handleCreateAgent } = await import("../src/handlers/agents");
       const agentRes = await handleCreateAgent(
         req("/v1/agents", {
-          body: { name: "res-agent", model: "claude-sonnet-4-6" },
+          body: { name: "res-agent", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const agent = await agentRes.json();
@@ -450,7 +450,7 @@ describe("Anthropic API spec alignment", () => {
       const { handleCreateAgent } = await import("../src/handlers/agents");
       const agentRes = await handleCreateAgent(
         req("/v1/agents", {
-          body: { name: "vault-spec-agent", model: "claude-sonnet-4-6" },
+          body: { name: "vault-spec-agent", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const agent = await agentRes.json();
@@ -474,7 +474,7 @@ describe("Anthropic API spec alignment", () => {
       const { handleCreateAgent } = await import("../src/handlers/agents");
       const agentRes = await handleCreateAgent(
         req("/v1/agents", {
-          body: { name: "vault-type-agent", model: "claude-sonnet-4-6" },
+          body: { name: "vault-type-agent", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const agent = await agentRes.json();
@@ -494,7 +494,7 @@ describe("Anthropic API spec alignment", () => {
       const { handleCreateAgent } = await import("../src/handlers/agents");
       const agentRes = await handleCreateAgent(
         req("/v1/agents", {
-          body: { name: "vault-meta-agent", model: "claude-sonnet-4-6" },
+          body: { name: "vault-meta-agent", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const agent = await agentRes.json();
@@ -574,7 +574,7 @@ describe("Anthropic API spec alignment", () => {
       await bootDb();
       const { handleCreateAgent } = await import("../src/handlers/agents");
       await handleCreateAgent(
-        req("/v1/agents", { body: { name: "list-a1", model: "claude-sonnet-4-6" } }),
+        req("/v1/agents", { body: { name: "list-a1", model: { id: "claude-sonnet-4-6" } } }),
       );
 
       const { handleListAgents } = await import("../src/handlers/agents");
@@ -594,7 +594,7 @@ describe("Anthropic API spec alignment", () => {
       await bootDb();
       const { handleCreateAgent } = await import("../src/handlers/agents");
       const agentRes = await handleCreateAgent(
-        req("/v1/agents", { body: { name: "list-session-agent", model: "claude-sonnet-4-6" } }),
+        req("/v1/agents", { body: { name: "list-session-agent", model: { id: "claude-sonnet-4-6" } } }),
       );
       const agent = await agentRes.json();
       const env = await createReadyEnv({ name: "list-session-env" });
@@ -638,7 +638,7 @@ describe("Anthropic API spec alignment", () => {
       await bootDb();
       const { handleCreateAgent } = await import("../src/handlers/agents");
       const agentRes = await handleCreateAgent(
-        req("/v1/agents", { body: { name: "list-vault-agent", model: "claude-sonnet-4-6" } }),
+        req("/v1/agents", { body: { name: "list-vault-agent", model: { id: "claude-sonnet-4-6" } } }),
       );
       const agent = await agentRes.json();
 
@@ -664,7 +664,7 @@ describe("Anthropic API spec alignment", () => {
       await bootDb();
       const { handleCreateAgent } = await import("../src/handlers/agents");
       await handleCreateAgent(
-        req("/v1/agents", { body: { name: "single-page", model: "claude-sonnet-4-6" } }),
+        req("/v1/agents", { body: { name: "single-page", model: { id: "claude-sonnet-4-6" } } }),
       );
 
       const { handleListAgents } = await import("../src/handlers/agents");
@@ -682,7 +682,7 @@ describe("Anthropic API spec alignment", () => {
       await bootDb();
       const { handleCreateAgent } = await import("../src/handlers/agents");
       const createRes = await handleCreateAgent(
-        req("/v1/agents", { body: { name: "consistency-agent", model: "claude-sonnet-4-6" } }),
+        req("/v1/agents", { body: { name: "consistency-agent", model: { id: "claude-sonnet-4-6" } } }),
       );
       const created = await createRes.json();
 
@@ -704,7 +704,7 @@ describe("Anthropic API spec alignment", () => {
       await bootDb();
       const { handleCreateAgent } = await import("../src/handlers/agents");
       const agentRes = await handleCreateAgent(
-        req("/v1/agents", { body: { name: "list-sess-agent", model: "claude-sonnet-4-6" } }),
+        req("/v1/agents", { body: { name: "list-sess-agent", model: { id: "claude-sonnet-4-6" } } }),
       );
       const agent = await agentRes.json();
       const env = await createReadyEnv({ name: "list-sess-env" });

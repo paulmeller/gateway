@@ -172,7 +172,8 @@ export class LocalBackend implements Backend {
   agents = {
     async create(input: { name: string; model: string; system?: string; backend?: string; confirmation_mode?: boolean }) {
       const { handleCreateAgent } = await import("@agentstep/agent-sdk/handlers");
-      return callHandler(handleCreateAgent, "POST", url("/v1/agents"), input);
+      const { model, ...rest } = input;
+      return callHandler(handleCreateAgent, "POST", url("/v1/agents"), { ...rest, model: { id: model } });
     },
 
     async list(opts?: { limit?: number; order?: string; include_archived?: boolean }): Promise<Paginated<any>> {

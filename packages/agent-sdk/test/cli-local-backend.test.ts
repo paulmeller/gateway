@@ -142,7 +142,7 @@ async function createAgent(overrides: Record<string, unknown> = {}): Promise<Rec
     handleCreateAgent,
     "POST",
     "/v1/agents",
-    { name: `Agent-${Date.now()}-${Math.random()}`, model: "claude-sonnet-4-6", ...overrides },
+    { name: `Agent-${Date.now()}-${Math.random()}`, model: { id: "claude-sonnet-4-6" }, ...overrides },
   );
 }
 
@@ -219,7 +219,7 @@ describe("Quickstart Flow", () => {
       handleCreateAgent,
       "POST",
       "/v1/agents",
-      { name: "QuickstartAgent", model: "claude-sonnet-4-6" },
+      { name: "QuickstartAgent", model: { id: "claude-sonnet-4-6" } },
     );
     expect(agent.id).toBeTruthy();
     expect(agent.name).toBe("QuickstartAgent");
@@ -279,14 +279,14 @@ describe("Quickstart Flow", () => {
 
   it("quickstart with different engine (codex)", async () => {
     await bootDb();
-    const agent = await createAgent({ name: "CodexAgent", engine: "codex", model: "codex-mini-latest" });
+    const agent = await createAgent({ name: "CodexAgent", engine: "codex", model: { id: "codex-mini-latest" } });
     expect(agent.engine).toBe("codex");
     expect(agent.model).toEqual({ id: "codex-mini-latest" });
   });
 
   it("agent creation returns id, name, model, engine", async () => {
     await bootDb();
-    const agent = await createAgent({ name: "FieldsAgent", model: "claude-sonnet-4-6" });
+    const agent = await createAgent({ name: "FieldsAgent", model: { id: "claude-sonnet-4-6" } });
     expect(agent).toHaveProperty("id");
     expect(agent).toHaveProperty("name", "FieldsAgent");
     expect(agent).toHaveProperty("model", { id: "claude-sonnet-4-6" });
@@ -410,7 +410,7 @@ describe("Agent CLI Operations", () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
     const res = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "CLIAgent", model: "claude-sonnet-4-6" } }),
+      req("/v1/agents", { body: { name: "CLIAgent", model: { id: "claude-sonnet-4-6" } } }),
     );
     expect(res.status).toBe(201);
     const body = await res.json();
@@ -518,7 +518,7 @@ describe("Agent CLI Operations", () => {
     await bootDb();
     const agent = await createAgent({
       name: "SystemAgent",
-      model: "claude-sonnet-4-6",
+      model: { id: "claude-sonnet-4-6" },
       system: "You are a helpful coding assistant.",
     });
     expect(agent.system).toBe("You are a helpful coding assistant.");
@@ -1320,16 +1320,16 @@ describe("Error Handling", () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
     await expect(
-      callHandler(handleCreateAgent, "POST", "/v1/agents", { name: "", model: "claude-sonnet-4-6" }),
+      callHandler(handleCreateAgent, "POST", "/v1/agents", { name: "", model: { id: "claude-sonnet-4-6" } }),
     ).rejects.toThrow();
   });
 
   it("handler 409 conflict error", async () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
-    await callHandler(handleCreateAgent, "POST", "/v1/agents", { name: "DuplicateAgent", model: "claude-sonnet-4-6" });
+    await callHandler(handleCreateAgent, "POST", "/v1/agents", { name: "DuplicateAgent", model: { id: "claude-sonnet-4-6" } });
     await expect(
-      callHandler(handleCreateAgent, "POST", "/v1/agents", { name: "DuplicateAgent", model: "claude-sonnet-4-6" }),
+      callHandler(handleCreateAgent, "POST", "/v1/agents", { name: "DuplicateAgent", model: { id: "claude-sonnet-4-6" } }),
     ).rejects.toThrow(/409|conflict|already.exists/i);
   });
 

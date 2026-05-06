@@ -202,7 +202,7 @@ test.describe("Agents API", () => {
   test("create and delete agent", async ({ request }) => {
     const createRes = await request.post("/v1/agents", {
       headers: { "x-api-key": apiKey, "content-type": "application/json" },
-      data: { name: `e2e-test-${Date.now()}`, model: "claude-sonnet-4-6" },
+      data: { name: `e2e-test-${Date.now()}`, model: { id: "claude-sonnet-4-6" } },
     });
     expect(createRes.status()).toBe(201);
     const agent = await createRes.json();
@@ -332,7 +332,7 @@ test.describe("Vault API — Duplicate Prevention", () => {
     // Create agent first
     const agentRes = await request.post("/v1/agents", {
       headers: { "x-api-key": apiKey, "content-type": "application/json" },
-      data: { name: `vault-test-agent-${Date.now()}`, model: "claude-sonnet-4-6" },
+      data: { name: `vault-test-agent-${Date.now()}`, model: { id: "claude-sonnet-4-6" } },
     });
     const agent = await agentRes.json();
 

@@ -201,10 +201,7 @@ export const CreateAgentRequestSchema = registry.register(
   z
     .object({
       name: z.string().min(1).openapi({ example: "my-agent" }),
-      model: z.union([
-        z.string().min(1),
-        z.object({ id: z.string().min(1), speed: z.enum(["standard", "fast"]).optional() }),
-      ]).openapi({ description: "Model identifier as a string, or an object with `id` and optional `speed`.", example: "claude-sonnet-4-6" }),
+      model: z.object({ id: z.string().min(1), speed: z.enum(["standard", "fast"]).optional() }).openapi({ description: "Model configuration. `id` is the canonical model identifier.", example: { id: "claude-sonnet-4-6" } }),
       description: z.string().max(2048).optional().openapi({
         description: "Human-readable description of the agent.",
       }),
@@ -213,15 +210,12 @@ export const CreateAgentRequestSchema = registry.register(
       }),
       system: z.string().nullish().openapi({ example: "You are a helpful assistant." }),
       tools: z.array(ToolConfigSchema).optional(),
-      mcp_servers: z.union([
-        z.record(McpServerConfigSchema),
-        z.array(z.object({
-          name: z.string(),
-          type: z.string().optional(),
-          url: z.string().optional(),
-        }).catchall(z.unknown())),
-      ]).optional().openapi({
-        description: "MCP servers as a name-keyed record or an array of objects with name/type/url.",
+      mcp_servers: z.array(z.object({
+        name: z.string(),
+        type: z.string().optional(),
+        url: z.string().optional(),
+      }).catchall(z.unknown())).optional().openapi({
+        description: "MCP servers as an array of objects with name, type, and optional url.",
       }),
       engine: z.enum(["claude", "opencode", "codex", "anthropic", "gemini", "factory", "pi"]).optional().openapi({
         description:
@@ -250,7 +244,7 @@ export const CreateAgentRequestSchema = registry.register(
     .openapi({
       example: {
         name: "my-agent",
-        model: "claude-sonnet-4-6",
+        model: { id: "claude-sonnet-4-6" },
         system: "You are a helpful assistant.",
         tools: [{ type: "agent_toolset_20260401" }],
       },
@@ -264,11 +258,8 @@ export const UpdateAgentRequestSchema = registry.register(
       description: "Current agent version for optimistic concurrency. Must match the agent's current version.",
     }),
     name: z.string().min(1).optional(),
-    model: z.union([
-      z.string().min(1),
-      z.object({ id: z.string().min(1), speed: z.enum(["standard", "fast"]).optional() }),
-    ]).optional().openapi({
-      description: "Model identifier as a string, or an object with `id` and optional `speed`.",
+    model: z.object({ id: z.string().min(1), speed: z.enum(["standard", "fast"]).optional() }).optional().openapi({
+      description: "Model configuration. `id` is the canonical model identifier.",
     }),
     description: z.string().max(2048).optional().openapi({
       description: "Human-readable description of the agent.",
@@ -278,15 +269,12 @@ export const UpdateAgentRequestSchema = registry.register(
     }),
     system: z.string().nullish(),
     tools: z.array(ToolConfigSchema).optional(),
-    mcp_servers: z.union([
-      z.record(McpServerConfigSchema),
-      z.array(z.object({
-        name: z.string(),
-        type: z.string().optional(),
-        url: z.string().optional(),
-      }).catchall(z.unknown())),
-    ]).optional().openapi({
-      description: "MCP servers as a name-keyed record or an array of objects with name/type/url.",
+    mcp_servers: z.array(z.object({
+      name: z.string(),
+      type: z.string().optional(),
+      url: z.string().optional(),
+    }).catchall(z.unknown())).optional().openapi({
+      description: "MCP servers as an array of objects with name, type, and optional url.",
     }),
     skills: z.array(AgentSkillSchema).max(20).optional().openapi({
       description: "Updated skills list. Replaces the existing skills entirely.",

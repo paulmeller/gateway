@@ -107,6 +107,6 @@ export function decodeCursor(
   try {
     return Buffer.from(page, "base64url").toString("utf8");
   } catch {
-    return page; // Fall back to raw ID for backward compat
+    return undefined;
   }
 }

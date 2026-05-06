@@ -84,7 +84,7 @@ async function createTestAgent(
     req("/v1/agents", {
       body: {
         name: `Agent-${Date.now()}-${Math.random()}`,
-        model: "claude-sonnet-4-6",
+        model: { id: "claude-sonnet-4-6" },
         ...overrides,
       },
     }),
@@ -519,7 +519,7 @@ describe("vault credentials API", () => {
       req("/v1/agents", {
         body: {
           name: "def-agent",
-          model: "claude-sonnet-4-6",
+          model: { id: "claude-sonnet-4-6" },
           tenant_id: "tenant_default",
         },
         apiKey: global.key,

@@ -134,7 +134,7 @@ describe("M6 SDK compat smoke", () => {
       headers: H,
       body: JSON.stringify({
         name: "sdk-compat",
-        model: "claude-sonnet-4-6",
+        model: { id: "claude-sonnet-4-6" },
         tools: [{ type: "agent_toolset_20260401" }],
       }),
     });

@@ -43,7 +43,10 @@ export class RemoteBackend implements Backend {
   }
 
   agents = {
-    create: (input: any) => this.request("POST", "/v1/agents", input),
+    create: (input: any) => {
+      const { model, ...rest } = input;
+      return this.request("POST", "/v1/agents", { ...rest, model: { id: model } });
+    },
     list: (opts?: any): Promise<Paginated<any>> => {
       const params = new URLSearchParams();
       if (opts?.limit) params.set("limit", String(opts.limit));

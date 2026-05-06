@@ -104,7 +104,7 @@ describe("memory store agent scoping", () => {
 
     const agentRes = await handleCreateAgent(
       req("/v1/agents", globalKey, {
-        body: { name: "mem-agent", model: "claude-sonnet-4-6" },
+        body: { name: "mem-agent", model: { id: "claude-sonnet-4-6" } },
       }),
     );
     const agent = await agentRes.json() as { id: string };
@@ -127,7 +127,7 @@ describe("memory store agent scoping", () => {
     // Global admin creates agent + store in default tenant
     const agentRes = await handleCreateAgent(
       req("/v1/agents", globalKey, {
-        body: { name: "def-agent", model: "claude-sonnet-4-6", tenant_id: "tenant_default" },
+        body: { name: "def-agent", model: { id: "claude-sonnet-4-6" }, tenant_id: "tenant_default" },
       }),
     );
     const agent = await agentRes.json() as { id: string };
@@ -154,7 +154,7 @@ describe("memory store agent scoping", () => {
     // Create agent + store in each tenant
     const defAgent = await (await handleCreateAgent(
       req("/v1/agents", globalKey, {
-        body: { name: "def-a", model: "claude-sonnet-4-6", tenant_id: "tenant_default" },
+        body: { name: "def-a", model: { id: "claude-sonnet-4-6" }, tenant_id: "tenant_default" },
       }),
     )).json() as { id: string };
     await handleCreateMemoryStore(
@@ -165,7 +165,7 @@ describe("memory store agent scoping", () => {
 
     const acmeAgent = await (await handleCreateAgent(
       req("/v1/agents", acmeKey, {
-        body: { name: "acme-a", model: "claude-sonnet-4-6" },
+        body: { name: "acme-a", model: { id: "claude-sonnet-4-6" } },
       }),
     )).json() as { id: string };
     await handleCreateMemoryStore(
@@ -195,7 +195,7 @@ describe("memory store agent scoping", () => {
 
     const agent = await (await handleCreateAgent(
       req("/v1/agents", globalKey, {
-        body: { name: "mem-a", model: "claude-sonnet-4-6", tenant_id: "tenant_default" },
+        body: { name: "mem-a", model: { id: "claude-sonnet-4-6" }, tenant_id: "tenant_default" },
       }),
     )).json() as { id: string };
     const store = await (await handleCreateMemoryStore(

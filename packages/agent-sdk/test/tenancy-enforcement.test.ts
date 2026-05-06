@@ -114,7 +114,7 @@ describe("v0.5 tenant enforcement — agents", () => {
     // Global admin creates one agent in each tenant.
     const defRes = await handleCreateAgent(
       req("/v1/agents", globalKey, {
-        body: { name: "default-a", model: "claude-sonnet-4-6", tenant_id: "tenant_default" },
+        body: { name: "default-a", model: { id: "claude-sonnet-4-6" }, tenant_id: "tenant_default" },
       }),
     );
     expect(defRes.status).toBe(201);
@@ -122,7 +122,7 @@ describe("v0.5 tenant enforcement — agents", () => {
 
     const acmeRes = await handleCreateAgent(
       req("/v1/agents", globalKey, {
-        body: { name: "acme-a", model: "claude-sonnet-4-6", tenant_id: "tenant_acme" },
+        body: { name: "acme-a", model: { id: "claude-sonnet-4-6" }, tenant_id: "tenant_acme" },
       }),
     );
     expect(acmeRes.status).toBe(201);
@@ -174,7 +174,7 @@ describe("v0.5 tenant enforcement — agents", () => {
     // Body tenant_id is ignored for tenant users — their own tenant always wins.
     const res = await handleCreateAgent(
       req("/v1/agents", acmeAdminKey, {
-        body: { name: "still-acme", model: "claude-sonnet-4-6", tenant_id: "tenant_default" },
+        body: { name: "still-acme", model: { id: "claude-sonnet-4-6" }, tenant_id: "tenant_default" },
       }),
     );
     expect(res.status).toBe(201);
@@ -260,7 +260,7 @@ describe("v0.5 tenant enforcement — sessions", () => {
     // global admin who can pick tenants.
     const agentRes = await handleCreateAgent(
       req("/v1/agents", globalKey, {
-        body: { name: "cross-a", model: "claude-sonnet-4-6", tenant_id: "tenant_default" },
+        body: { name: "cross-a", model: { id: "claude-sonnet-4-6" }, tenant_id: "tenant_default" },
       }),
     );
     const agent = await readJson(agentRes);
@@ -296,7 +296,7 @@ describe("v0.5 tenant enforcement — sessions", () => {
 
     const agentRes = await handleCreateAgent(
       req("/v1/agents", acmeAdminKey, {
-        body: { name: "acme-agent", model: "claude-sonnet-4-6" },
+        body: { name: "acme-agent", model: { id: "claude-sonnet-4-6" } },
       }),
     );
     const agent = await readJson(agentRes);
@@ -354,7 +354,7 @@ describe("v0.5 tenant enforcement — session fallback", () => {
     const primaryAgent = await readJson(
       await handleCreateAgent(
         req("/v1/agents", globalKey, {
-          body: { name: "primary", model: "claude-sonnet-4-6", tenant_id: "tenant_default" },
+          body: { name: "primary", model: { id: "claude-sonnet-4-6" }, tenant_id: "tenant_default" },
         }),
       ),
     );
@@ -423,7 +423,7 @@ describe("v0.5 tenant enforcement — session fallback", () => {
     const primary = await readJson(
       await handleCreateAgent(
         req("/v1/agents", globalKey, {
-          body: { name: "has-stale-fallback", model: "claude-sonnet-4-6", tenant_id: "tenant_default" },
+          body: { name: "has-stale-fallback", model: { id: "claude-sonnet-4-6" }, tenant_id: "tenant_default" },
         }),
       ),
     );
@@ -462,14 +462,14 @@ describe("v0.5 tenant enforcement — session fallback", () => {
     const primary = await readJson(
       await handleCreateAgent(
         req("/v1/agents", acmeAdminKey, {
-          body: { name: "primary", model: "claude-sonnet-4-6" },
+          body: { name: "primary", model: { id: "claude-sonnet-4-6" } },
         }),
       ),
     );
     const backup = await readJson(
       await handleCreateAgent(
         req("/v1/agents", acmeAdminKey, {
-          body: { name: "backup", model: "claude-sonnet-4-6" },
+          body: { name: "backup", model: { id: "claude-sonnet-4-6" } },
         }),
       ),
     );

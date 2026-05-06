@@ -112,7 +112,7 @@ describe("M3 interrupt e2e", () => {
         headers: H,
         body: JSON.stringify({
           name: "interrupt-test",
-          model: "claude-sonnet-4-6",
+          model: { id: "claude-sonnet-4-6" },
           tools: [{ type: "agent_toolset_20260401" }],
         }),
       })

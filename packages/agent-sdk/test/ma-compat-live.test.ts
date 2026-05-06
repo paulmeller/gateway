@@ -50,7 +50,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
     async () => {
       // Create agent
       const createAgentRes = await api("/v1/agents", {
-        body: { name: `live-smoke-agent-${Date.now()}`, engine: "claude", model: "claude-sonnet-4-6" },
+        body: { name: `live-smoke-agent-${Date.now()}`, engine: "claude", model: { id: "claude-sonnet-4-6" } },
       });
       expect(createAgentRes.status).toBe(201);
       const agent = (await createAgentRes.json()) as { id: string };
@@ -121,7 +121,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
         body: {
           name: `live-custom-tool-${Date.now()}`,
           engine: "claude",
-          model: "claude-sonnet-4-6",
+          model: { id: "claude-sonnet-4-6" },
           tools: [
             {
               type: "custom",
@@ -255,7 +255,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
       // Create 3 agents
       for (let i = 0; i < 3; i++) {
         const res = await api("/v1/agents", {
-          body: { name: `live-pag-agent-${suffix}-${i}`, engine: "claude", model: "claude-sonnet-4-6" },
+          body: { name: `live-pag-agent-${suffix}-${i}`, engine: "claude", model: { id: "claude-sonnet-4-6" } },
         });
         expect(res.status).toBe(201);
         const agent = (await res.json()) as { id: string };
@@ -303,7 +303,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
   it("vault + credentials: create static_bearer + mcp_oauth — token not in GET response", async () => {
     // Create an agent to own the vault
     const createAgentRes = await api("/v1/agents", {
-      body: { name: `live-vault-agent-${Date.now()}`, engine: "claude", model: "claude-sonnet-4-6" },
+      body: { name: `live-vault-agent-${Date.now()}`, engine: "claude", model: { id: "claude-sonnet-4-6" } },
     });
     expect(createAgentRes.status).toBe(201);
     const agent = (await createAgentRes.json()) as { id: string };
@@ -444,7 +444,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
   it("events pagination: create session, post 3 events, list with limit=2, verify next_page", async () => {
     // Create agent + session for events pagination test
     const createAgentRes = await api("/v1/agents", {
-      body: { name: `live-evt-pag-${Date.now()}`, engine: "claude", model: "claude-sonnet-4-6" },
+      body: { name: `live-evt-pag-${Date.now()}`, engine: "claude", model: { id: "claude-sonnet-4-6" } },
     });
     expect(createAgentRes.status).toBe(201);
     const agent = (await createAgentRes.json()) as { id: string };
