@@ -93,6 +93,10 @@ export { runTurn, writePermissionResponse } from "./sessions/driver";
 export { injectMcpAuthHeaders } from "./sessions/mcp-auth";
 export { loadSessionSecrets } from "./sessions/secrets";
 
+// Dreaming
+export { reviewSessions } from "./dreaming/review";
+export type { DreamResult } from "./dreaming/review";
+
 // Queue
 export { enqueueTurn } from "./queue";
 

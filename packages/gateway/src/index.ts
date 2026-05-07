@@ -21,6 +21,7 @@ import { registerDbCommands } from "./commands/db.js";
 import { registerTenantCommands } from "./commands/tenants.js";
 import { registerUpstreamKeyCommands } from "./commands/upstream_keys.js";
 import { registerAuditCommands } from "./commands/audit.js";
+import { registerDreamCommand } from "./commands/dream.js";
 import { ensureTelemetryConsent, trackCommand } from "./telemetry/index.js";
 
 const program = new Command("gateway")
@@ -121,6 +122,7 @@ registerDbCommands(program);
 registerTenantCommands(program);
 registerUpstreamKeyCommands(program);
 registerAuditCommands(program);
+registerDreamCommand(program);
 
 // Parse and run
 program.parseAsync(process.argv).then(() => {
