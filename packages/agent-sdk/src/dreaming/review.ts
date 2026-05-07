@@ -93,6 +93,7 @@ export async function reviewSessions(opts: {
   lookbackMs: number;
   dryRun: boolean;
   apiKey?: string;
+  model?: string;
 }): Promise<DreamResult> {
   const { storeId, lookbackMs, dryRun } = opts;
 
@@ -166,7 +167,7 @@ export async function reviewSessions(opts: {
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
+      model: opts.model || "claude-sonnet-4-6",
       max_tokens: 4096,
       system: DREAMING_SYSTEM_PROMPT,
       tools: [UPDATE_MEMORIES_TOOL],

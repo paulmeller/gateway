@@ -116,6 +116,7 @@ import {
   handleDeleteCredential,
   handleUpdateMemoryStore,
   handleRedactMemoryVersion,
+  handleDreamMemoryStore,
   handleUpdateResource,
   handleListModels,
 } from "@agentstep/agent-sdk/handlers";
@@ -316,6 +317,7 @@ app.post("/v1/memory_stores", (c) => handleCreateMemoryStore(c.req.raw));
 app.get("/v1/memory_stores", (c) => handleListMemoryStores(c.req.raw));
 // Sub-resource routes must be registered BEFORE the generic :id routes
 app.post("/v1/memory_stores/:id/archive", (c) => handleArchiveMemoryStore(c.req.raw, c.req.param("id")));
+app.post("/v1/memory_stores/:id/dream", (c) => handleDreamMemoryStore(c.req.raw, c.req.param("id")));
 app.get("/v1/memory_stores/:id/memory_versions", (c) => handleListMemoryVersions(c.req.raw, c.req.param("id")));
 app.get("/v1/memory_stores/:id/memory_versions/:vid", (c) => handleGetMemoryVersion(c.req.raw, c.req.param("id"), c.req.param("vid")));
 app.post("/v1/memory_stores/:id/memory_versions/:vid/redact", (c) => handleRedactMemoryVersion(c.req.raw, c.req.param("id"), c.req.param("vid")));

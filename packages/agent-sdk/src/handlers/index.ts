@@ -7,7 +7,7 @@ export { handleCreateVault, handleListVaults, handleGetVault, handleUpdateVault,
 export { handleCreateCredential, handleListCredentials, handleGetCredential, handleUpdateCredential, handleArchiveCredential, handleDeleteCredential } from "./credentials";
 export { handleBatch } from "./batch";
 export { handleListThreads, handleGetThread, handleArchiveThread, handleListThreadEvents, handleStreamThreadEvents } from "./threads";
-export { handleCreateMemoryStore, handleListMemoryStores, handleGetMemoryStore, handleUpdateMemoryStore, handleDeleteMemoryStore, handleCreateMemory, handleListMemories, handleGetMemory, handleUpdateMemory, handleDeleteMemory, handleListMemoryVersions, handleGetMemoryVersion, handleRedactMemoryVersion, handleArchiveMemoryStore } from "./memory";
+export { handleCreateMemoryStore, handleListMemoryStores, handleGetMemoryStore, handleUpdateMemoryStore, handleDeleteMemoryStore, handleCreateMemory, handleListMemories, handleGetMemory, handleUpdateMemory, handleDeleteMemory, handleListMemoryVersions, handleGetMemoryVersion, handleRedactMemoryVersion, handleArchiveMemoryStore, handleDreamMemoryStore } from "./memory";
 export { handleGetOpenApiSpec } from "./openapi";
 export { handleGetDocs } from "./docs";
 export { handleGetUI } from "./ui";

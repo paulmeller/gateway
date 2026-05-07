@@ -18,9 +18,11 @@ import {
   redactMemoryVersion,
 } from "../db/memory";
 import { getAgent } from "../db/agents";
-import { badRequest, notFound, conflict } from "../errors";
+import { badRequest, notFound, conflict, tooManyRequests } from "../errors";
 import { assertResourceTenant, resolveCreateTenant, tenantFilter } from "../auth/scope";
 import type { AuthContext } from "../types";
+import { reviewSessions } from "../dreaming/review";
+import { getConfig } from "../config";
 
 // ── Tenant helper for memory stores ──────────────────────────────────
 
@@ -249,5 +251,60 @@ export function handleArchiveMemoryStore(request: Request, storeId: string): Pro
     if (!archived) throw notFound(`memory store not found: ${storeId}`);
     const store = getMemoryStore(storeId);
     return jsonOk(store);
+  });
+}
+
+// ── Dream ────────────────────────────────────────────────────────────
+
+const DreamRequestSchema = z.object({
+  lookback_hours: z.number().min(1).max(720).default(24),
+  dry_run: z.boolean().default(false),
+  model: z.string().optional(),
+  api_key: z.string().optional(),
+});
+
+// Per-store cooldown (5 minutes)
+const dreamCooldowns = new Map<string, number>();
+const DREAM_COOLDOWN_MS = 5 * 60 * 1000;
+
+export function handleDreamMemoryStore(request: Request, storeId: string): Promise<Response> {
+  return routeWrap(request, async ({ auth }) => {
+    loadStoreForCaller(auth, storeId); // tenant guard + existence check
+
+    const body = await request.json();
+    const parsed = DreamRequestSchema.safeParse(body);
+    if (!parsed.success) throw badRequest(parsed.error.message);
+
+    // Check per-store cooldown
+    const lastDreamed = dreamCooldowns.get(storeId);
+    if (lastDreamed !== undefined && Date.now() - lastDreamed < DREAM_COOLDOWN_MS) {
+      const retryAfterSec = Math.ceil((DREAM_COOLDOWN_MS - (Date.now() - lastDreamed)) / 1000);
+      throw tooManyRequests(`dream was triggered recently; retry after ${retryAfterSec}s`);
+    }
+
+    // Resolve API key: body.api_key || config
+    const apiKey = parsed.data.api_key || getConfig().anthropicApiKey;
+    if (!apiKey) {
+      throw badRequest("No Anthropic API key available. Provide api_key in the request body or set ANTHROPIC_API_KEY.");
+    }
+
+    const result = await reviewSessions({
+      storeId,
+      lookbackMs: parsed.data.lookback_hours * 3_600_000,
+      dryRun: parsed.data.dry_run,
+      apiKey,
+      model: parsed.data.model,
+    });
+
+    // Set cooldown after successful run
+    dreamCooldowns.set(storeId, Date.now());
+
+    return jsonOk({
+      type: "dream_result",
+      memory_store_id: storeId,
+      session_count: result.sessionCount,
+      proposed_changes: result.proposedChanges,
+      applied: result.applied,
+    });
   });
 }
