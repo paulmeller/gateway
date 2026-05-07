@@ -230,6 +230,27 @@ export async function syncContainerFiles(opts: {
     console.log(`[container-file-sync] ${sessionId}: tracked paths: ${allPaths.join(", ")}`);
   }
 
+  // Also scan /mnt/session/outputs/ for deliverables (Anthropic convention).
+  // This directory is always checked regardless of tool usage, because agents
+  // may write output files there via any mechanism.
+  try {
+    const outputResult = await provider.exec(
+      sandboxName,
+      ["sh", "-c", "find /mnt/session/outputs -type f 2>/dev/null || true"],
+      { secrets, timeoutMs: 5000 },
+    );
+    if (outputResult.exit_code === 0 && outputResult.stdout.trim()) {
+      const clean = outputResult.stdout.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+      for (const filePath of clean.trim().split("\n").filter(Boolean)) {
+        const p = filePath.trim();
+        if (p && !allPaths.includes(p)) {
+          allPaths.push(p);
+        }
+      }
+      console.log(`[container-file-sync] ${sessionId}: found ${clean.trim().split("\n").filter(Boolean).length} file(s) in /mnt/session/outputs/`);
+    }
+  } catch { /* best effort */ }
+
   // Fallback: discover changed files on the container when:
   // 1. File tools were used but paths were empty (Codex v0.120+ bug)
   // 2. Bash tool was used (scripts may produce output files like .docx)

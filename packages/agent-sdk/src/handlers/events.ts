@@ -469,6 +469,7 @@ const UserDefineOutcome = z.object({
   rubric: z.union([
     z.string(),
     z.object({ type: z.literal("text"), content: z.string() }),
+    z.object({ type: z.literal("file"), file_id: z.string() }),
   ]).optional(),
   max_iterations: z.number().int().min(1).max(20).optional(),
 });
@@ -666,9 +667,20 @@ export function handlePostEvents(request: Request, sessionId: string): Promise<R
         if (event.type === "user.define_outcome") {
           const { newId: genId } = await import("../util/ids");
           const outcomeId = genId("outc");
-          const rubricText = typeof event.rubric === "string"
-            ? event.rubric
-            : event.rubric?.content ?? "";
+          let rubricText: string;
+          if (typeof event.rubric === "string") {
+            rubricText = event.rubric;
+          } else if (event.rubric && event.rubric.type === "text") {
+            rubricText = event.rubric.content;
+          } else if (event.rubric && event.rubric.type === "file") {
+            const { getFile: getFileRow } = await import("../db/files");
+            const { readFile: readStoredFile } = await import("../files/storage");
+            const fileRow = getFileRow(event.rubric.file_id);
+            if (!fileRow) throw badRequest(`Rubric file not found: ${event.rubric.file_id}`);
+            rubricText = readStoredFile(fileRow.storage_path).toString("utf-8");
+          } else {
+            rubricText = "";
+          }
           const maxIterations = event.max_iterations ?? 3;
           const processedAt = nowMs();
 

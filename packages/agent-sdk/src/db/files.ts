@@ -114,9 +114,7 @@ export function getFileRecord(id: string): FileRecord | null {
 
 export interface FileListResult {
   data: FileRecord[];
-  has_more: boolean;
-  first_id: string | null;
-  last_id: string | null;
+  next_page: string | null;
 }
 
 export function listFiles(opts?: { limit?: number; scope_id?: string; before_id?: string; after_id?: string }): FileListResult {
@@ -144,15 +142,13 @@ export function listFiles(opts?: { limit?: number; scope_id?: string; before_id?
         WHERE f.scope_id = ${opts.scope_id} AND f2.id IS NULL${cursorClause}
         ORDER BY f.id DESC LIMIT ${limit + 1}`,
     ) as FileRow[];
-    const has_more = rows.length > limit;
-    if (has_more) rows.pop();
+    const hasMore = rows.length > limit;
+    if (hasMore) rows.pop();
     const records = rows.map(hydrate);
-    return {
-      data: records,
-      has_more,
-      first_id: records.length > 0 ? records[0].id : null,
-      last_id: records.length > 0 ? records[records.length - 1].id : null,
-    };
+    const nextPage = hasMore && records.length > 0
+      ? Buffer.from(records[records.length - 1].id).toString("base64url")
+      : null;
+    return { data: records, next_page: nextPage };
   }
 
   // Unscoped listing (global admin)
@@ -166,15 +162,13 @@ export function listFiles(opts?: { limit?: number; scope_id?: string; before_id?
     ? db.select().from(schema.files).where(cursorCondition).orderBy(desc(schema.files.id)).limit(limit + 1)
     : db.select().from(schema.files).orderBy(desc(schema.files.id)).limit(limit + 1);
   const rows = query.all() as FileRow[];
-  const has_more = rows.length > limit;
-  if (has_more) rows.pop();
+  const hasMore = rows.length > limit;
+  if (hasMore) rows.pop();
   const records = rows.map(hydrate);
-  return {
-    data: records,
-    has_more,
-    first_id: records.length > 0 ? records[0].id : null,
-    last_id: records.length > 0 ? records[records.length - 1].id : null,
-  };
+  const nextPage = hasMore && records.length > 0
+    ? Buffer.from(records[records.length - 1].id).toString("base64url")
+    : null;
+  return { data: records, next_page: nextPage };
 }
 
 export function countFilesForScope(scopeId: string): number {

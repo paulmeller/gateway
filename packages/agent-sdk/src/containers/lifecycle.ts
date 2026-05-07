@@ -665,7 +665,13 @@ export async function provisionResources(
           console.warn(`[lifecycle] skipping file ${r.file_id}: too large`);
           continue;
         }
-        await writeTo(mountTarget, data.toString("utf8"));
+        // Use base64 transport to avoid corrupting binary files (docx, pdf, etc.)
+        const b64 = data.toString("base64");
+        await provider.exec(sandboxName,
+          ["sh", "-c", "base64 -d > \"$1\"", "sh", mountTarget],
+          { stdin: b64 },
+        );
+        await provider.exec(sandboxName, ["chmod", "a-w", mountTarget]);
       } catch (err) {
         console.warn(`[lifecycle] failed to provision file resource ${r.file_id}:`, err);
       }
