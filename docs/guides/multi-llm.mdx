@@ -1,0 +1,196 @@
+---
+title: Multi-LLM Setup
+description: Run agents on Claude, Codex, OpenCode, Gemini, Factory, or Pi — switch engines with a single config change.
+---
+
+AgentStep Gateway supports six agent engines. Each engine shells out to a different CLI inside the container, translates the process output into the gateway's unified event format, and streams results through the same SSE protocol. Your client code doesn't change when you switch engines.
+
+## Supported engines
+
+| Engine | CLI | Model provider | Required credential |
+|---|---|---|---|
+| `claude` | `claude` (Claude Code) | Anthropic | `ANTHROPIC_API_KEY` or OAuth token |
+| `codex` | `codex` (OpenAI Codex CLI) | OpenAI | `OPENAI_API_KEY` |
+| `opencode` | `opencode` | OpenAI, Anthropic, Google, others | Varies by model |
+| `gemini` | `gemini` (Gemini CLI) | Google | `GEMINI_API_KEY` |
+| `factory` | `factory` | Factory.ai | `FACTORY_API_KEY` |
+| `pi` | `pi` | Multi-provider (Anthropic, OpenAI, Google) | Varies by model |
+
+## Creating an agent with a specific engine
+
+Set the `engine` field when creating an agent:
+
+```json
+POST /v1/agents
+{
+  "name": "codex-agent",
+  "engine": "codex",
+  "model": { "id": "o4-mini" }
+}
+```
+
+```json
+POST /v1/agents
+{
+  "name": "gemini-agent",
+  "engine": "gemini",
+  "model": { "id": "gemini-2.5-pro" }
+}
+```
+
+The `model` field is validated against the engine's supported model list. An invalid model returns a 400 with the list of valid options.
+
+## Providing credentials
+
+Each engine needs its own model-provider API key. Store credentials in a vault and attach the vault to sessions:
+
+```bash
+# Create a vault with multiple provider keys
+gateway vaults create --name llm-keys
+gateway vaults put-entry <vault-id> ANTHROPIC_API_KEY sk-ant-api03-...
+gateway vaults put-entry <vault-id> OPENAI_API_KEY sk-...
+gateway vaults put-entry <vault-id> GEMINI_API_KEY AIza...
+```
+
+The gateway injects vault secrets as environment variables inside the container before each turn. You can use the same vault across agents with different engines.
+
+## Engine details
+
+### Claude (`claude`)
+
+The default engine. Runs the Claude Code CLI inside the container with `--print` mode for non-interactive execution.
+
+**Supported models**: `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-sonnet-4-5`, `claude-haiku-4-5`, and others in the Claude family.
+
+**Features**:
+- Full tool support via `agent_toolset_20260401`
+- Custom tools via MCP bridge
+- Skills installation
+- OAuth token support (`CLAUDE_CODE_OAUTH_TOKEN`)
+- `--fast` mode via `model_config.speed: "fast"`
+
+**Configuration**:
+```json
+{
+  "name": "claude-agent",
+  "engine": "claude",
+  "model": { "id": "claude-sonnet-4-6", "speed": "fast" },
+  "tools": [{ "type": "agent_toolset_20260401" }]
+}
+```
+
+### Codex (`codex`)
+
+Runs the OpenAI Codex CLI. Optimized for code generation and editing tasks.
+
+**Supported models**: `o4-mini`, `o3`, `gpt-4.1`, and others in the OpenAI family.
+
+**Notes**:
+- Runs with `--dangerously-bypass-approvals-and-sandbox` for headless execution inside the already-sandboxed container.
+- The `tools` field is not supported — Codex manages its own tool permissions.
+
+**Configuration**:
+```json
+{
+  "name": "codex-agent",
+  "engine": "codex",
+  "model": { "id": "o4-mini" }
+}
+```
+
+### OpenCode (`opencode`)
+
+Runs the OpenCode CLI, which supports multiple model providers through a unified interface.
+
+**Supported models**: Any model supported by OpenCode — OpenAI (`openai/gpt-4o`), Anthropic (`anthropic/claude-sonnet-4-6`), Google (`google/gemini-2.5-pro`), and others.
+
+**Notes**:
+- Runs with `--dangerously-skip-permissions` for headless execution.
+- Multi-provider: use any model from any provider OpenCode supports.
+- Set the appropriate API key for your chosen provider.
+
+**Configuration**:
+```json
+{
+  "name": "opencode-agent",
+  "engine": "opencode",
+  "model": { "id": "openai/gpt-4o" }
+}
+```
+
+### Gemini (`gemini`)
+
+Runs the Gemini CLI from Google.
+
+**Supported models**: `gemini-2.5-pro`, `gemini-2.5-flash`, and others in the Gemini family.
+
+**Configuration**:
+```json
+{
+  "name": "gemini-agent",
+  "engine": "gemini",
+  "model": { "id": "gemini-2.5-pro" }
+}
+```
+
+### Factory (`factory`)
+
+Runs the Factory.ai agent harness.
+
+**Configuration**:
+```json
+{
+  "name": "factory-agent",
+  "engine": "factory",
+  "model": { "id": "factory-default" }
+}
+```
+
+### Pi (`pi`)
+
+Multi-provider harness that supports Anthropic, OpenAI, and Google models through a single CLI.
+
+**Configuration**:
+```json
+{
+  "name": "pi-agent",
+  "engine": "pi",
+  "model": { "id": "claude-sonnet-4-6" }
+}
+```
+
+## Running the same task across engines
+
+You can create multiple agents with different engines pointing at the same environment, then compare results:
+
+```python
+from anthropic import Anthropic
+
+client = Anthropic(api_key="gw-key", base_url="http://localhost:4000")
+
+# Create agents with different engines
+claude_agent = client.beta.agents.create(name="claude-bot", model={"id": "claude-sonnet-4-6"}, engine="claude")
+codex_agent = client.beta.agents.create(name="codex-bot", model={"id": "o4-mini"}, engine="codex")
+
+env = client.beta.environments.create(name="test", config={"type": "cloud", "provider": "docker"})
+
+# Run the same task on both
+for agent in [claude_agent, codex_agent]:
+    session = client.beta.sessions.create(
+        agent_id=agent.id,
+        environment_id=env.id,
+        vault_ids=["vlt_..."],
+    )
+    client.beta.sessions.events.create(
+        session_id=session.id,
+        type="user.message",
+        content=[{"type": "text", "text": "Write a function that parses CSV files"}],
+    )
+```
+
+## Engine constraints
+
+- The `tools` field is only supported on the `claude` engine. Other engines manage tool permissions internally.
+- The `engine` field cannot be changed after agent creation.
+- Each engine installs its own CLI binary inside the container on first use. The gateway handles this automatically.
+- All engines produce the same event types (`agent.message`, `agent.tool_use`, `agent.tool_result`, etc.) regardless of the underlying CLI's native output format.

@@ -26,14 +26,25 @@ The resolved config object is cached for 30 seconds (`CACHE_MS = 30_000`). Calli
 | Variable | Default | Description |
 |---|---|---|
 | `CONCURRENCY` | `4` | Maximum number of turns that can run simultaneously across all sessions (global queue). |
-| `MAX_SANDBOXES_PER_ENV` | `8` | Maximum number of live containers per environment. New sessions wait when the limit is reached. |
+| `MAX_SANDBOXES_PER_ENV` | `8` | Maximum number of live containers per environment (global default). Can be overridden per-environment with `max_sandboxes` in the environment config. New sessions wait when the limit is reached. |
 
 ### Session lifecycle
 
 | Variable | Default | Description |
 |---|---|---|
-| `SESSION_MAX_AGE_MS` | `604800000` (7 days) | Sessions older than this value are eligible for sweeper cleanup. |
+| `SESSION_MAX_AGE_MS` | `3600000` (1 hour) | Sessions older than this value are eligible for sweeper cleanup. Changed from 7 days to 1 hour in v0.5.1. |
 | `SWEEPER_INTERVAL_MS` | `60000` (1 min) | How often the background sweeper runs to reap old sessions and containers. |
+
+### Per-environment config
+
+These settings can be specified in the environment's `config` object to override global defaults on a per-environment basis. See [Environments](/build-agents/environments) for details.
+
+| Config field | Default | Description |
+|---|---|---|
+| `idle_timeout_ms` | `3600000` (1 hour) | Per-environment idle TTL. Containers are released after this duration of inactivity. |
+| `max_sandboxes` | `8` | Maximum live containers for this environment. Overrides `MAX_SANDBOXES_PER_ENV`. |
+| `warm_pool_size` | — | Number of pre-warmed containers to keep ready. |
+| `default_engine` | — | Default engine for sessions in this environment. |
 
 ### Storage
 

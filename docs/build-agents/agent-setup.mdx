@@ -14,8 +14,9 @@ POST /v1/agents
 ```json
 {
   "name": "code-reviewer",
-  "model": "claude-opus-4-5",
+  "model": { "id": "claude-opus-4-5" },
   "engine": "claude",
+  "description": "Reviews diffs and outputs structured feedback.",
   "system": "You are a senior engineer. Review the diff and output structured feedback.",
   "tools": [
     {
@@ -29,26 +30,29 @@ POST /v1/agents
 }
 ```
 
-The response body is an `Agent` object at `version: 1`.
+The response body is an `Agent` object at `version: 1` with `type: "agent"`.
 
 ## Config fields
 
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `name` | string | — | Display name. Must be unique within your tenant. |
-| `model` | string | — | Model identifier. Must be supported by the chosen engine. |
+| `model` | `{ id: string, speed?: "standard" \| "fast" }` | — | Model object. `id` is the model identifier (must be supported by the chosen engine). Optional `speed` maps to `--fast` on the Claude CLI. |
 | `engine` | string | `"claude"` | Execution engine: `claude`, `opencode`, `codex`, `gemini`, `factory`, `pi`, or `anthropic`. |
+| `description` | string \| null | `null` | Human-readable description (max 2048 characters). |
 | `system` | string \| null | `null` | System prompt injected before every turn. |
+| `metadata` | Record\<string, string\> | `{}` | Arbitrary key-value pairs (max 16 pairs). |
 | `tools` | array | `[{type:"agent_toolset_20260401"}]` | Tool configuration. See [Tools](/build-agents/tools). |
-| `mcp_servers` | object | `{}` | MCP server declarations keyed by server name. See [MCP Connector](/build-agents/mcp-connector). |
+| `mcp_servers` | array | `[]` | MCP server declarations. Each entry is `{ name: string, type: "url", url: string }`. See [MCP Connector](/build-agents/mcp-connector). |
 | `skills` | array | `[]` | Skill bundles installed into the container at session start. See [Skills](/build-agents/skills). |
 | `webhook_url` | string \| null | `null` | URL that receives session lifecycle events. |
 | `webhook_events` | string[] | `["session.status_idle","session.status_running","session.error"]` | Which events to deliver. |
 | `webhook_secret` | string | — | HMAC-SHA256 shared secret (min 32 chars). When set, deliveries include `X-AgentStep-Signature: sha256=<hex>`. The secret is never returned by the API — only `webhook_signing_enabled: true/false` is surfaced. |
+| `multiagent` | object \| null | `null` | Multi-agent coordinator config. Set to `{ type: "coordinator", agents: [...] }` to enable thread-based delegation. See [Multi-Agent](/build-agents/multi-agent). |
 | `threads_enabled` | boolean | `false` | Adds a synthetic `spawn_agent` custom tool so the agent can delegate sub-tasks. |
 | `confirmation_mode` | boolean | `false` | Enables the permission bridge. Claude runs with `default` permission mode and pauses before destructive tool calls. |
 | `callable_agents` | array | `[]` | Agents this agent may spawn when `threads_enabled` is `true`. Each entry is `{type:"agent", id, version?}`. |
-| `model_config` | object | `{}` | Engine-level model hints. Currently supports `speed: "standard" \| "fast"` (maps to `--fast` on the Claude CLI). |
+| `model_config` | object | `{}` | Engine-level model hints (deprecated in favor of `model.speed`). |
 
 ### Engine constraints
 
@@ -62,11 +66,12 @@ The response body is an `Agent` object at `version: 1`.
 PATCH /v1/agents/:id
 ```
 
-Send only the fields you want to change. Every successful PATCH increments `version` and writes a new `agent_versions` row. The previous version remains readable via the `?version=N` query parameter on GET.
+Send only the fields you want to change plus the current `version` for optimistic concurrency. Every successful PATCH increments `version` and writes a new `agent_versions` row. The previous version remains readable via the `?version=N` query parameter on GET. If the `version` in the request body does not match the agent's current version, the server returns `409 Conflict`.
 
 ```json
 {
-  "model": "claude-sonnet-4-5",
+  "version": 1,
+  "model": { "id": "claude-sonnet-4-5" },
   "system": "Updated system prompt."
 }
 ```
@@ -105,9 +110,19 @@ Returns `{ data: Agent[], next_page: string | null }`.
 ## Archive an agent
 
 ```http
-DELETE /v1/agents/:id
+POST /v1/agents/:id/archive
 ```
 
-Sets `archived_at` and returns `{ id, type: "agent_deleted" }`. Archived agents are excluded from list results unless `include_archived=true`. All historical version rows are preserved; sessions that reference the agent continue to function.
+Sets `archived_at` and returns the full agent object. Archived agents are excluded from list results unless `include_archived=true`. All historical version rows are preserved; sessions that reference the agent continue to function.
 
 Archiving is irreversible through the API — there is no unarchive endpoint.
+
+The legacy `DELETE /v1/agents/:id` endpoint is still supported and returns `{ id, type: "agent_deleted" }`.
+
+## List agent versions
+
+```http
+GET /v1/agents/:id/versions
+```
+
+Returns a paginated list of all version snapshots for the agent. Each entry is a full agent object at that version. Pagination uses `{ data, next_page }` — pass `next_page` as the `page` query parameter to fetch the next batch.

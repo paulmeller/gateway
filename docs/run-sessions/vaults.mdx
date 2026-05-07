@@ -3,7 +3,7 @@ title: Authenticate with Vaults
 description: Store secrets for your agents in encrypted vaults and inject them automatically into session containers.
 ---
 
-A **vault** is a per-agent key-value store for secrets. Vault entries are encrypted at rest with AES-256-GCM and are never returned in plaintext over the API. When a session starts with `vault_ids` set, the gateway decrypts each entry and injects it as an environment variable into the container before the first turn runs.
+A **vault** is a key-value store for secrets. Vault entries are encrypted at rest with AES-256-GCM and are never returned in plaintext over the API. When a session starts with `vault_ids` set, the gateway decrypts each entry and injects it as an environment variable into the container before the first turn runs. Vaults can be scoped to a specific agent or created as standalone (no `agent_id`).
 
 ## How secrets are resolved
 
@@ -24,22 +24,26 @@ POST /v1/vaults
 ```json
 {
   "agent_id": "agent_01abc",
-  "name": "production-secrets"
+  "name": "production-secrets",
+  "metadata": { "team": "backend" }
 }
 ```
 
-A vault belongs to exactly one agent. You cannot share a vault across agents. The `display_name` field is accepted as an alias for `name` for compatibility with the Anthropic API.
+The `agent_id` field is optional. When provided, the vault is scoped to that agent. When omitted, the vault is standalone and can be attached to sessions for any agent. The `display_name` field is accepted as an alias for `name` for compatibility with the Anthropic API.
 
 The response:
 
 ```json
 {
   "id": "vault_01...",
+  "type": "vault",
   "agent_id": "agent_01abc",
   "name": "production-secrets",
   "display_name": "production-secrets",
+  "metadata": { "team": "backend" },
   "created_at": "2026-04-01T12:00:00.000Z",
-  "updated_at": "2026-04-01T12:00:00.000Z"
+  "updated_at": "2026-04-01T12:00:00.000Z",
+  "archived_at": null
 }
 ```
 
@@ -114,6 +118,23 @@ DELETE /v1/vaults/:id/entries/:key
 
 Returns `{ "key": "...", "type": "entry_deleted" }`.
 
+## Update a vault
+
+```http
+POST /v1/vaults/:id
+```
+
+Update `name`, `metadata`, or other mutable fields:
+
+```json
+{
+  "name": "renamed-secrets",
+  "metadata": { "team": "platform" }
+}
+```
+
+Returns the full updated vault object.
+
 ## List vaults
 
 ```http
@@ -125,6 +146,16 @@ Filter by agent:
 ```
 GET /v1/vaults?agent_id=agent_01abc
 ```
+
+Returns `{ data: Vault[], next_page: string | null }`. Pass `next_page` as the `page` query parameter to fetch the next batch.
+
+## Archive a vault
+
+```http
+POST /v1/vaults/:id/archive
+```
+
+Sets `archived_at` and returns the full vault object. Archived vaults are excluded from list results unless `include_archived=true`.
 
 ## Delete a vault
 
@@ -146,6 +177,6 @@ Pass `vault_ids` when creating a session:
 }
 ```
 
-All vault IDs must belong to the same agent as the session. The gateway validates ownership at session creation time — attaching a vault from a different agent returns a `400` error.
+Agent-scoped vaults must belong to the same agent as the session. Standalone vaults (no `agent_id`) can be attached to any session. The gateway validates ownership at session creation time — attaching an agent-scoped vault from a different agent returns a `400` error.
 
 At turn start, the driver decrypts every entry from every attached vault and sets them as environment variables inside the container. Later turns in the same session re-inject the same variables from the same vaults, so you can rotate a secret by updating the vault entry and the next turn will use the new value.

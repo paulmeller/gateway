@@ -30,7 +30,7 @@ POST /v1/environments
 }
 ```
 
-The gateway validates provider availability synchronously before saving the row, then kicks off background setup. The environment starts in `state: "preparing"`.
+The gateway validates provider availability synchronously before saving the row, then kicks off background setup. The environment starts in `state: "preparing"`. The response includes `type: "environment"` and `updated_at`.
 
 ## Config fields
 
@@ -42,6 +42,10 @@ The gateway validates provider availability synchronously before saving the row,
 | `provider` | string | yes | Sandbox provider key. See the table below. |
 | `packages` | object | no | Packages to pre-install by ecosystem. |
 | `networking` | object | no | Network access policy for containers. |
+| `idle_timeout_ms` | number | no | Per-environment idle TTL in milliseconds. Containers are released after this duration of inactivity. Default: `3600000` (1 hour). |
+| `max_sandboxes` | number | no | Maximum number of live containers for this environment. New sessions wait when the limit is reached. Default: `8`. |
+| `warm_pool_size` | number | no | Number of pre-warmed containers to keep ready for this environment. |
+| `default_engine` | string | no | Default engine for sessions created in this environment, overriding the global default. |
 
 ### Providers
 

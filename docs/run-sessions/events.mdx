@@ -261,6 +261,9 @@ Span events carry OpenTelemetry-style trace context. Each event carries `trace_i
 |------|-------------|
 | `span.model_request_start` | The model API call started |
 | `span.model_request_end` | The model API call completed; carries token usage |
+| `span.outcome_evaluation_start` | An outcome grader evaluation has started |
+| `span.outcome_evaluation_ongoing` | The grader is still evaluating; carries partial progress |
+| `span.outcome_evaluation_end` | The grader evaluation completed; carries the evaluation result |
 
 ```json
 {
@@ -372,3 +375,16 @@ for await (const event of stream) {
 ```
 
 The gateway handles the `memory` built-in tool server-side — you do not need to implement that one yourself.
+
+## Thread event types
+
+Thread events are emitted when a multi-agent coordinator spawns or communicates with sub-agent threads. These events appear on the coordinator session's event stream.
+
+| Type | Description |
+|------|-------------|
+| `session.thread_created` | A new sub-agent thread was spawned by the coordinator |
+| `session.thread_status_running` | A thread has started processing |
+| `session.thread_status_idle` | A thread has finished its current turn and is idle |
+| `session.thread_status_terminated` | A thread has been permanently closed |
+| `agent.thread_message_received` | The coordinator received a message from a sub-agent thread |
+| `agent.thread_message_sent` | The coordinator sent a message to a sub-agent thread |

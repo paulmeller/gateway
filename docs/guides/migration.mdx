@@ -1,0 +1,193 @@
+---
+title: Migrate from Anthropic Managed Agents
+description: Switch from Anthropic's hosted Managed Agents to self-hosted AgentStep Gateway with zero client-code changes.
+---
+
+AgentStep Gateway implements the same API surface as Anthropic's hosted Managed Agents. If you already have a working integration with `client.beta.agents`, `client.beta.environments`, and `client.beta.sessions`, you can point it at your gateway instance and everything works — same resource model, same SSE event shapes, same SDK methods.
+
+## What changes
+
+| | Anthropic Managed Agents | AgentStep Gateway |
+|---|---|---|
+| **Base URL** | `https://api.anthropic.com` | `http://localhost:4000` (or your host) |
+| **API key** | `sk-ant-api03-…` | Gateway-issued key (or passthrough with `sk-ant-api*`) |
+| **Container runtime** | Anthropic-managed | Your choice of 11 providers |
+| **Engine** | Claude only | Claude, Codex, OpenCode, Gemini, Factory, Pi |
+| **Pricing** | $0.08/session-hour + token costs | Your infra costs only |
+| **Data residency** | Anthropic's cloud | Your servers |
+
+## Step 1 — Install and start the gateway
+
+```bash
+npx @agentstep/gateway@latest serve
+```
+
+This starts the server on port 4000, creates a SQLite database, and prints your first API key.
+
+## Step 2 — Point your SDK at the gateway
+
+### Python
+
+```python
+from anthropic import Anthropic
+
+client = Anthropic(
+    api_key="your-gateway-key",
+    base_url="http://localhost:4000",
+)
+
+# Everything else stays the same
+agent = client.beta.agents.create(
+    name="my-agent",
+    model={"id": "claude-sonnet-4-6"},
+)
+```
+
+### TypeScript
+
+```typescript
+import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic({
+  apiKey: "your-gateway-key",
+  baseURL: "http://localhost:4000",
+});
+
+const agent = await client.beta.agents.create({
+  name: "my-agent",
+  model: { id: "claude-sonnet-4-6" },
+});
+```
+
+### Go
+
+```go
+client := anthropic.NewClient(
+    option.WithAPIKey("your-gateway-key"),
+    option.WithBaseURL("http://localhost:4000"),
+)
+```
+
+### cURL
+
+```bash
+# Just change the URL — the header shape is identical
+curl http://localhost:4000/v1/agents \
+  -H "x-api-key: your-gateway-key" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "anthropic-beta: managed-agents-2026-04-01" \
+  -d '{"name":"my-agent","model":{"id":"claude-sonnet-4-6"}}'
+```
+
+## Step 3 — Provide LLM credentials
+
+Anthropic's hosted service uses your API key for both authentication and LLM billing. With the gateway, these are separate:
+
+- **Gateway API key** — authenticates your requests to the gateway.
+- **LLM API key** — authenticates the agent engine with the model provider.
+
+Store LLM credentials in a vault so they are injected into the container at turn time:
+
+```bash
+# For Claude engine
+gateway vaults create --name creds
+gateway vaults put-entry <vault-id> ANTHROPIC_API_KEY sk-ant-api03-...
+
+# For Codex engine
+gateway vaults put-entry <vault-id> OPENAI_API_KEY sk-...
+
+# For Gemini engine
+gateway vaults put-entry <vault-id> GEMINI_API_KEY AIza...
+```
+
+Then reference the vault when creating sessions:
+
+```json
+POST /v1/sessions
+{
+  "agent_id": "agnt_...",
+  "environment_id": "env_...",
+  "vault_ids": ["vlt_..."]
+}
+```
+
+## Step 4 — Create an environment with your preferred provider
+
+On Anthropic's platform, the container runtime is opaque. With the gateway, you choose:
+
+```json
+POST /v1/environments
+{
+  "name": "dev",
+  "config": {
+    "type": "cloud",
+    "provider": "docker"
+  }
+}
+```
+
+See [Provider Comparison](/infrastructure/provider-comparison) for help choosing.
+
+## API compatibility notes
+
+### Fully compatible
+
+- `POST /v1/agents` — create, update, archive, list, get (including versioning)
+- `POST /v1/environments` — create, update, archive, list, get
+- `POST /v1/sessions` — create with `agent_id`, `environment_id`, `vault_ids`, `resources`
+- `POST /v1/sessions/:id/events` — send user messages and tool results
+- `GET /v1/sessions/:id/stream` — SSE event stream with the same event types
+- `GET /v1/sessions/:id/events` — paginated event list
+- `POST /v1/vaults` — create, list, get, archive, put/get/delete entries
+- `POST /v1/credentials` — create, list, get, archive
+
+### Pagination shape
+
+The gateway uses cursor-based pagination:
+
+```json
+{
+  "data": [...],
+  "next_page": "sesn_xyz"
+}
+```
+
+### ID prefixes
+
+Gateway IDs use the same prefixes as Anthropic: `agnt_`, `env_`, `sesn_`, `vlt_`, `cred_`, etc.
+
+### Features not yet available
+
+| Feature | Status |
+|---|---|
+| Permission policies (`always_allow` / `always_ask`) | Planned |
+
+### Features added in v0.5.x
+
+| Feature | Version |
+|---|---|
+| Multi-agent (coordinator with thread-based delegation) | v0.5.2 |
+| Outcomes (rubrics + grader evaluation loop) | v0.5.2 |
+| Memory store container mount + dreaming | v0.5.2 |
+| Per-environment idle timeout, max sandboxes, warm pool | v0.5.1 |
+| `model` as `{ id, speed? }` object, `mcp_servers` as array | v0.5.0 |
+
+## Passthrough mode (hybrid)
+
+If you want to keep some sessions on Anthropic's infrastructure while running others locally, use passthrough mode. Send requests with your Anthropic `sk-ant-api*` key and the gateway proxies them directly:
+
+```bash
+# Enable passthrough
+gateway settings set anthropic_passthrough_enabled true
+
+# Now sk-ant-api* keys are forwarded to Anthropic
+curl http://localhost:4000/v1/agents \
+  -H "x-api-key: sk-ant-api03-YOUR-ANTHROPIC-KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "anthropic-beta: managed-agents-2026-04-01" \
+  -d '{"name":"my-agent","model":{"id":"claude-sonnet-4-6"}}'
+```
+
+## Sync-and-proxy mode
+
+For a tighter integration, create an environment with `provider: "anthropic"`. The gateway syncs your agent config to Anthropic, creates hosted sessions, and proxies event streams — but your config, observability, and cost tracking stay local. See [Anthropic Integration](/guides/anthropic-integration) for details.

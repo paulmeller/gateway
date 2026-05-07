@@ -39,7 +39,7 @@ Omitting `version` always uses the agent's current version at session creation t
 | `metadata` | object | No | Arbitrary key-value pairs attached to the session |
 | `max_budget_usd` | number | No | Hard spending cap in USD; the session terminates when exceeded |
 | `vault_ids` | string[] | No | Vault IDs whose secrets are injected into the container at turn start |
-| `resources` | object[] | No | Files, URIs, or GitHub repositories to mount into the session |
+| `resources` | object[] | No | Files, URIs, GitHub repositories, or memory stores to mount into the session |
 
 ### Resources
 
@@ -51,6 +51,7 @@ Resources are mounted into the container before the first turn runs. Supported t
 | `text` | `content` | Raw text content |
 | `file` | `file_id`, optionally `mount_path` | A previously uploaded file |
 | `github_repository` | `repository_url` (or `url`), `branch` or `commit` or `checkout` | Clone a repo; use `authorization_token` to embed credentials |
+| `memory_store` | `memory_store_id` | Mount a memory store at `/mnt/memory/` inside the container. Contents sync automatically after each turn. |
 
 ```json
 {
@@ -92,7 +93,18 @@ Returns the full session object, including cumulative usage stats and cost:
 {
   "id": "session_01...",
   "type": "session",
-  "agent": { "type": "agent", "id": "agent_01abc", "version": 3 },
+  "agent": {
+    "type": "agent",
+    "id": "agent_01abc",
+    "version": 3,
+    "name": "code-reviewer",
+    "model": { "id": "claude-opus-4-5" },
+    "engine": "claude",
+    "description": "Reviews diffs and outputs structured feedback.",
+    "system": "You are a senior engineer...",
+    "created_at": "2026-04-01T11:00:00.000Z",
+    "updated_at": "2026-04-01T11:00:00.000Z"
+  },
   "environment_id": "env_01xyz",
   "status": "idle",
   "stop_reason": "end_turn",
@@ -101,6 +113,7 @@ Returns the full session object, including cumulative usage stats and cost:
   "max_budget_usd": null,
   "resources": [],
   "vault_ids": [],
+  "outcome_evaluations": [],
   "stats": {
     "turn_count": 2,
     "tool_calls_count": 5,
@@ -111,7 +124,10 @@ Returns the full session object, including cumulative usage stats and cost:
     "input_tokens": 4200,
     "output_tokens": 810,
     "cache_read_input_tokens": 0,
-    "cache_creation_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
     "cost_usd": 0.0042
   },
   "created_at": "2026-04-01T12:00:00.000Z",
@@ -133,7 +149,8 @@ Returns a paginated list. Use the `next_page` cursor from the response as the `p
 | `agent_id` | string | Filter to a specific agent |
 | `agent_version` | number | Filter to a specific agent version |
 | `environment_id` | string | Filter to a specific environment |
-| `status` | string | Filter by status: `idle`, `running`, `rescheduling`, or `terminated` |
+| `status` | string | Filter by a single status: `idle`, `running`, `rescheduling`, or `terminated` |
+| `statuses` | string[] | Filter by multiple statuses (e.g., `statuses=idle,running`) |
 | `limit` | number | Results per page (default 20) |
 | `order` | `asc` \| `desc` | Sort direction by creation time |
 | `include_archived` | boolean | Include archived sessions (default false) |

@@ -155,6 +155,31 @@ POST /v1/environments
 }
 ```
 
+### Per-environment container config
+
+Environment config supports additional fields to control container lifecycle:
+
+| Field | Default | Description |
+|---|---|---|
+| `idle_timeout_ms` | `3600000` (1 hour) | Idle TTL. Containers are released after this duration of inactivity. |
+| `max_sandboxes` | `8` | Maximum number of live containers for this environment. |
+| `warm_pool_size` | — | Number of pre-warmed containers to keep ready. Reduces cold-start latency for new sessions. |
+| `default_engine` | — | Default engine for sessions created in this environment. |
+
+```json
+POST /v1/environments
+{
+  "name": "high-throughput",
+  "config": {
+    "type": "cloud",
+    "provider": "docker",
+    "idle_timeout_ms": 7200000,
+    "max_sandboxes": 16,
+    "warm_pool_size": 4
+  }
+}
+```
+
 If `provider` is omitted, the gateway throws an error at session start. The default provider for new environments created via the interactive quickstart (`gateway chat`) is `sprites`.
 
 Provider credentials follow precedence order: **vault secrets → `process.env` → settings DB**. Credentials stored via `PUT /v1/settings` are read by `readEnvOrSetting()` at turn time, so they work without restarting the server.
