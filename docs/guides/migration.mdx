@@ -68,6 +68,32 @@ client := anthropic.NewClient(
 )
 ```
 
+### Anthropic CLI (`ant`)
+
+The official Anthropic CLI works against the gateway with `--base-url`:
+
+```bash
+brew install anthropics/tap/ant
+
+# All ant commands work — just point at your gateway
+ant --base-url http://localhost:4000 \
+  --api-key your-gateway-key \
+  beta:agents list
+
+ant --base-url http://localhost:4000 \
+  --api-key your-gateway-key \
+  beta:agents create \
+  --name "my-agent" \
+  --model '{id: claude-sonnet-4-6}' \
+  --tool '{type: agent_toolset_20260401}'
+
+ant --base-url http://localhost:4000 \
+  --api-key your-gateway-key \
+  beta:sessions list --format yaml
+```
+
+`ant` provides YAML/JSON output formats, GJSON field transforms (`--transform`), file input (`@file.md`), and YAML stdin — useful for scripting and CI. For server management and interactive use, use the `gateway` CLI (`gateway serve`, `gateway chat`, `gateway dream`).
+
 ### cURL
 
 ```bash

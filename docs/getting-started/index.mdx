@@ -48,6 +48,16 @@ AgentStep Gateway is a self-hosted, open-source server that implements the Anthr
 
 The gateway also supports a **sync-and-proxy** mode: create an environment with `provider: "anthropic"` and the gateway syncs your local agent config to Anthropic, creates a hosted session, and proxies execution traffic. Anthropic manages the sandbox; your config stays local.
 
+## Compatible with Anthropic tools
+
+The gateway implements the same API, so Anthropic's own tools work out of the box:
+
+- **Anthropic CLI (`ant`)** — `ant --base-url http://localhost:4000 beta:agents list` works with all CRUD operations, YAML output, field transforms, and file input.
+- **Anthropic SDKs** — Python, TypeScript, Go, Java, C#, Ruby, PHP SDKs work by changing `base_url`.
+- **`gateway` CLI** — for server management (`serve`), interactive chat (`chat`), memory curation (`dream`), and interactive setup (`quickstart`).
+
+For API operations and scripting, use `ant` or the SDKs. For running the server and interactive workflows, use `gateway`. See [Migration Guide](/guides/migration) for setup details.
+
 ## Supported engines
 
 | Engine | Key | Notes |
