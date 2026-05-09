@@ -42,14 +42,19 @@ function hydrateSkillVersion(row: {
   skill_id: string;
   version: string;
   content: string;
+  files_json?: string;
   created_at: number;
 }): SkillVersion {
+  const filesJson = row.files_json ?? "{}";
+  const files = JSON.parse(filesJson) as Record<string, string>;
+  const hasFiles = Object.keys(files).length > 0;
   return {
     type: "skill_version",
     id: row.id,
     skill_id: row.skill_id,
     version: row.version,
     content: row.content,
+    ...(hasFiles ? { files } : {}),
     created_at: toIso(row.created_at),
   };
 }
@@ -62,6 +67,7 @@ export function createSkill(input: {
   name: string;
   description?: string;
   content: string;
+  files?: Record<string, string>;
   tenantId?: string;
 }): Skill {
   const db = getDrizzle();
@@ -86,6 +92,7 @@ export function createSkill(input: {
       skill_id: id,
       version,
       content: input.content,
+      files_json: JSON.stringify(input.files ?? {}),
       created_at: now,
     }).run();
   });
@@ -165,7 +172,7 @@ function autoIncrement(current: string): string {
 
 export function createSkillVersion(
   skillId: string,
-  input: { content: string; version?: string },
+  input: { content: string; files?: Record<string, string>; version?: string },
 ): SkillVersion | undefined {
   const db = getDrizzle();
 
@@ -186,6 +193,7 @@ export function createSkillVersion(
       skill_id: skillId,
       version,
       content: input.content,
+      files_json: JSON.stringify(input.files ?? {}),
       created_at: now,
     }).run();
 
@@ -214,7 +222,7 @@ export function getSkillVersion(
     )
     .get();
   if (!row) return undefined;
-  return hydrateSkillVersion(row as typeof row & { id: string; skill_id: string; version: string; content: string; created_at: number });
+  return hydrateSkillVersion(row as typeof row & { id: string; skill_id: string; version: string; content: string; files_json?: string; created_at: number });
 }
 
 export function listSkillVersions(
@@ -238,7 +246,7 @@ export function listSkillVersions(
     .all();
 
   return rows.map((r) =>
-    hydrateSkillVersion(r as typeof r & { id: string; skill_id: string; version: string; content: string; created_at: number }),
+    hydrateSkillVersion(r as typeof r & { id: string; skill_id: string; version: string; content: string; files_json?: string; created_at: number }),
   );
 }
 

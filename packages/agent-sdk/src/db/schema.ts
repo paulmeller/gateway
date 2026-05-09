@@ -304,6 +304,7 @@ export const skillVersions = sqliteTable("skill_versions", {
   skill_id: text("skill_id").notNull(),
   version: text("version").notNull(),
   content: text("content").notNull(),
+  files_json: text("files_json").notNull().default("{}"),
   created_at: integer("created_at").notNull(),
 });
 

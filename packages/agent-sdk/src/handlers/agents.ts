@@ -48,6 +48,7 @@ const InlineSkillSchema = z.object({
   name: z.string().min(1),
   source: z.string().min(1),
   content: z.string().min(1).max(256 * 1024), // 256KB per skill
+  files: z.record(z.string(), z.string()).optional(),
   installed_at: z.string().optional(),
 });
 
@@ -103,6 +104,7 @@ async function resolveSkillInputs(
         name: dbSkill.name,
         source: `skill:${s.skill_id}@${version}`,
         content: sv.content,
+        ...(sv.files && Object.keys(sv.files).length > 0 ? { files: sv.files } : {}),
         installed_at: nowIso,
       });
     } else {
@@ -112,6 +114,7 @@ async function resolveSkillInputs(
         name: inline.name,
         source: inline.source,
         content: inline.content,
+        ...(inline.files && Object.keys(inline.files).length > 0 ? { files: inline.files } : {}),
         installed_at: inline.installed_at ?? nowIso,
       });
     }

@@ -787,6 +787,16 @@ export function runMigrations(db: InstanceType<typeof Database>): void {
   `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_skill_versions_skill ON skill_versions(skill_id, created_at)`);
 
+  // Multi-file skills: files_json stores all files in the skill directory
+  const skillVersionCols = db
+    .prepare(`PRAGMA table_info(skill_versions)`)
+    .all() as Array<{ name: string }>;
+  if (!skillVersionCols.some((c) => c.name === "files_json")) {
+    db.exec(
+      `ALTER TABLE skill_versions ADD COLUMN files_json TEXT NOT NULL DEFAULT '{}'`,
+    );
+  }
+
   // Memory versions: redacted_at column for version redaction
   {
     const cols = db.prepare("PRAGMA table_info(memory_versions)").all() as Array<{ name: string }>;

@@ -112,6 +112,8 @@ export interface AgentSkill {
   name: string;
   source: string;
   content: string;
+  /** All files in the skill directory (relative path → content). Binary files use "base64:" prefix. */
+  files?: Record<string, string>;
   installed_at: string;
 }
 
@@ -522,6 +524,8 @@ export interface SkillVersion {
   skill_id: string;
   version: string;
   content: string;
+  /** All files in the skill directory (relative path → content). Binary files use "base64:" prefix. */
+  files?: Record<string, string>;
   created_at: string;
 }
 

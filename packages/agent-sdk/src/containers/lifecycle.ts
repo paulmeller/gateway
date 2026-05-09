@@ -100,29 +100,57 @@ export async function installSkills(
   const homeResult = await provider.exec(sandboxName, ["sh", "-c", "echo $HOME"]);
   const homeDir = homeResult.stdout.replace(/[\x00-\x1f]/g, "").trim() || "/home/agent";
 
+  /**
+   * Write SKILL.md and all additional files (scripts, templates, etc.)
+   * into a skill directory on the container.
+   */
+  async function writeSkillFiles(
+    skill: AgentSkill,
+    baseDirPath: string,
+  ): Promise<void> {
+    await provider.exec(sandboxName, ["mkdir", "-p", baseDirPath]);
+
+    // Always write SKILL.md
+    await provider.exec(sandboxName, ["sh", "-c", "cat > \"$1\"", "sh", `${baseDirPath}/SKILL.md`], {
+      stdin: skill.content,
+    });
+
+    // Write additional files if present
+    if (skill.files) {
+      for (const [relativePath, fileContent] of Object.entries(skill.files)) {
+        if (relativePath === "SKILL.md") continue; // already written
+        const fullPath = `${baseDirPath}/${relativePath}`;
+        const fileDir = fullPath.substring(0, fullPath.lastIndexOf("/"));
+        await provider.exec(sandboxName, ["mkdir", "-p", fileDir]);
+
+        if (fileContent.startsWith("base64:")) {
+          // Binary file — decode base64 on the container
+          await provider.exec(sandboxName, ["sh", "-c", "base64 -d > \"$1\"", "sh", fullPath], {
+            stdin: fileContent.slice(7),
+          });
+        } else {
+          // Text file
+          await provider.exec(sandboxName, ["sh", "-c", "cat > \"$1\"", "sh", fullPath], {
+            stdin: fileContent,
+          });
+        }
+      }
+    }
+  }
+
   if (engine === "claude") {
     // Claude Code reads from $HOME/.claude/skills/ directory
     await provider.exec(sandboxName, ["mkdir", "-p", `${homeDir}/.claude/skills`]);
 
     for (const skill of safeSkills) {
-      const dirPath = `${homeDir}/.claude/skills/${skill.name}`;
-      const filePath = `${dirPath}/SKILL.md`;
-      await provider.exec(sandboxName, ["mkdir", "-p", dirPath]);
-      await provider.exec(sandboxName, ["sh", "-c", "cat > \"$1\"", "sh", filePath], {
-        stdin: skill.content,
-      });
+      await writeSkillFiles(skill, `${homeDir}/.claude/skills/${skill.name}`);
     }
   }
 
   // Also write to $HOME/.agents/skills/ for universal agent compatibility
   await provider.exec(sandboxName, ["mkdir", "-p", `${homeDir}/.agents/skills`]);
   for (const skill of safeSkills) {
-    const dirPath = `${homeDir}/.agents/skills/${skill.name}`;
-    const filePath = `${dirPath}/SKILL.md`;
-    await provider.exec(sandboxName, ["mkdir", "-p", dirPath]);
-    await provider.exec(sandboxName, ["sh", "-c", "cat > \"$1\"", "sh", filePath], {
-      stdin: skill.content,
-    });
+    await writeSkillFiles(skill, `${homeDir}/.agents/skills/${skill.name}`);
   }
 }
 
