@@ -10,6 +10,7 @@
  * DELETE /v1/skills/:id/versions/:version   — delete version (cannot delete current)
  */
 import { z } from "zod";
+import { inflateRawSync } from "node:zlib";
 import { routeWrap, jsonOk, paginatedOk, decodeCursor } from "../http";
 import { badRequest, notFound } from "../errors";
 import {
@@ -23,6 +24,46 @@ import {
   deleteSkillVersion,
 } from "../db/skills";
 import { resolveCreateTenant, tenantFilter } from "../auth/scope";
+
+// ---------------------------------------------------------------------------
+// Zip parser — minimal Local File Header reader (supports stored + deflate)
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract files from a zip buffer.  Walks Local File Headers (signature
+ * 0x04034b50) and supports compression methods 0 (stored) and 8 (deflate).
+ * Returns a Map<filename, utf8-content>.
+ */
+function extractFromZip(buffer: Buffer): Map<string, string> {
+  const files = new Map<string, string>();
+  let offset = 0;
+  while (offset + 30 <= buffer.length) {
+    const sig = buffer.readUInt32LE(offset);
+    if (sig !== 0x04034b50) break; // not a Local File Header — stop
+    const compMethod = buffer.readUInt16LE(offset + 8);
+    const compSize = buffer.readUInt32LE(offset + 18);
+    const uncompSize = buffer.readUInt32LE(offset + 22);
+    const nameLen = buffer.readUInt16LE(offset + 26);
+    const extraLen = buffer.readUInt16LE(offset + 28);
+    const name = buffer.toString("utf8", offset + 30, offset + 30 + nameLen);
+    const dataStart = offset + 30 + nameLen + extraLen;
+
+    if (compMethod === 0) {
+      // Stored — no compression
+      const content = buffer.toString("utf8", dataStart, dataStart + uncompSize);
+      files.set(name, content);
+    } else if (compMethod === 8) {
+      // Deflate — use Node's zlib inflateRaw
+      const compressed = buffer.subarray(dataStart, dataStart + compSize);
+      const content = inflateRawSync(compressed).toString("utf8");
+      files.set(name, content);
+    }
+    // Skip entries with unknown compression methods
+
+    offset = dataStart + compSize;
+  }
+  return files;
+}
 
 // ---------------------------------------------------------------------------
 // Validation schemas
@@ -47,23 +88,61 @@ const CreateVersionSchema = z.object({
 /** POST /v1/skills */
 export function handleCreateSkill(request: Request): Promise<Response> {
   return routeWrap(request, async ({ auth }) => {
-    const body = await request.json().catch(() => null);
-    const parsed = CreateSkillSchema.safeParse(body);
-    if (!parsed.success) {
-      throw badRequest(
-        `invalid body: ${parsed.error.issues.map((i) => i.message).join("; ")}`,
-      );
+    const contentType = request.headers.get("content-type") ?? "";
+
+    let name: string;
+    let description: string | undefined;
+    let content: string;
+    let tenantId: string | undefined;
+
+    if (contentType.includes("multipart/form-data")) {
+      // Anthropic deploy-managed-agent.sh format:
+      //   -F "display_title=skill-name" -F "files[]=@skill.zip"
+      const formData = await request.formData();
+      name = ((formData.get("display_title") as string | null) ?? "").trim() || "untitled";
+
+      const file =
+        formData.get("files[]") ??
+        formData.get("files") ??
+        formData.get("file");
+      if (!file || !(file instanceof File)) {
+        throw badRequest("Missing file in multipart upload");
+      }
+
+      const buffer = Buffer.from(await file.arrayBuffer());
+
+      if (file.name?.toLowerCase().endsWith(".zip")) {
+        // Extract SKILL.md from zip archive
+        const zipFiles = extractFromZip(buffer);
+        const skillEntry = [...zipFiles.entries()].find(
+          ([k]) => k.endsWith("SKILL.md") || k.endsWith("skill.md"),
+        );
+        if (!skillEntry) {
+          throw badRequest("No SKILL.md found in zip archive");
+        }
+        content = skillEntry[1];
+      } else {
+        // Raw markdown / text file
+        content = buffer.toString("utf-8");
+      }
+
+      tenantId = resolveCreateTenant(auth, undefined);
+    } else {
+      // JSON body (native format)
+      const body = await request.json().catch(() => null);
+      const parsed = CreateSkillSchema.safeParse(body);
+      if (!parsed.success) {
+        throw badRequest(
+          `invalid body: ${parsed.error.issues.map((i) => i.message).join("; ")}`,
+        );
+      }
+      name = parsed.data.name;
+      description = parsed.data.description;
+      content = parsed.data.content;
+      tenantId = resolveCreateTenant(auth, parsed.data.tenant_id);
     }
 
-    const tenantId = resolveCreateTenant(auth, parsed.data.tenant_id);
-
-    const skill = createSkill({
-      name: parsed.data.name,
-      description: parsed.data.description,
-      content: parsed.data.content,
-      tenantId,
-    });
-
+    const skill = createSkill({ name, description, content, tenantId });
     return jsonOk(skill, 201);
   });
 }
