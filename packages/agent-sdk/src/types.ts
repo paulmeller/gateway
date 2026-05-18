@@ -19,6 +19,11 @@ export const BUILT_IN_TOOL_NAMES = [
   "Grep",
   "WebFetch",
   "WebSearch",
+  "ToolSearch",
+  "Skill",
+  "Agent",
+  "NotebookEdit",
+  "TodoWrite",
 ] as const;
 
 export type BuiltInToolName = (typeof BUILT_IN_TOOL_NAMES)[number];
