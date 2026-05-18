@@ -53,12 +53,12 @@
   },
   "homepage": "https://www.agentstep.com",
   "bugs": {
-    "url": "https://github.com/paulmeller/gateway/issues"
+    "url": "https://github.com/agentstep/gateway/issues"
   },
   "author": "AgentStep",
   "repository": {
     "type": "git",
-    "url": "https://github.com/paulmeller/gateway.git",
+    "url": "https://github.com/agentstep/gateway.git",
     "directory": "packages/agent-sdk"
   },
   "files": [
