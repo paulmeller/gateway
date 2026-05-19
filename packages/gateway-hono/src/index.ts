@@ -243,6 +243,7 @@ app.get("/v1/sessions/:id/events", (c) => handleListEvents(c.req.raw, c.req.para
 // each chunk immediately which SSE requires.
 import { streamSSE } from "hono/streaming";
 import { prepareSessionStream } from "@agentstep/agent-sdk/handlers";
+import { listEvents, rowToManagedEvent } from "@agentstep/agent-sdk";
 app.get("/v1/sessions/:id/events/stream", async (c) => {
   const sessionId = c.req.param("id");
   const prepared = await prepareSessionStream(c.req.raw, sessionId);
@@ -262,21 +263,46 @@ app.get("/v1/sessions/:id/events/stream", async (c) => {
 
     stream.onAbort(() => { sub.unsubscribe(); });
 
-    // Main loop: drain pending events, then sleep briefly.
-    // Short sleep (500ms) ensures live events are flushed promptly
-    // instead of waiting for a 15s keepalive cycle.
+    // Main loop: drain pending events, poll DB for external writes, keepalive.
+    // The EventEmitter handles events from this process. DB polling catches
+    // events written by remote workers (separate processes sharing SQLite).
     let lastPing = Date.now();
+    let lastDbPoll = Date.now();
+    let highestSeq = afterSeq;
+    const DB_POLL_INTERVAL = 2000; // Poll DB every 2s for remote worker events
+
     while (!c.req.raw.signal.aborted) {
-      // Drain all pending events
+      // Drain all pending events (from EventEmitter)
       while (pending.length > 0) {
         const evt = pending.shift()!;
         await stream.writeSSE({ id: String(evt.seq), event: evt.type, data: evt.data });
+        if (evt.seq > highestSeq) highestSeq = evt.seq;
+      }
+
+      // DB polling: catch events written by remote workers
+      const now = Date.now();
+      if (now - lastDbPoll >= DB_POLL_INTERVAL) {
+        try {
+          const newEvents = listEvents(sessionId, { limit: 100, order: "asc", afterSeq: highestSeq });
+          for (const row of newEvents) {
+            if (row.seq > highestSeq) {
+              const evt = rowToManagedEvent(row);
+              await stream.writeSSE({
+                id: String(evt.seq),
+                event: evt.type,
+                data: JSON.stringify(evt),
+              });
+              highestSeq = evt.seq;
+            }
+          }
+        } catch { /* best effort — DB may not be available */ }
+        lastDbPoll = now;
       }
 
       // Keepalive ping every 15s
-      if (Date.now() - lastPing > 15000) {
+      if (now - lastPing > 15000) {
         await stream.writeSSE({ data: JSON.stringify({ type: "ping" }), event: "ping" });
-        lastPing = Date.now();
+        lastPing = now;
       }
 
       await stream.sleep(500);
