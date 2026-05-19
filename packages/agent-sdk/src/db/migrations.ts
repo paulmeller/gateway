@@ -806,6 +806,29 @@ export function runMigrations(db: InstanceType<typeof Database>): void {
     }
   }
 
+  // Work queue items table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS work_items (
+      id TEXT PRIMARY KEY,
+      environment_id TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      state TEXT NOT NULL DEFAULT 'queued',
+      worker_id TEXT,
+      inputs_json TEXT,
+      metadata_json TEXT NOT NULL DEFAULT '{}',
+      tenant_id TEXT,
+      created_at INTEGER NOT NULL,
+      acknowledged_at INTEGER,
+      started_at INTEGER,
+      latest_heartbeat_at INTEGER,
+      stop_requested_at INTEGER,
+      stopped_at INTEGER,
+      lease_expires_at INTEGER
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_work_env_state ON work_items(environment_id, state)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_work_session ON work_items(session_id)`);
+
   // Vault metadata + archive + optional agent_id.
   // agent_id was originally NOT NULL — SQLite requires table recreation to
   // drop the constraint. We detect by checking the column's `notnull` flag.

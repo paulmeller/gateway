@@ -158,13 +158,43 @@ export interface Agent {
 }
 
 // ---------------------------------------------------------------------------
+// Work Queue
+// ---------------------------------------------------------------------------
+
+export type WorkState = "queued" | "pending" | "active" | "completed" | "failed";
+
+export interface WorkItem {
+  type: "work";
+  id: string;
+  environment_id: string;
+  state: WorkState;
+  data: { type: "session"; id: string };
+  metadata: Record<string, string>;
+  worker_id: string | null;
+  created_at: string;
+  acknowledged_at: string | null;
+  started_at: string | null;
+  latest_heartbeat_at: string | null;
+  stop_requested_at: string | null;
+  stopped_at: string | null;
+}
+
+export interface WorkQueueStats {
+  type: "work_queue_stats";
+  depth: number;
+  pending: number;
+  workers_polling: number | null;
+  oldest_queued_at: string | null;
+}
+
+// ---------------------------------------------------------------------------
 // Environment
 // ---------------------------------------------------------------------------
 
 export type EnvironmentState = "preparing" | "ready" | "failed";
 
 export interface EnvironmentConfig {
-  type: "cloud";
+  type: "cloud" | "self_hosted";
   provider?: "sprites" | "docker" | "apple-container" | "apple-firecracker" | "podman" | "e2b" | "vercel" | "daytona" | "fly" | "modal" | "mvm" | "anthropic";
   packages?: {
     apt?: string[];

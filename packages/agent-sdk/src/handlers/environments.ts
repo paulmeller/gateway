@@ -66,7 +66,7 @@ const NetworkingSchema = z.union([
 ]);
 
 const ConfigSchema = z.object({
-  type: z.literal("cloud"),
+  type: z.enum(["cloud", "self_hosted"]),
   provider: z.enum(["sprites", "docker", "apple-container", "apple-firecracker", "podman", "e2b", "vercel", "daytona", "fly", "modal", "mvm", "anthropic"]).optional(),
   packages: PackagesSchema,
   networking: NetworkingSchema.optional(),

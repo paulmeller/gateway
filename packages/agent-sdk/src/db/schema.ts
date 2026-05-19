@@ -308,6 +308,26 @@ export const skillVersions = sqliteTable("skill_versions", {
   created_at: integer("created_at").notNull(),
 });
 
+// ── work_items ──────────────────────────────────────────────────────
+
+export const workItems = sqliteTable("work_items", {
+  id: text("id").primaryKey(),
+  environment_id: text("environment_id").notNull(),
+  session_id: text("session_id").notNull(),
+  state: text("state").notNull().default("queued"),
+  worker_id: text("worker_id"),
+  inputs_json: text("inputs_json"),
+  metadata_json: text("metadata_json").notNull().default("{}"),
+  tenant_id: text("tenant_id"),
+  created_at: integer("created_at").notNull(),
+  acknowledged_at: integer("acknowledged_at"),
+  started_at: integer("started_at"),
+  latest_heartbeat_at: integer("latest_heartbeat_at"),
+  stop_requested_at: integer("stop_requested_at"),
+  stopped_at: integer("stopped_at"),
+  lease_expires_at: integer("lease_expires_at"),
+});
+
 // ── anthropic_sync ────────────────────────────────────────────────────
 
 export const anthropicSync = sqliteTable("anthropic_sync", {
