@@ -100,6 +100,9 @@ export type { DreamResult } from "./dreaming/review";
 // Queue
 export { enqueueTurn } from "./queue";
 
+// Workers
+export { startWorker } from "./workers/runner";
+
 // Backends
 export { resolveBackend } from "./backends/registry";
 

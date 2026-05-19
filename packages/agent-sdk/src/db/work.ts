@@ -69,6 +69,23 @@ export function getWorkItem(id: string): WorkItem | undefined {
   return row ? hydrate(row) : undefined;
 }
 
+// ── Get (internal — includes inputs_json for worker) ────────────────
+
+/**
+ * Returns the raw `inputs_json` string for a work item.
+ * This is an internal-only helper consumed by the co-located worker;
+ * the field is intentionally excluded from the public WorkItem type.
+ */
+export function getWorkItemInputs(id: string): string | null {
+  const db = getDrizzle();
+  const row = db
+    .select({ inputs_json: schema.workItems.inputs_json })
+    .from(schema.workItems)
+    .where(eq(schema.workItems.id, id))
+    .get() as { inputs_json: string | null } | undefined;
+  return row?.inputs_json ?? null;
+}
+
 // ── List ─────────────────────────────────────────────────────────────────
 
 export function listWorkItems(

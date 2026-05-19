@@ -22,6 +22,7 @@ import { registerTenantCommands } from "./commands/tenants.js";
 import { registerUpstreamKeyCommands } from "./commands/upstream_keys.js";
 import { registerAuditCommands } from "./commands/audit.js";
 import { registerDreamCommand } from "./commands/dream.js";
+import { registerWorkerCommand } from "./commands/worker.js";
 import { ensureTelemetryConsent, trackCommand } from "./telemetry/index.js";
 
 const program = new Command("gateway")
@@ -99,7 +100,7 @@ export function getFormat(): OutputFormat {
 export function isLongRunning(): boolean {
   // Commands that should NOT call process.exit
   const args = process.argv.slice(2);
-  const longRunning = ["chat", "serve", "quickstart", "stream"];
+  const longRunning = ["chat", "serve", "quickstart", "stream", "worker"];
   return longRunning.some((cmd) => args.includes(cmd));
 }
 
@@ -123,6 +124,7 @@ registerTenantCommands(program);
 registerUpstreamKeyCommands(program);
 registerAuditCommands(program);
 registerDreamCommand(program);
+registerWorkerCommand(program);
 
 // Parse and run
 program.parseAsync(process.argv).then(() => {
