@@ -38,16 +38,20 @@ vi.mock("../src/containers/lifecycle", () => ({
 
 vi.mock("../src/providers/registry", async () => {
   const fake = await import("./helpers/fake-exec");
+  const fakeProvider = {
+    name: "sprites",
+    stripControlChars: true,
+    startExec: fake.startExec,
+    exec: vi.fn(async () => ({ stdout: "", stderr: "", exit_code: 0 })),
+    create: vi.fn(async () => {}),
+    delete: vi.fn(async () => {}),
+    list: vi.fn(async () => []),
+  };
   return {
-    resolveContainerProvider: async () => ({
-      name: "sprites",
-      stripControlChars: true,
-      startExec: fake.startExec,
-      exec: vi.fn(async () => ({ stdout: "", stderr: "", exit_code: 0 })),
-      create: vi.fn(async () => {}),
-      delete: vi.fn(async () => {}),
-      list: vi.fn(async () => []),
-    }),
+    resolveContainerProvider: async () => fakeProvider,
+    resolveProvider: async () => fakeProvider,
+    tryResolveProvider: async () => fakeProvider,
+    resolveProviderName: () => "sprites",
   };
 });
 
