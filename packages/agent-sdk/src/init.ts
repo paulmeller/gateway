@@ -25,7 +25,7 @@ import { enqueueTurn } from "./queue";
 import { reconcileOrphanSandboxes, reconcileDockerOrphanSandboxes, fillWarmPools } from "./containers/lifecycle";
 import { installShutdownHandlers } from "./shutdown";
 import { nowMs } from "./util/clock";
-import { resolveContainerProvider } from "./providers/registry";
+import { tryResolveProvider } from "./providers/registry";
 import { getEnvironment } from "./db/environments";
 import { initSentry } from "./sentry";
 import { setSessionSandbox } from "./db/sessions";
@@ -243,7 +243,8 @@ export async function recoverStaleSessions(): Promise<void> {
         // If the session had a sandbox, verify the container still exists
         if (row.sandbox_name) {
           const envObj = getEnvironment(row.environment_id);
-          const provider = await resolveContainerProvider(envObj?.config?.provider);
+          const provider = await tryResolveProvider({ envConfigProvider: envObj?.config?.provider });
+          if (!provider) continue; // Skip env with no resolvable provider
           try {
             const containers = await provider.list({ prefix: row.sandbox_name });
             const alive = containers.some((c) => c.name === row.sandbox_name);
@@ -359,7 +360,8 @@ async function rebuildContainerPool(): Promise<void> {
 
     try {
       const envObj = getEnvironment(row.environment_id);
-      const provider = await resolveContainerProvider(envObj?.config?.provider);
+      const provider = await tryResolveProvider({ envConfigProvider: envObj?.config?.provider });
+      if (!provider) continue; // Skip env with no resolvable provider
       const containers = await provider.list({ prefix: row.sandbox_name! });
       const alive = containers.some((c) => c.name === row.sandbox_name);
 

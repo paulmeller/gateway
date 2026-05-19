@@ -33,7 +33,7 @@ import { appendEvent } from "../sessions/bus";
 import { getConfig } from "../config";
 import { ApiError } from "../errors";
 import { nowMs } from "../util/clock";
-import { resolveContainerProvider } from "../providers/registry";
+import { resolveProvider, tryResolveProvider } from "../providers/registry";
 import { dockerProvider } from "../providers/docker";
 import { resolveVaultSecrets } from "../providers/resolve-secrets";
 import type { SessionResource, AgentSkill } from "../types";
@@ -210,8 +210,7 @@ export async function acquireForFirstTurn(sessionId: string): Promise<string> {
   const backend = resolveBackend(agent.engine);
 
   // Resolve the container provider from the environment config.
-  // Defaults to "sprites" for backward compatibility.
-  const provider = await resolveContainerProvider(envObj?.config?.provider);
+  const provider = await resolveProvider({ envConfigProvider: envObj?.config?.provider });
 
   // Resolve vault secrets for provider auth (vault > process.env)
   const sessionForSecrets = getSession(sessionId);
@@ -573,7 +572,8 @@ async function fillOneEnv(env: import("../types").Environment): Promise<void> {
   if (target <= 0) return;
 
   try {
-    const provider = await resolveContainerProvider(env.config?.provider);
+    const provider = await tryResolveProvider({ envConfigProvider: env.config?.provider });
+    if (!provider) return; // Skip env with no resolvable provider
     if (!provider.supportsWarmPool) return;
 
     // Use the environment's default_engine if configured, otherwise fall back to "claude".
@@ -799,7 +799,8 @@ export async function releaseSession(sessionId: string): Promise<void> {
   const name = entry?.sandboxName ?? row?.sandbox_name ?? null;
   if (name) {
     const envObj = row ? getEnvironment(row.environment_id) : null;
-    const provider = await resolveContainerProvider(envObj?.config?.provider);
+    const provider = await tryResolveProvider({ envConfigProvider: envObj?.config?.provider });
+    if (!provider) return; // Can't delete sandbox without knowing the provider
     await provider.delete(name, entry?.vaultSecrets).catch((err: unknown) => {
       console.warn(`releaseSession: failed to delete container ${name}:`, err);
     });

@@ -30,7 +30,7 @@ import {
 } from "../db/sessions";
 import { releaseSession, reconcileOrphanSandboxes, reconcileDockerOrphanSandboxes } from "../containers/lifecycle";
 import { expireWarm } from "../containers/warm-pool";
-import { resolveContainerProvider } from "../providers/registry";
+import { tryResolveProvider } from "../providers/registry";
 import { getEnvironment } from "../db/environments";
 
 let sweeping = false;
@@ -94,7 +94,8 @@ async function evictExpiredWarmContainers(): Promise<void> {
   for (const entry of expired) {
     try {
       const envObj = getEnvironment(entry.envId);
-      const provider = await resolveContainerProvider(envObj?.config?.provider);
+      const provider = await tryResolveProvider({ envConfigProvider: envObj?.config?.provider });
+      if (!provider) continue; // Skip — can't evict without provider
       await provider.delete(entry.sandboxName, entry.vaultSecrets);
       console.log(`[sweeper] deleted expired warm container: ${entry.sandboxName}`);
     } catch (err) {

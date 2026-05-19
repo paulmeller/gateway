@@ -31,7 +31,7 @@ import {
 } from "../db/environments";
 import type { EnvironmentConfig } from "../types";
 import type { ContainerProvider } from "../providers/types";
-import { resolveContainerProvider } from "../providers/registry";
+import { resolveContainerProvider, resolveProvider } from "../providers/registry";
 import { newId } from "../util/ids";
 
 const SENTINEL_DIR = "/home/sprite";
@@ -128,7 +128,7 @@ async function runEnvironmentSetup(envId: string): Promise<void> {
   if (row.state === "ready") return;
 
   const config = JSON.parse(row.config_json) as EnvironmentConfig;
-  const provider = await resolveContainerProvider(config.provider);
+  const provider = await resolveProvider({ envConfigProvider: config?.provider });
   const hasPackages = config.packages && Object.values(config.packages).some((v) => v && v.length > 0);
 
   if (!hasPackages) {

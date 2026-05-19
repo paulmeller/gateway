@@ -36,7 +36,7 @@ import { markUserEventProcessed, listEvents } from "../db/events";
 import { acquireForFirstTurn, installSkills, provisionResources, wrapProviderWithSecrets } from "../containers/lifecycle";
 import * as pool from "../containers/pool";
 import { resolveBackend } from "../backends/registry";
-import { resolveContainerProvider } from "../providers/registry";
+import { resolveProvider, resolveProviderName } from "../providers/registry";
 import { BLOCKED_ENV_KEYS, resolveVaultSecrets } from "../providers/resolve-secrets";
 import { loadSessionSecrets } from "./secrets";
 import { parseNDJSONLines } from "../backends/shared/ndjson";
@@ -257,7 +257,7 @@ export async function runTurn(
       if (newSkills.length > 0) {
         console.log(`[driver] ${sessionId} injecting ${newSkills.length} new skill(s)...`);
         const envRow = getEnvironment(session.environment_id);
-        const baseProvider = await resolveContainerProvider(envRow?.config?.provider);
+        const baseProvider = await resolveProvider({ envConfigProvider: envRow?.config?.provider });
         const sp = wrapProviderWithSecrets(baseProvider, postAcquireSecrets);
         await installSkills(sandboxName, sp, newSkills, agent.engine);
         console.log(`[driver] ${sessionId} skills injected`);
@@ -268,7 +268,7 @@ export async function runTurn(
     const freshSession = getSession(sessionId);
     if (freshSession?.resources && freshSession.resources.length > 0) {
       const envRow = getEnvironment(session.environment_id);
-      const baseProvider = await resolveContainerProvider(envRow?.config?.provider);
+      const baseProvider = await resolveProvider({ envConfigProvider: envRow?.config?.provider });
       const sp = wrapProviderWithSecrets(baseProvider, postAcquireSecrets);
       await provisionResources(sandboxName, freshSession.resources, sp);
     }
@@ -370,7 +370,7 @@ export async function runTurn(
   // entirely. The two flags conflict — can't use both. (openai/codex#15282)
   if (agent.engine === "codex") {
     const envRow = getEnvironment(session.environment_id);
-    const provName = envRow?.config?.provider ?? "docker";
+    const provName = resolveProviderName({ envConfigProvider: envRow?.config?.provider });
     const firecrackerProviders = new Set(["sprites", "fly", "apple-firecracker"]);
     if (firecrackerProviders.has(provName)) {
       // Remove --full-auto (conflicts with --yolo)
@@ -439,7 +439,7 @@ export async function runTurn(
     let ollamaHostPort: string | undefined;
     if (!turnBuild.env.OLLAMA_HOST) {
       const envRow = getEnvironment(session.environment_id);
-      const provName = envRow?.config?.provider ?? "docker";
+      const provName = resolveProviderName({ envConfigProvider: envRow?.config?.provider });
       if (provName === "docker" || provName === "podman") {
         ollamaHostPort = "host.docker.internal:11434";
       } else if (provName === "apple-container" || provName === "apple-firecracker") {
@@ -493,7 +493,7 @@ export async function runTurn(
 
   // Resolve the container provider and vault secrets for this session
   const env = getEnvironment(session.environment_id);
-  const provider = await resolveContainerProvider(env?.config?.provider);
+  const provider = await resolveProvider({ envConfigProvider: env?.config?.provider });
   const poolEntry = pool.getBySession(sessionId);
   // Pool entry may be missing after restart — fall back to resolving from vault_ids
   const secrets = poolEntry?.vaultSecrets
@@ -844,7 +844,7 @@ export async function runTurn(
       if (sprName) {
         const responseJson = JSON.stringify({ content: [{ type: "text", text: serverToolResult.text }] });
         const envForSession = getEnvironment(session.environment_id);
-        const providerForReentry = await resolveContainerProvider(envForSession?.config?.provider);
+        const providerForReentry = await resolveProvider({ envConfigProvider: envForSession?.config?.provider });
         const reentrySecrets = pool.getBySession(sessionId)?.vaultSecrets;
         await providerForReentry.exec(
           sprName,
@@ -1166,7 +1166,7 @@ export async function writePermissionResponse(
   }
 
   const env = getEnvironment(row.environment_id);
-  const provider = await resolveContainerProvider(env?.config?.provider);
+  const provider = await resolveProvider({ envConfigProvider: env?.config?.provider });
   const permSecrets = pool.getBySession(sessionId)?.vaultSecrets;
 
   const response = JSON.stringify({
@@ -1280,7 +1280,7 @@ export async function writeToolBridgeResponse(
   }
 
   const env = getEnvironment(row.environment_id);
-  const provider = await resolveContainerProvider(env?.config?.provider);
+  const provider = await resolveProvider({ envConfigProvider: env?.config?.provider });
   const bridgeSecrets = pool.getBySession(sessionId)?.vaultSecrets;
 
   // The bridge expects {content: [...]} with text blocks
