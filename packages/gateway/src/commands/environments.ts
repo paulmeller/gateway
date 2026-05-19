@@ -21,7 +21,7 @@ export function registerEnvironmentCommands(parent: Command): void {
     .option("--packages-apt <pkgs>", "apt packages (comma-separated)")
     .action(async (opts) => {
       const b = await initBackend();
-      const config: Record<string, unknown> = { type: "cloud", provider: opts.provider };
+      const config: Record<string, unknown> = { type: "self_hosted", provider: opts.provider };
       const packages: Record<string, string[]> = {};
       if (opts.packagesNpm) packages.npm = opts.packagesNpm.split(",");
       if (opts.packagesPip) packages.pip = opts.packagesPip.split(",");

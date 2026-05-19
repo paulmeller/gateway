@@ -97,6 +97,14 @@ export function handleCreateEnvironment(request: Request): Promise<Response> {
     const parsed = CreateSchema.safeParse(body);
     if (!parsed.success) throw badRequest(parsed.error.message);
 
+    // Backward compat: type: "cloud" with a non-anthropic provider is deprecated
+    // Silently treat as self_hosted
+    let configData = parsed.data.config;
+    if (configData.type === "cloud" && configData.provider && configData.provider !== "anthropic") {
+      console.warn(`[compat] type: "cloud" with provider "${configData.provider}" is deprecated — use type: "self_hosted"`);
+      configData = { ...configData, type: "self_hosted" };
+    }
+
     // Resolve tenant up-front so both the proxy and local paths can
     // stamp it on any created resources.
     const createTenantId = resolveCreateTenant(auth, parsed.data.tenant_id);
@@ -123,8 +131,8 @@ export function handleCreateEnvironment(request: Request): Promise<Response> {
     // Pre-flight: check provider availability before creating the environment.
     // cloud type = Anthropic proxy — no local provider needed.
     // self_hosted = provider is optional (executor provides via DEFAULT_PROVIDER).
-    const configType = parsed.data.config.type;
-    const providerName = parsed.data.config.provider;
+    const configType = configData.type;
+    const providerName = configData.provider;
 
     if (configType === "cloud") {
       // Cloud = Anthropic proxy. No provider needed — Anthropic handles infrastructure.
@@ -146,7 +154,7 @@ export function handleCreateEnvironment(request: Request): Promise<Response> {
 
     const env = createEnvironment({
       name: parsed.data.name,
-      config: parsed.data.config,
+      config: configData,
       description: parsed.data.description ?? null,
       metadata: parsed.data.metadata,
       tenant_id: createTenantId,

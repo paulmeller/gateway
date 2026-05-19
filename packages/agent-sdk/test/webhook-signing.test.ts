@@ -17,6 +17,7 @@ import os from "node:os";
 function freshDbEnv(): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ca-webhook-test-"));
   process.env.DATABASE_PATH = path.join(dir, "test.db");
+  process.env.DEFAULT_PROVIDER = "docker";
   const g = globalThis as typeof globalThis & {
     __caDb?: unknown;
     __caInitialized?: unknown;
@@ -191,7 +192,7 @@ describe("fireWebhook signs requests when a secret is configured", () => {
       });
       const env = createEnvironment({
         name: "e",
-        config: { type: "cloud", provider: "docker" },
+        config: { type: "self_hosted", provider: "docker" },
       });
       // Sessions require env state=ready for turn-driver, but the bus
       // doesn't care — we're only testing event append → webhook send.
@@ -252,7 +253,7 @@ describe("fireWebhook signs requests when a secret is configured", () => {
         webhook_events: ["user.interrupt"],
         // no secret
       });
-      const env = createEnvironment({ name: "e", config: { type: "cloud", provider: "docker" } });
+      const env = createEnvironment({ name: "e", config: { type: "self_hosted", provider: "docker" } });
       getDb().prepare(`UPDATE environments SET state = 'ready' WHERE id = ?`).run(env.id);
       const session = createSession({
         agent_id: agent.id,

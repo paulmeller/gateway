@@ -22,6 +22,7 @@ import os from "node:os";
 function freshDbEnv(): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ca-api-test-"));
   process.env.DATABASE_PATH = path.join(dir, "test.db");
+  process.env.DEFAULT_PROVIDER = "docker";
   const g = globalThis as typeof globalThis & {
     __caDb?: unknown;
     __caDrizzle?: unknown;
@@ -2557,7 +2558,7 @@ describe("Environment Creation — Cloud Provider Skip", () => {
     await bootDb();
     const { handleCreateEnvironment } = await import("../src/handlers/environments");
     const res = await handleCreateEnvironment(req("/v1/environments", {
-      body: { name: `cloud-env-${Date.now()}`, config: { type: "cloud", provider: "e2b", packages: {} } },
+      body: { name: `cloud-env-${Date.now()}`, config: { type: "self_hosted", provider: "e2b", packages: {} } },
     }));
     // Should succeed even without E2B_API_KEY — check is skipped for cloud providers
     expect(res.status).toBe(201);
@@ -2568,12 +2569,12 @@ describe("Environment Creation — Cloud Provider Skip", () => {
     const { handleCreateEnvironment } = await import("../src/handlers/environments");
     const name = `dup-env-${Date.now()}`;
     const res1 = await handleCreateEnvironment(req("/v1/environments", {
-      body: { name, config: { type: "cloud", provider: "e2b", packages: {} } },
+      body: { name, config: { type: "self_hosted", provider: "e2b", packages: {} } },
     }));
     expect(res1.status).toBe(201);
 
     const res2 = await handleCreateEnvironment(req("/v1/environments", {
-      body: { name, config: { type: "cloud", provider: "e2b", packages: {} } },
+      body: { name, config: { type: "self_hosted", provider: "e2b", packages: {} } },
     }));
     expect(res2.status).toBe(409);
   });
@@ -2666,7 +2667,7 @@ describe("Environments — Additional Coverage", () => {
     const { handleCreateEnvironment, handleListEnvironments } = await import("../src/handlers/environments");
     for (let i = 0; i < 3; i++) {
       await handleCreateEnvironment(req("/v1/environments", {
-        body: { name: `env-${i}-${Date.now()}`, config: { type: "cloud", provider: "e2b", packages: {} } },
+        body: { name: `env-${i}-${Date.now()}`, config: { type: "self_hosted", provider: "e2b", packages: {} } },
       }));
     }
     const res = await handleListEnvironments(req("/v1/environments?limit=2&order=desc"));
@@ -2679,7 +2680,7 @@ describe("Environments — Additional Coverage", () => {
     await bootDb();
     const { handleCreateEnvironment, handleGetEnvironment } = await import("../src/handlers/environments");
     const createRes = await handleCreateEnvironment(req("/v1/environments", {
-      body: { name: `env-get-${Date.now()}`, config: { type: "cloud", provider: "e2b", packages: {} } },
+      body: { name: `env-get-${Date.now()}`, config: { type: "self_hosted", provider: "e2b", packages: {} } },
     }));
     const env = await createRes.json() as Record<string, unknown>;
     const getRes = await handleGetEnvironment(req(`/v1/environments/${env.id}`), env.id as string);
@@ -2700,7 +2701,7 @@ describe("Environments — Additional Coverage", () => {
     await bootDb();
     const { handleCreateEnvironment, handleDeleteEnvironment, handleGetEnvironment } = await import("../src/handlers/environments");
     const createRes = await handleCreateEnvironment(req("/v1/environments", {
-      body: { name: `env-del-${Date.now()}`, config: { type: "cloud", provider: "e2b", packages: {} } },
+      body: { name: `env-del-${Date.now()}`, config: { type: "self_hosted", provider: "e2b", packages: {} } },
     }));
     const env = await createRes.json() as Record<string, unknown>;
 
@@ -2715,7 +2716,7 @@ describe("Environments — Additional Coverage", () => {
     await bootDb();
     const { handleCreateEnvironment, handleArchiveEnvironment } = await import("../src/handlers/environments");
     const createRes = await handleCreateEnvironment(req("/v1/environments", {
-      body: { name: `env-arch-${Date.now()}`, config: { type: "cloud", provider: "e2b", packages: {} } },
+      body: { name: `env-arch-${Date.now()}`, config: { type: "self_hosted", provider: "e2b", packages: {} } },
     }));
     const env = await createRes.json() as Record<string, unknown>;
 
@@ -3281,12 +3282,12 @@ describe("Environment Duplicate Names", () => {
     const name = `env-dup-${Date.now()}`;
 
     const res1 = await handleCreateEnvironment(req("/v1/environments", {
-      body: { name, config: { type: "cloud", provider: "e2b", packages: {} } },
+      body: { name, config: { type: "self_hosted", provider: "e2b", packages: {} } },
     }));
     expect(res1.status).toBe(201);
 
     const res2 = await handleCreateEnvironment(req("/v1/environments", {
-      body: { name, config: { type: "cloud", provider: "e2b", packages: {} } },
+      body: { name, config: { type: "self_hosted", provider: "e2b", packages: {} } },
     }));
     expect(res2.status).toBe(409);
     const body = await res2.json() as { error: { message: string } };

@@ -16,6 +16,7 @@ import os from "node:os";
 function freshDbEnv(): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ca-api-keys-test-"));
   process.env.DATABASE_PATH = path.join(dir, "test.db");
+  process.env.DEFAULT_PROVIDER = "docker";
   const g = globalThis as typeof globalThis & {
     __caDb?: unknown;
     __caInitialized?: unknown;
@@ -288,7 +289,7 @@ describe("Per-key cost dashboard (PR2)", () => {
     const envId = newId("env");
     db.prepare(
       `INSERT INTO environments (id, name, config_json, state, tenant_id, created_at) VALUES (?, ?, ?, 'ready', 'tenant_default', ?)`,
-    ).run(envId, "env-test", JSON.stringify({ type: "cloud", provider: "docker" }), Date.now());
+    ).run(envId, "env-test", JSON.stringify({ type: "self_hosted", provider: "docker" }), Date.now());
 
     const res = await handleCreateSession(req("/v1/sessions", {
       apiKey: adminKey,
@@ -317,7 +318,7 @@ describe("Per-key cost dashboard (PR2)", () => {
     const envId = newId("env");
     db.prepare(
       `INSERT INTO environments (id, name, config_json, state, tenant_id, created_at) VALUES (?, ?, ?, 'ready', 'tenant_default', ?)`,
-    ).run(envId, "env-metrics", JSON.stringify({ type: "cloud", provider: "docker" }), Date.now());
+    ).run(envId, "env-metrics", JSON.stringify({ type: "self_hosted", provider: "docker" }), Date.now());
 
     // Seed two sessions: one with api_key_id = adminId, one with null (legacy).
     const now = Date.now();
@@ -360,7 +361,7 @@ describe("Per-key cost dashboard (PR2)", () => {
     const envId = newId("env");
     db.prepare(
       `INSERT INTO environments (id, name, config_json, state, tenant_id, created_at) VALUES (?, ?, ?, 'ready', 'tenant_default', ?)`,
-    ).run(envId, "env-activity", JSON.stringify({ type: "cloud", provider: "docker" }), now);
+    ).run(envId, "env-activity", JSON.stringify({ type: "self_hosted", provider: "docker" }), now);
 
     // Two sessions for the admin key
     for (let i = 0; i < 2; i++) {
@@ -420,7 +421,7 @@ describe("Metrics time-series per key (PR2.5)", () => {
     const envId = newId("env");
     db.prepare(
       `INSERT INTO environments (id, name, config_json, state, tenant_id, created_at) VALUES (?, ?, ?, 'ready', 'tenant_default', ?)`,
-    ).run(envId, "env-ts", JSON.stringify({ type: "cloud", provider: "docker" }), Date.now());
+    ).run(envId, "env-ts", JSON.stringify({ type: "self_hosted", provider: "docker" }), Date.now());
     return { adminKey, adminId, agentId: agent.id, envId };
   }
 
@@ -485,7 +486,7 @@ describe("Metrics time-series per key (PR2.5)", () => {
     const envId = newId("env");
     db.prepare(
       `INSERT INTO environments (id, name, config_json, state, tenant_id, created_at) VALUES (?, ?, ?, 'ready', 'tenant_default', ?)`,
-    ).run(envId, "env-topN", JSON.stringify({ type: "cloud", provider: "docker" }), now);
+    ).run(envId, "env-topN", JSON.stringify({ type: "self_hosted", provider: "docker" }), now);
 
     for (let i = 0; i < 12; i++) {
       const { id: keyId } = createApiKey({
@@ -627,7 +628,7 @@ describe("Per-key budget enforcement (PR3)", () => {
     const envId = newId("env");
     db.prepare(
       `INSERT INTO environments (id, name, config_json, state, tenant_id, created_at) VALUES (?, ?, ?, 'ready', 'tenant_default', ?)`,
-    ).run(envId, "env-bump", JSON.stringify({ type: "cloud", provider: "docker" }), Date.now());
+    ).run(envId, "env-bump", JSON.stringify({ type: "self_hosted", provider: "docker" }), Date.now());
 
     const session = createSession({
       agent_id: agent.id,
@@ -658,7 +659,7 @@ describe("Per-key budget enforcement (PR3)", () => {
     const envId = newId("env");
     db.prepare(
       `INSERT INTO environments (id, name, config_json, state, tenant_id, created_at) VALUES (?, ?, ?, 'ready', 'tenant_default', ?)`,
-    ).run(envId, "env-zero", JSON.stringify({ type: "cloud", provider: "docker" }), Date.now());
+    ).run(envId, "env-zero", JSON.stringify({ type: "self_hosted", provider: "docker" }), Date.now());
 
     const session = createSession({ agent_id: agent.id, agent_version: 1, environment_id: envId, api_key_id: adminId });
     // turn_count only, no usage.cost_usd
@@ -687,7 +688,7 @@ describe("Session fallback (PR3)", () => {
     ).run(
       envId,
       `env-${name}`,
-      JSON.stringify({ type: "cloud", provider: "docker" }),
+      JSON.stringify({ type: "self_hosted", provider: "docker" }),
       ready ? "ready" : "failed",
       ready ? null : "provider unavailable",
       Date.now(),

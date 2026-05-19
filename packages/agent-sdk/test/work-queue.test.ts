@@ -19,6 +19,7 @@ import os from "node:os";
 function freshDbEnv(): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ca-work-test-"));
   process.env.DATABASE_PATH = path.join(dir, "test.db");
+  process.env.DEFAULT_PROVIDER = "docker";
   const g = globalThis as typeof globalThis & {
     __caDb?: unknown;
     __caDrizzle?: unknown;
@@ -86,7 +87,7 @@ async function seedFixtures() {
 
   const cloudEnv = createEnvironment({
     name: "test-cloud",
-    config: { type: "cloud", provider: "docker" },
+    config: { type: "cloud" },
   });
   updateEnvironmentState(cloudEnv.id, "ready");
 

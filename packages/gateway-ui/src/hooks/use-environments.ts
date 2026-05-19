@@ -28,7 +28,7 @@ export function useCreateEnvironment() {
     mutationFn: ({ name, config }: { name: string; config?: { provider?: string } }) =>
       api<Environment>("/environments", {
         method: "POST",
-        body: JSON.stringify({ name, config: { type: "cloud", provider: config?.provider, packages: {} } }),
+        body: JSON.stringify({ name, config: { type: "self_hosted", provider: config?.provider, packages: {} } }),
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["environments"] }),
   });

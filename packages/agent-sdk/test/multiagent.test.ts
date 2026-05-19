@@ -24,6 +24,7 @@ import os from "node:os";
 function freshDbEnv(): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ca-multiagent-test-"));
   process.env.DATABASE_PATH = path.join(dir, "test.db");
+  process.env.DEFAULT_PROVIDER = "docker";
   const g = globalThis as typeof globalThis & {
     __caDb?: unknown;
     __caDrizzle?: unknown;
@@ -96,7 +97,7 @@ async function createTestEnv(): Promise<Record<string, unknown>> {
   const id = newId("env");
   const now = nowMs();
   db.prepare(`INSERT INTO environments (id, name, config_json, state, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`).run(
-    id, `env-${Date.now()}`, JSON.stringify({ type: "cloud", provider: "docker" }), "ready", now, now,
+    id, `env-${Date.now()}`, JSON.stringify({ type: "self_hosted", provider: "docker" }), "ready", now, now,
   );
   return { id, type: "environment", name: `env-${Date.now()}` };
 }

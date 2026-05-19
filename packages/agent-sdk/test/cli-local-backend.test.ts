@@ -23,6 +23,7 @@ import os from "node:os";
 function freshDbEnv(): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-local-test-"));
   process.env.DATABASE_PATH = path.join(dir, "test.db");
+  process.env.DEFAULT_PROVIDER = "docker";
   const g = globalThis as typeof globalThis & {
     __caDb?: unknown;
     __caDrizzle?: unknown;
@@ -156,7 +157,7 @@ async function createEnv(overrides: Record<string, unknown> = {}): Promise<Recor
   const id = newId("env");
   const now = nowMs();
   const name = (overrides.name as string) ?? `env-${Date.now()}-${Math.random()}`;
-  const config = overrides.config ?? { type: "cloud", provider: "sprites" };
+  const config = overrides.config ?? { type: "self_hosted", provider: "sprites" };
 
   db.prepare(
     `INSERT INTO environments (id, name, config_json, state, tenant_id, created_at) VALUES (?, ?, ?, 'ready', 'tenant_default', ?)`,
@@ -295,7 +296,7 @@ describe("Quickstart Flow", () => {
 
   it("environment creation with provider config", async () => {
     await bootDb();
-    const env = await createEnv({ name: "ProviderEnv", config: { type: "cloud", provider: "docker" } });
+    const env = await createEnv({ name: "ProviderEnv", config: { type: "self_hosted", provider: "docker" } });
     expect(env.id).toBeTruthy();
     expect((env.config as Record<string, unknown>).provider).toBe("docker");
   });
@@ -624,7 +625,7 @@ describe("Environment CLI Operations", () => {
     // Create directly in DB with packages config (no provider availability check in test)
     const env = await createEnv({
       name: "PkgEnv",
-      config: { type: "cloud", provider: "sprites", packages: { npm: ["express"] } },
+      config: { type: "self_hosted", provider: "sprites", packages: { npm: ["express"] } },
     });
     expect(env.id).toBeTruthy();
     expect(env.name).toBe("PkgEnv");

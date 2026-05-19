@@ -154,7 +154,7 @@ async function runInteractiveQuickstart(b: any, opts: any, verbose: boolean): Pr
     try {
       env = await b.environments.create({
         name: (envName as string).trim(),
-        config: { type: "cloud", provider },
+        config: { type: "self_hosted", provider },
       });
       s.stop(`Environment created: ${env.id}`);
     } catch (err: any) {
@@ -231,7 +231,7 @@ async function runNonInteractiveQuickstart(b: any, opts: any, verbose: boolean):
     console.log(`Creating environment (provider: ${opts.provider})...`);
     env = await b.environments.create({
       name: envName,
-      config: { type: "cloud", provider: opts.provider },
+      config: { type: "self_hosted", provider: opts.provider },
     });
   } catch (err: any) {
     if (err?.message?.includes("already exists")) {

@@ -19,6 +19,7 @@ import os from "node:os";
 function freshDbEnv(): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ca-outcomes-test-"));
   process.env.DATABASE_PATH = path.join(dir, "test.db");
+  process.env.DEFAULT_PROVIDER = "docker";
   const g = globalThis as typeof globalThis & {
     __caDb?: unknown;
     __caDrizzle?: unknown;
@@ -91,7 +92,7 @@ async function createTestEnv(overrides: Record<string, unknown> = {}): Promise<R
   const id = newId("env");
   const now = nowMs();
   const name = (overrides.name as string) ?? `env-${Date.now()}-${Math.random()}`;
-  const config = overrides.config ?? { type: "cloud", provider: "docker" };
+  const config = overrides.config ?? { type: "self_hosted", provider: "docker" };
 
   db.prepare(
     `INSERT INTO environments (id, name, config_json, state, tenant_id, created_at, updated_at) VALUES (?, ?, ?, 'ready', 'tenant_default', ?, ?)`,
