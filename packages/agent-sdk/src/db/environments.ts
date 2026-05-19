@@ -6,12 +6,19 @@ import { nowMs, toIso } from "../util/clock";
 import type { Environment, EnvironmentConfig, EnvironmentRow, EnvironmentState } from "../types";
 
 function hydrate(row: EnvironmentRow): Environment {
+  // Backward compat: existing DB rows with type:"cloud" + non-anthropic provider
+  // should be treated as self_hosted. This handles environments created before v0.5.12.
+  let config = JSON.parse(row.config_json) as EnvironmentConfig;
+  if (config.type === "cloud" && config.provider && config.provider !== "anthropic") {
+    config = { ...config, type: "self_hosted" };
+  }
+
   return {
     type: "environment" as const,
     id: row.id,
     name: row.name,
     description: row.description ?? null,
-    config: JSON.parse(row.config_json) as EnvironmentConfig,
+    config,
     metadata: (row.metadata_json ? JSON.parse(row.metadata_json) : {}) as Record<string, string>,
     state: row.state,
     state_message: row.state_message,
