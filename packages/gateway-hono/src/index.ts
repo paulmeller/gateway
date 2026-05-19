@@ -108,6 +108,7 @@ import {
   handleListSkillVersions,
   handleGetSkillVersion,
   handleDeleteSkillVersion,
+  handleGetSkillVersionContent,
   handleCreateCredential,
   handleListCredentials,
   handleGetCredential,
@@ -366,6 +367,9 @@ app.get("/v1/skills/sources", (c) => handleGetSkillsSources(c.req.raw));
 app.get("/v1/skills/index", (c) => handleGetSkillsIndex(c.req.raw));
 app.get("/v1/skills/feed", (c) => handleGetSkillsFeed(c.req.raw));
 // CRUD + versioning routes — versioned routes before :id to avoid shadowing
+// Content download must be before the generic :version route to avoid shadowing
+app.get("/v1/skills/:id/versions/:version/content", (c) =>
+  handleGetSkillVersionContent(c.req.raw, c.req.param("id"), c.req.param("version")));
 app.get("/v1/skills/:id/versions/:version", (c) => handleGetSkillVersion(c.req.raw, c.req.param("id"), c.req.param("version")));
 app.delete("/v1/skills/:id/versions/:version", (c) => handleDeleteSkillVersion(c.req.raw, c.req.param("id"), c.req.param("version")));
 app.post("/v1/skills/:id/versions", (c) => handleCreateSkillVersion(c.req.raw, c.req.param("id")));

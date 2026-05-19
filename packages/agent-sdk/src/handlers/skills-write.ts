@@ -278,6 +278,30 @@ export function handleGetSkillVersion(
   });
 }
 
+/** GET /v1/skills/:id/versions/:version/content — download skill content */
+export function handleGetSkillVersionContent(
+  request: Request,
+  skillId: string,
+  version: string,
+): Promise<Response> {
+  return routeWrap(request, async () => {
+    const skill = getSkill(skillId);
+    if (!skill) throw notFound("skill not found");
+
+    const sv = getSkillVersion(skillId, version);
+    if (!sv) throw notFound("skill version not found");
+
+    // For v1, return the SKILL.md content as text/markdown
+    return new Response(sv.content, {
+      headers: {
+        "Content-Type": "text/markdown",
+        "Content-Disposition": `attachment; filename="${skill.name}-${version}.md"`,
+        "Content-Length": String(Buffer.byteLength(sv.content, "utf-8")),
+      },
+    });
+  });
+}
+
 /** DELETE /v1/skills/:id/versions/:version */
 export function handleDeleteSkillVersion(
   request: Request,
