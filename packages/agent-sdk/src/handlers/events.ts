@@ -14,6 +14,7 @@ import { resolveRemoteSessionId } from "../db/sync";
 import { forwardToAnthropic } from "../proxy/forward";
 import { badRequest, notFound } from "../errors";
 import { getAgent } from "../db/agents";
+import { getEnvironment, getEnvironmentRow } from "../db/environments";
 import { resolveAnthropicKey as resolveAnthropicKeyShared, reportUpstreamFailure, reportUpstreamSuccess } from "../providers/upstream-keys";
 import { assertResourceTenant } from "../auth/scope";
 import { getProxiedTenantId } from "../db/proxy";
@@ -734,11 +735,37 @@ export function handlePostEvents(request: Request, sessionId: string): Promise<R
     if (appended.pendingForTurn.length > 0) {
       const row = getSessionRow(sessionId);
       if (row) {
-        void enqueueTurn(row.environment_id, () => runTurn(sessionId, appended.pendingForTurn)).catch(
-          (err: unknown) => {
-            console.error(`[events] enqueueTurn failed:`, err);
-          },
-        );
+        const env = getEnvironment(row.environment_id);
+        if (env?.config?.type === "self_hosted") {
+          // Queue work instead of executing inline — a remote worker will pick it up
+          const { createWorkItem } = await import("../db/work");
+          const { updateSessionStatus } = await import("../db/sessions");
+
+          const inputsJson = JSON.stringify(appended.pendingForTurn);
+          const envRow = getEnvironmentRow(row.environment_id);
+
+          createWorkItem(row.environment_id, sessionId, {
+            inputsJson,
+            tenantId: envRow?.tenant_id ?? undefined,
+          });
+
+          // Mark session as running so clients see activity
+          updateSessionStatus(sessionId, "running");
+
+          // Emit session.status_running so SSE clients get notified
+          appendEvent(sessionId, {
+            type: "session.status_running",
+            payload: {},
+            origin: "server",
+            processedAt: nowMs(),
+          });
+        } else {
+          void enqueueTurn(row.environment_id, () => runTurn(sessionId, appended.pendingForTurn)).catch(
+            (err: unknown) => {
+              console.error(`[events] enqueueTurn failed:`, err);
+            },
+          );
+        }
       }
     }
 
