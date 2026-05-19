@@ -21,6 +21,27 @@ mkdir -p /tmp/v8-cache
 # Install claude CLI if not present
 if ! command -v claude >/dev/null 2>&1; then npm install -g @anthropic-ai/claude-code; fi
 claude --version >&2 2>/dev/null || true
+# Sprites keep-alive: prevent VM suspension during long agent turns.
+# Only activates if the sprites management socket exists (sprites containers only).
+SPRITE_SOCK="/.sprite/api.sock"
+HEARTBEAT_PID=""
+if [ -S "$SPRITE_SOCK" ]; then
+  # Create task with 5-minute expiry
+  curl -sf --unix-socket "$SPRITE_SOCK" -H "Host: sprite" \
+    -X POST http://sprite/v1/tasks \
+    -H "Content-Type: application/json" \
+    -d '{"name":"agent-turn","expire":"5m"}' >/dev/null 2>&1
+  # Background heartbeat: refresh every 60s
+  (while sleep 60; do
+    curl -sf --unix-socket "$SPRITE_SOCK" -H "Host: sprite" \
+      -X PUT http://sprite/v1/tasks/agent-turn \
+      -H "Content-Type: application/json" \
+      -d '{"expire":"5m"}' >/dev/null 2>&1
+  done) &
+  HEARTBEAT_PID=$!
+  # Cleanup on exit
+  trap 'curl -sf --unix-socket "$SPRITE_SOCK" -H "Host: sprite" -X DELETE http://sprite/v1/tasks/agent-turn >/dev/null 2>&1; [ -n "$HEARTBEAT_PID" ] && kill $HEARTBEAT_PID 2>/dev/null' EXIT
+fi
 # Read env vars from stdin until blank line, save remaining stdin to temp file
 PROMPT_FILE=$(mktemp)
 while IFS= read -r line; do [ -z "$line" ] && break; export "$line"; done

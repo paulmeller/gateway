@@ -33,7 +33,24 @@ const SANDBOX_WRAPPER_SCRIPT = [
   "set -e",
   'while IFS= read -r line; do [ -z "$line" ] && break; export "$line"; done',
   "PROMPT=$(cat)",
-  'exec opencode "$@" "$PROMPT"',
+  // Sprites keep-alive: prevent VM suspension during long agent turns.
+  'SPRITE_SOCK="/.sprite/api.sock"',
+  'HEARTBEAT_PID=""',
+  'if [ -S "$SPRITE_SOCK" ]; then',
+  '  curl -sf --unix-socket "$SPRITE_SOCK" -H "Host: sprite" \\',
+  '    -X POST http://sprite/v1/tasks \\',
+  '    -H "Content-Type: application/json" \\',
+  '    -d \'{"name":"agent-turn","expire":"5m"}\' >/dev/null 2>&1',
+  '  (while sleep 60; do',
+  '    curl -sf --unix-socket "$SPRITE_SOCK" -H "Host: sprite" \\',
+  '      -X PUT http://sprite/v1/tasks/agent-turn \\',
+  '      -H "Content-Type: application/json" \\',
+  '      -d \'{"expire":"5m"}\' >/dev/null 2>&1',
+  '  done) &',
+  '  HEARTBEAT_PID=$!',
+  '  trap \'curl -sf --unix-socket "$SPRITE_SOCK" -H "Host: sprite" -X DELETE http://sprite/v1/tasks/agent-turn >/dev/null 2>&1; [ -n "$HEARTBEAT_PID" ] && kill $HEARTBEAT_PID 2>/dev/null\' EXIT',
+  'fi',
+  'opencode "$@" "$PROMPT"',
 ].join("\n");
 
 export async function installOpencodeWrapper(sandboxName: string, provider: ContainerProvider): Promise<void> {
