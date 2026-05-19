@@ -213,11 +213,11 @@ describe("v0.5 tenant enforcement — environments", () => {
     const now = nowMs();
     db.prepare(
       `INSERT INTO environments (id, name, config_json, state, tenant_id, created_at)
-       VALUES (?, 'def-env', '{"type":"cloud","provider":"docker"}', 'ready', 'tenant_default', ?)`,
+       VALUES (?, 'def-env', '{"type":"self_hosted","provider":"docker"}', 'ready', 'tenant_default', ?)`,
     ).run(defEnvId, now);
     db.prepare(
       `INSERT INTO environments (id, name, config_json, state, tenant_id, created_at)
-       VALUES (?, 'acme-env', '{"type":"cloud","provider":"docker"}', 'ready', 'tenant_acme', ?)`,
+       VALUES (?, 'acme-env', '{"type":"self_hosted","provider":"docker"}', 'ready', 'tenant_acme', ?)`,
     ).run(acmeEnvId, now);
 
     // Global admin sees both.
@@ -269,7 +269,7 @@ describe("v0.5 tenant enforcement — sessions", () => {
     getDb()
       .prepare(
         `INSERT INTO environments (id, name, config_json, state, tenant_id, created_at)
-         VALUES (?, 'other-env', '{"type":"cloud","provider":"docker"}', 'ready', 'tenant_acme', ?)`,
+         VALUES (?, 'other-env', '{"type":"self_hosted","provider":"docker"}', 'ready', 'tenant_acme', ?)`,
       )
       .run(envId, nowMs());
 
@@ -305,7 +305,7 @@ describe("v0.5 tenant enforcement — sessions", () => {
     getDb()
       .prepare(
         `INSERT INTO environments (id, name, config_json, state, tenant_id, created_at)
-         VALUES (?, 'acme-env', '{"type":"cloud","provider":"docker"}', 'ready', 'tenant_acme', ?)`,
+         VALUES (?, 'acme-env', '{"type":"self_hosted","provider":"docker"}', 'ready', 'tenant_acme', ?)`,
       )
       .run(envId, nowMs());
 
@@ -369,13 +369,13 @@ describe("v0.5 tenant enforcement — session fallback", () => {
     // Primary env — broken (state="error") so fallback is forced.
     db.prepare(
       `INSERT INTO environments (id, name, config_json, state, tenant_id, created_at)
-       VALUES (?, 'primary-env', '{"type":"cloud","provider":"docker"}', 'error', 'tenant_default', ?)`,
+       VALUES (?, 'primary-env', '{"type":"self_hosted","provider":"docker"}', 'error', 'tenant_default', ?)`,
     ).run(primaryEnvId, now);
 
     // Acme tenant env (cross-tenant — should be skipped as fallback).
     db.prepare(
       `INSERT INTO environments (id, name, config_json, state, tenant_id, created_at)
-       VALUES (?, 'acme-env', '{"type":"cloud","provider":"docker"}', 'ready', 'tenant_acme', ?)`,
+       VALUES (?, 'acme-env', '{"type":"self_hosted","provider":"docker"}', 'ready', 'tenant_acme', ?)`,
     ).run(acmeEnvId, now);
 
     // Acme tenant agent (cross-tenant — should be skipped).
@@ -430,7 +430,7 @@ describe("v0.5 tenant enforcement — session fallback", () => {
     const primaryEnvId = newId("env");
     getDb().prepare(
       `INSERT INTO environments (id, name, config_json, state, tenant_id, created_at)
-       VALUES (?, 'env', '{"type":"cloud","provider":"docker"}', 'error', 'tenant_default', ?)`,
+       VALUES (?, 'env', '{"type":"self_hosted","provider":"docker"}', 'error', 'tenant_default', ?)`,
     ).run(primaryEnvId, nowMs());
 
     // Fallback references rows that don't exist anywhere.
@@ -480,11 +480,11 @@ describe("v0.5 tenant enforcement — session fallback", () => {
     const db = getDb();
     db.prepare(
       `INSERT INTO environments (id, name, config_json, state, tenant_id, created_at)
-       VALUES (?, 'broken', '{"type":"cloud","provider":"docker"}', 'error', 'tenant_acme', ?)`,
+       VALUES (?, 'broken', '{"type":"self_hosted","provider":"docker"}', 'error', 'tenant_acme', ?)`,
     ).run(brokenEnv, now);
     db.prepare(
       `INSERT INTO environments (id, name, config_json, state, tenant_id, created_at)
-       VALUES (?, 'healthy', '{"type":"cloud","provider":"docker"}', 'ready', 'tenant_acme', ?)`,
+       VALUES (?, 'healthy', '{"type":"self_hosted","provider":"docker"}', 'ready', 'tenant_acme', ?)`,
     ).run(healthyEnv, now);
 
     // Primary agent falls back to backup/healthy within the same tenant.

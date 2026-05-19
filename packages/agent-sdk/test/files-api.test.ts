@@ -559,7 +559,7 @@ describe("Resources passed at session creation", () => {
     ).run(now);
     db.prepare(
       `INSERT INTO environments (id, name, config_json, state, tenant_id, created_at)
-       VALUES ('env_rc', 'rc-env', '{"type":"cloud","provider":"docker"}', 'ready', 'tenant_default', ?)`,
+       VALUES ('env_rc', 'rc-env', '{"type":"self_hosted","provider":"docker"}', 'ready', 'tenant_default', ?)`,
     ).run(now);
 
     const { key } = createApiKey({
@@ -625,7 +625,7 @@ describe("Resources passed at session creation", () => {
     ).run(now);
     db.prepare(
       `INSERT INTO environments (id, name, config_json, state, tenant_id, created_at)
-       VALUES ('env_sr', 'sr-env', '{"type":"cloud","provider":"docker"}', 'ready', 'tenant_default', ?)`,
+       VALUES ('env_sr', 'sr-env', '{"type":"self_hosted","provider":"docker"}', 'ready', 'tenant_default', ?)`,
     ).run(now);
 
     const { key } = createApiKey({
