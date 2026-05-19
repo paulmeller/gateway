@@ -166,7 +166,7 @@ describe("streaming — basic", () => {
     // race window where an event lands between the DB read and listener attach.
     // The live handler should dedupe by seq.
     const { EventEmitter } = await import("node:events");
-    const g = globalThis as typeof globalThis & { __caBusEmitters?: Map<string, EventEmitter> };
+    const g = globalThis as typeof globalThis & { __caBusEmitters?: Map<string, InstanceType<typeof EventEmitter>> };
     const em = g.__caBusEmitters?.get("sess_dedup");
     expect(em).toBeDefined();
     em!.emit("event", row);
