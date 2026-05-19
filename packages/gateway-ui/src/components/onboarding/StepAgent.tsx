@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ENGINES, FALLBACK_MODELS } from "@/lib/constants";
+import { modelId } from "@/lib/utils";
 import { ModelCombobox } from "@/components/ModelCombobox";
 import { useAgents } from "@/hooks/use-agents";
 import { toast } from "sonner";
@@ -32,7 +33,7 @@ export function StepAgent({ onNext }: Props) {
     if (mode === "select") {
       const agent = agents?.find(a => a.id === selectedId);
       if (!agent) { toast.error("Please select an agent"); return; }
-      onNext({ mode: "select", agent: { id: agent.id, name: agent.name, engine: agent.engine, model: agent.model } });
+      onNext({ mode: "select", agent: { id: agent.id, name: agent.name, engine: agent.engine, model: modelId(agent.model) } });
     } else {
       if (!name.trim()) { toast.error("Agent name is required"); return; }
       if (agents?.some(a => a.name.toLowerCase() === name.trim().toLowerCase())) {

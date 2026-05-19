@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useAgents, useDeleteAgent } from "@/hooks/use-agents";
+import { modelId } from "@/lib/utils";
 import { CreateAgentDialog } from "./CreateAgentDialog";
 import { PageHeader } from "./PageHeader";
 
@@ -57,7 +58,7 @@ export function AgentsTab() {
                 <TableRow key={a.id} className="cursor-pointer" onClick={() => openAgent(a.id)}>
                   <TableCell className="font-mono text-xs text-muted-foreground">{a.id.slice(0, 16)}...</TableCell>
                   <TableCell className="font-medium text-foreground">{a.name}</TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">{a.model}</TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">{modelId(a.model)}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className="border-lime-400/20 bg-lime-400/10 text-lime-400 text-xs">Active</Badge>
                   </TableCell>

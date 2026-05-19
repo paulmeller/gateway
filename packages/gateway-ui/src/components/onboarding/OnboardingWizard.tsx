@@ -9,6 +9,7 @@ import { StepAgent } from "./StepAgent";
 import { StepEnvironment } from "./StepEnvironment";
 import { StepSecrets } from "./StepSecrets";
 import { StepReady } from "./StepReady";
+import { modelId } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface VaultListResponse { data: Array<{ id: string; entry_count: number }> }
@@ -43,7 +44,7 @@ export function OnboardingWizard() {
 
   // Derived display data for later steps
   const agentData = agentChoice?.mode === "select"
-    ? { name: agentChoice.agent.name, engine: agentChoice.agent.engine, model: agentChoice.agent.model }
+    ? { name: agentChoice.agent.name, engine: agentChoice.agent.engine, model: modelId(agentChoice.agent.model) }
     : agentChoice?.mode === "create"
       ? agentChoice.data
       : { name: "", engine: "claude", model: "" };

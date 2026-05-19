@@ -23,6 +23,7 @@ import { PlaygroundSkills } from "@/components/playground/PlaygroundSkills";
 import { PlaygroundFiles } from "@/components/playground/PlaygroundFiles";
 import { toast } from "sonner";
 import { isLocalModel } from "@/lib/constants";
+import { modelId } from "@/lib/utils";
 
 // ─── Left panel ───────────────────────────────────────────────────────────────
 
@@ -147,11 +148,11 @@ function ConfigPanel({ sessionId, onSessionCreated }: ConfigPanelProps) {
                         <>
                           <div className="flex justify-between text-xs">
                             <span className="text-muted-foreground">Model</span>
-                            <span className="font-mono text-foreground truncate max-w-[120px]">{agent.model}</span>
+                            <span className="font-mono text-foreground truncate max-w-[120px]">{modelId(agent.model)}</span>
                           </div>
                           <div className="flex justify-between text-xs">
                             <span className="text-muted-foreground">Engine</span>
-                            <span className="font-mono text-foreground">{(agent.engine ?? "claude") + (isLocalModel(agent.model) ? " (ollama)" : "")}</span>
+                            <span className="font-mono text-foreground">{(agent.engine ?? "claude") + (isLocalModel(modelId(agent.model)) ? " (ollama)" : "")}</span>
                           </div>
                         </>
                       )}
@@ -192,9 +193,9 @@ function ConfigPanel({ sessionId, onSessionCreated }: ConfigPanelProps) {
                 </Select>
                 {currentAgent && (
                   <div className="flex items-center gap-2 pl-0.5">
-                    <span className="font-mono text-[10px] text-muted-foreground">{currentAgent.model}</span>
+                    <span className="font-mono text-[10px] text-muted-foreground">{modelId(currentAgent.model)}</span>
                     <span className="text-[10px] text-muted-foreground/60">·</span>
-                    <span className="text-[10px] text-muted-foreground">{(currentAgent.engine ?? "claude") + (isLocalModel(currentAgent.model) ? " (ollama)" : "")}</span>
+                    <span className="text-[10px] text-muted-foreground">{(currentAgent.engine ?? "claude") + (isLocalModel(modelId(currentAgent.model)) ? " (ollama)" : "")}</span>
                   </div>
                 )}
               </div>

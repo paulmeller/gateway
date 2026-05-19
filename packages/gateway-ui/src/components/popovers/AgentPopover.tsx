@@ -1,6 +1,7 @@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { useAgent } from "@/hooks/use-agents";
+import { modelId } from "@/lib/utils";
 
 interface Props { agentId: string; children: React.ReactNode; }
 
@@ -20,7 +21,7 @@ export function AgentPopover({ agentId, children }: Props) {
           </div>
           <div>
             <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Model</p>
-            <p className="font-mono text-xs text-muted-foreground">{agent.model}</p>
+            <p className="font-mono text-xs text-muted-foreground">{modelId(agent.model)}</p>
           </div>
           {agent.system && (
             <div>

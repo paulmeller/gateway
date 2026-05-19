@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { useUpdateAgent, type Agent } from "@/hooks/use-agents";
 import { FALLBACK_MODELS, ENGINES } from "@/lib/constants";
+import { modelId } from "@/lib/utils";
 import { ModelCombobox } from "@/components/ModelCombobox";
 import { toast } from "sonner";
 
@@ -24,7 +25,7 @@ export function AgentConfigTab({ agent }: Props) {
   const update = useUpdateAgent();
   const [name, setName] = useState(agent.name);
   const [engine, setEngine] = useState(agent.engine);
-  const [model, setModel] = useState(agent.model);
+  const [model, setModel] = useState(modelId(agent.model));
   const [system, setSystem] = useState(agent.system || "");
   const [threadsEnabled, setThreadsEnabled] = useState(
     agent.threads_enabled ?? false
@@ -36,7 +37,7 @@ export function AgentConfigTab({ agent }: Props) {
   const dirty =
     name !== agent.name ||
     engine !== agent.engine ||
-    model !== agent.model ||
+    model !== modelId(agent.model) ||
     system !== (agent.system || "") ||
     threadsEnabled !== (agent.threads_enabled ?? false) ||
     confirmationMode !== (agent.confirmation_mode ?? false);

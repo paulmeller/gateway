@@ -7,6 +7,7 @@ import { TypingIndicator } from "./TypingIndicator";
 import { useSession } from "@/hooks/use-sessions";
 import { useAgent } from "@/hooks/use-agents";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
+import { modelId } from "@/lib/utils";
 
 const MESSAGE_TYPES = new Set([
   "user.message", "agent.message", "agent.thinking",
@@ -58,7 +59,7 @@ export function ChatThread() {
           <div className="flex flex-1 flex-col items-center justify-center py-24">
             <span className="size-3 rounded-full bg-lime-400 shadow-[0_0_10px_rgba(163,230,53,0.5)] mb-4" />
             <p className="text-sm font-medium text-foreground">{agent.name}</p>
-            <p className="text-xs text-muted-foreground font-mono mt-0.5">{agent.model}</p>
+            <p className="text-xs text-muted-foreground font-mono mt-0.5">{modelId(agent.model)}</p>
             <p className="text-xs text-muted-foreground/50 mt-4">Send a message to start</p>
           </div>
         )}
@@ -66,7 +67,7 @@ export function ChatThread() {
           <div className="mb-4 flex items-center gap-2">
             <span className="size-2 rounded-full bg-lime-400 shadow-[0_0_6px_rgba(163,230,53,0.5)]" />
             <span className="text-xs font-medium text-foreground">{agent.name}</span>
-            <span className="text-xs text-muted-foreground font-mono">{agent.model}</span>
+            <span className="text-xs text-muted-foreground font-mono">{modelId(agent.model)}</span>
           </div>
         )}
         {messages.map((event) => <MessageBubble key={event.id} event={event} />)}

@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { getEngineKey, PROVIDER_TOKENS } from "@/lib/constants";
+import { modelId } from "@/lib/utils";
 import { useVaults } from "@/hooks/use-vaults";
 import { ModeToggle } from "./ModeToggle";
 
@@ -78,7 +79,7 @@ export function StepSecrets({ engine, model, provider, agentId, agentName, hasEx
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-lime-400/60 mb-1">Step 3 of 4</p>
           <h2 className="text-lg font-semibold text-foreground">Secrets</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            {model && !model.includes("/") && !["claude-","gpt-","o1-","o3-","codex-","gemini-"].some(p => model.startsWith(p))
+            {modelId(model) && !modelId(model).includes("/") && !["claude-","gpt-","o1-","o3-","codex-","gemini-"].some(p => modelId(model).startsWith(p))
               ? "No API key required — this model runs locally via Ollama."
               : "No API keys needed for this combination."}
           </p>

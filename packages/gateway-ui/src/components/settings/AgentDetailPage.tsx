@@ -9,6 +9,7 @@ import { AgentConfigTab } from "./AgentConfigTab";
 import { AgentSkillsTab } from "./AgentSkillsTab";
 import { AgentAdvancedTab } from "./AgentAdvancedTab";
 import { AgentEditTab } from "./AgentEditTab";
+import { modelId } from "@/lib/utils";
 
 export function AgentDetailPage() {
   const agentId = useAppStore((s) => s.selectedAgentId);
@@ -31,7 +32,7 @@ export function AgentDetailPage() {
         <div className="flex-1">
           <h2 className="text-sm font-semibold text-foreground">{agent.name}</h2>
           <p className="text-xs text-muted-foreground">
-            {agent.engine} / {agent.model}
+            {agent.engine} / {modelId(agent.model)}
           </p>
         </div>
         <Badge
