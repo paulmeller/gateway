@@ -100,7 +100,7 @@ async function createTestEnv(overrides: Record<string, unknown> = {}): Promise<R
   const id = newId("env");
   const now = nowMs();
   const name = overrides.name as string ?? `env-${Date.now()}-${Math.random()}`;
-  const config = overrides.config ?? { type: "cloud", provider: "docker" };
+  const config = overrides.config ?? { type: "self_hosted", provider: "docker" };
 
   // Stamp tenant_default so the agent (stamped by the handler) and the env
   // match when a session is created across them (v0.5).

@@ -262,8 +262,8 @@ export function handleCreateSession(request: Request): Promise<Response> {
         vaults: data.vault_ids,
       });
 
-      // Engine-provider compatibility: anthropic provider only runs Claude models
-      if (env.config?.provider === "anthropic" && agent.engine !== "claude") {
+      // Engine-provider compatibility: cloud / anthropic provider only runs Claude models
+      if ((env.config?.type === "cloud" || env.config?.provider === "anthropic") && agent.engine !== "claude") {
         throw badRequest(
           `${agent.engine} engine cannot run on the anthropic provider — ` +
           `Anthropic's managed agents API only supports Claude models. ` +
@@ -308,8 +308,8 @@ export function handleCreateSession(request: Request): Promise<Response> {
         }
       }
 
-      // ── Anthropic provider: sync local config → Anthropic, then proxy ──
-      if (env.config?.provider === "anthropic") {
+      // ── Anthropic provider / cloud type: sync local config → Anthropic, then proxy ──
+      if (env.config?.type === "cloud" || env.config?.provider === "anthropic") {
         // Unified resolver: vault → pool → config cascade (v0.4 PR4).
         const { resolveAnthropicKey } = await import("../providers/upstream-keys");
         const resolved = resolveAnthropicKey({ vaultIds: data.vault_ids ?? undefined });

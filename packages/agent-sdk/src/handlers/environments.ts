@@ -120,19 +120,26 @@ export function handleCreateEnvironment(request: Request): Promise<Response> {
       throw conflict(`Environment with name "${parsed.data.name}" already exists`);
     }
 
-    // Pre-flight: check provider is available before creating the environment
-    // Skip for cloud providers — their API keys are configured separately (vaults/secrets)
+    // Pre-flight: check provider availability before creating the environment.
+    // cloud type = Anthropic proxy — no local provider needed.
+    // self_hosted = provider is optional (executor provides via DEFAULT_PROVIDER).
+    const configType = parsed.data.config.type;
     const providerName = parsed.data.config.provider;
-    if (!providerName) {
-      throw badRequest("config.provider is required — specify a sandbox provider (e.g. docker, apple-container)");
-    }
-    const CLOUD_PROVIDERS = new Set(["sprites", "e2b", "vercel", "daytona", "fly", "modal", "anthropic"]);
-    if (!CLOUD_PROVIDERS.has(providerName)) {
-      const provider = await resolveProvider(providerName);
-      if (provider.checkAvailability) {
-        const result = await provider.checkAvailability();
-        if (!result.available) {
-          throw badRequest(`Provider "${providerName}" is not available: ${result.message}`);
+
+    if (configType === "cloud") {
+      // Cloud = Anthropic proxy. No provider needed — Anthropic handles infrastructure.
+    } else {
+      // self_hosted — provider is a deprecated fallback; not required.
+      if (providerName) {
+        const CLOUD_PROVIDERS = new Set(["sprites", "e2b", "vercel", "daytona", "fly", "modal", "anthropic"]);
+        if (!CLOUD_PROVIDERS.has(providerName)) {
+          const provider = await resolveProvider(providerName);
+          if (provider.checkAvailability) {
+            const result = await provider.checkAvailability();
+            if (!result.available) {
+              throw badRequest(`Provider "${providerName}" is not available: ${result.message}`);
+            }
+          }
         }
       }
     }
