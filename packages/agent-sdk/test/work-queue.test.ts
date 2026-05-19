@@ -908,7 +908,10 @@ describe("work queue — self_hosted event dispatch", () => {
   beforeEach(() => freshDbEnv());
 
   // 24. POST /sessions/:id/events on self_hosted session creates work item
+  // (only queues when no inline executor — clear DEFAULT_PROVIDER to simulate)
   it("posting a user.message event on self_hosted session creates a work item", async () => {
+    const saved = process.env.DEFAULT_PROVIDER;
+    delete process.env.DEFAULT_PROVIDER;
     await bootDb();
     const fx = await seedFixtures();
     const { handlePostEvents } = await import("../src/handlers/events");
@@ -938,5 +941,9 @@ describe("work queue — self_hosted event dispatch", () => {
     expect(after[0].state).toBe("queued");
     expect(after[0].data).toEqual({ type: "session", id: fx.sessionId });
     expect(after[0].environment_id).toBe(fx.selfHostedEnvId);
+
+    // Restore
+    if (saved) process.env.DEFAULT_PROVIDER = saved;
+    else delete process.env.DEFAULT_PROVIDER;
   });
 });

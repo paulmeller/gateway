@@ -15,6 +15,7 @@ import { forwardToAnthropic } from "../proxy/forward";
 import { badRequest, notFound } from "../errors";
 import { getAgent } from "../db/agents";
 import { getEnvironment, getEnvironmentRow } from "../db/environments";
+import { getConfig } from "../config";
 import { resolveAnthropicKey as resolveAnthropicKeyShared, reportUpstreamFailure, reportUpstreamSuccess } from "../providers/upstream-keys";
 import { assertResourceTenant } from "../auth/scope";
 import { getProxiedTenantId } from "../db/proxy";
@@ -736,8 +737,14 @@ export function handlePostEvents(request: Request, sessionId: string): Promise<R
       const row = getSessionRow(sessionId);
       if (row) {
         const env = getEnvironment(row.environment_id);
-        if (env?.config?.type === "self_hosted") {
-          // Queue work instead of executing inline — a remote worker will pick it up
+        // Decide: inline execution vs work queue.
+        // Use work queue ONLY for self_hosted envs when no inline executor
+        // is available (no DEFAULT_PROVIDER set). When gateway serve --provider
+        // is running, execute inline regardless of environment type.
+        const canExecuteInline = !!getConfig().defaultProvider || !!env?.config?.provider;
+
+        if (env?.config?.type === "self_hosted" && !canExecuteInline) {
+          // No inline executor — queue work for a remote worker to pick up
           const { createWorkItem } = await import("../db/work");
           const { updateSessionStatus } = await import("../db/sessions");
 
@@ -749,10 +756,8 @@ export function handlePostEvents(request: Request, sessionId: string): Promise<R
             tenantId: envRow?.tenant_id ?? undefined,
           });
 
-          // Mark session as running so clients see activity
           updateSessionStatus(sessionId, "running");
 
-          // Emit session.status_running so SSE clients get notified
           appendEvent(sessionId, {
             type: "session.status_running",
             payload: {},
@@ -760,6 +765,7 @@ export function handlePostEvents(request: Request, sessionId: string): Promise<R
             processedAt: nowMs(),
           });
         } else {
+          // Inline execution — gateway serve has a provider available
           void enqueueTurn(row.environment_id, () => runTurn(sessionId, appended.pendingForTurn)).catch(
             (err: unknown) => {
               console.error(`[events] enqueueTurn failed:`, err);
