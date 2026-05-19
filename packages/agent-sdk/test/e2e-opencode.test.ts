@@ -47,7 +47,8 @@ vi.mock("../src/providers/registry", async () => {
     resolveContainerProvider: async () => fakeProvider,
     resolveProvider: async () => fakeProvider,
     tryResolveProvider: async () => fakeProvider,
-    resolveProviderName: () => "sprites",
+    resolveProviderName: (opts?: { override?: string; envConfigProvider?: string | null }) =>
+      opts?.override ?? opts?.envConfigProvider ?? "sprites",
   };
 });
 
