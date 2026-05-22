@@ -723,6 +723,7 @@ export async function runTurn(
     if (permissionPollTimer) clearInterval(permissionPollTimer);
     if (toolBridgePollTimer) clearInterval(toolBridgePollTimer);
     getPendingToolBridgeCalls().delete(sessionId);
+    customToolCallCounts.delete(sessionId);
     runtime.inFlightRuns.delete(sessionId);
   }
 
@@ -1194,6 +1195,10 @@ export async function writePermissionResponse(
 
 /** Sessions with an in-flight tool bridge call (prevents duplicate events). */
 const pendingToolBridgeCalls = new Set<string>();
+/** Per-session counter of consecutive custom tool calls in the current turn. */
+const customToolCallCounts = new Map<string, number>();
+const MAX_CUSTOM_TOOL_CALLS_PER_TURN = 10;
+
 export function getPendingToolBridgeCalls(): Set<string> {
   return pendingToolBridgeCalls;
 }
@@ -1215,6 +1220,14 @@ async function checkToolBridgeSentinel(
   trace: TraceContext,
 ): Promise<void> {
   if (pendingToolBridgeCalls.has(sessionId)) return;
+
+  // Safety: cap consecutive custom tool calls to prevent infinite loops.
+  // The counter resets when the turn ends (in the main stream loop cleanup).
+  const callCount = customToolCallCounts.get(sessionId) ?? 0;
+  if (callCount >= MAX_CUSTOM_TOOL_CALLS_PER_TURN) {
+    console.warn(`[driver] ${sessionId}: custom tool call limit reached (${MAX_CUSTOM_TOOL_CALLS_PER_TURN}), skipping`);
+    return;
+  }
 
   try {
     const result = await provider.exec(
@@ -1262,8 +1275,9 @@ async function checkToolBridgeSentinel(
 
   // Mark as pending to avoid duplicate events
   pendingToolBridgeCalls.add(sessionId);
+  customToolCallCounts.set(sessionId, (customToolCallCounts.get(sessionId) ?? 0) + 1);
 
-  console.log(`[driver] ${sessionId} custom tool call: ${request.name} (${request.tool_use_id})`);
+  console.log(`[driver] ${sessionId} custom tool call #${customToolCallCounts.get(sessionId)}: ${request.name} (${request.tool_use_id})`);
 
   // Emit agent.custom_tool_use so the client sees it on the SSE stream
   appendEvent(sessionId, {
@@ -1300,8 +1314,14 @@ export async function writeToolBridgeResponse(
   const provider = await resolveProvider({ envConfigProvider: env?.config?.provider });
   const bridgeSecrets = pool.getBySession(sessionId)?.vaultSecrets;
 
-  // The bridge expects {content: [...]} with text blocks
-  const response = JSON.stringify({ content });
+  // The bridge expects {content: [...]} with text blocks.
+  // Append a stop hint so the model knows to end its turn after receiving
+  // the tool result. Without this, models often loop calling the same tool.
+  const augmentedContent = [
+    ...(Array.isArray(content) ? content : []),
+    { type: "text", text: "\n[Tool result delivered. Your turn is complete — do not call this tool again.]" },
+  ];
+  const response = JSON.stringify({ content: augmentedContent });
 
   try {
     await provider.exec(
