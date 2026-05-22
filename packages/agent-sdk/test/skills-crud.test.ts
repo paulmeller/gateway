@@ -836,3 +836,43 @@ describe("Skills DB layer", () => {
     expect(result.reason).toBe("cannot delete the current version");
   });
 });
+
+describe("Agent update with Anthropic skills", () => {
+  beforeEach(() => { freshDbEnv(); });
+
+  it("updates an existing agent to add an Anthropic skill", async () => {
+    await bootDb();
+    const { handleCreateAgent, handleUpdateAgent } = await import("../src/handlers/agents");
+
+    // Create agent without skills
+    const createRes = await handleCreateAgent(
+      req("/v1/agents", {
+        body: {
+          name: "update-skill-test",
+          model: { id: "claude-sonnet-4-6" },
+        },
+      }),
+    );
+    expect(createRes.status).toBe(201);
+    const agent = await createRes.json();
+    expect(agent.skills).toHaveLength(0);
+
+    // Update to add docx skill
+    const updateRes = await handleUpdateAgent(
+      req(`/v1/agents/${agent.id}`, {
+        method: "POST",
+        body: {
+          version: agent.version,
+          skills: [{ skill_id: "docx", type: "anthropic" }],
+        },
+      }),
+      agent.id,
+    );
+    expect(updateRes.status).toBe(200);
+    const updated = await updateRes.json();
+    expect(updated.skills).toHaveLength(1);
+    expect(updated.skills[0].name).toBe("docx");
+    expect(updated.skills[0].source).toBe("anthropic:docx");
+    expect(updated.skills[0].content.length).toBeGreaterThan(100);
+  });
+});

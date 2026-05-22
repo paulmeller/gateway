@@ -196,8 +196,10 @@ async function resolveSkillInputs(
             installed_at: nowIso,
           });
         } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`[agents] failed to fetch Anthropic skill "${skillName}":`, msg);
           throw badRequest(
-            `skill "${skillName}" not found in local DB or Anthropic skills repo. ` +
+            `skill "${skillName}" not found in local DB or Anthropic skills repo (${msg}). ` +
             `Upload it via POST /v1/skills or check the skill_id. ` +
             `Available Anthropic skills: docx, pdf, pptx, xlsx, mcp-builder, frontend-design`,
           );
