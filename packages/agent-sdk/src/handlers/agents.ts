@@ -92,21 +92,47 @@ async function resolveSkillInputs(
   if (!skills) return undefined;
   const resolved: AgentSkill[] = [];
   for (const s of skills) {
-    // Anthropic format: reference to a DB-stored skill
+    // Anthropic format: reference to a DB-stored or hosted skill
     if ("skill_id" in s && s.skill_id) {
       const { getSkill: dbGetSkill, getSkillVersion: dbGetSkillVersion } = await import("../db/skills");
       const dbSkill = dbGetSkill(s.skill_id);
-      if (!dbSkill) throw badRequest(`skill ${s.skill_id} not found`);
-      const version = s.version ?? dbSkill.current_version;
-      const sv = dbGetSkillVersion(s.skill_id, version);
-      if (!sv) throw badRequest(`skill version ${version} not found for skill ${s.skill_id}`);
-      resolved.push({
-        name: dbSkill.name,
-        source: `skill:${s.skill_id}@${version}`,
-        content: sv.content,
-        ...(sv.files && Object.keys(sv.files).length > 0 ? { files: sv.files } : {}),
-        installed_at: nowIso,
-      });
+
+      if (dbSkill) {
+        // DB-stored skill (custom or previously uploaded)
+        const version = s.version ?? dbSkill.current_version;
+        const sv = dbGetSkillVersion(s.skill_id, version);
+        if (!sv) throw badRequest(`skill version ${version} not found for skill ${s.skill_id}`);
+        resolved.push({
+          name: dbSkill.name,
+          source: `skill:${s.skill_id}@${version}`,
+          content: sv.content,
+          ...(sv.files && Object.keys(sv.files).length > 0 ? { files: sv.files } : {}),
+          installed_at: nowIso,
+        });
+      } else if (s.type === "anthropic" || !s.type) {
+        // Anthropic-hosted skill — fetch from GitHub anthropics/skills repo
+        const skillName = s.skill_id;
+        try {
+          const skillMdUrl = `https://raw.githubusercontent.com/anthropics/skills/main/skills/${skillName}/SKILL.md`;
+          const resp = await fetch(skillMdUrl, { signal: AbortSignal.timeout(10_000) });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const content = await resp.text();
+          resolved.push({
+            name: skillName,
+            source: `anthropic:${skillName}`,
+            content,
+            installed_at: nowIso,
+          });
+        } catch (err) {
+          throw badRequest(
+            `skill "${skillName}" not found in local DB or Anthropic skills repo. ` +
+            `Upload it via POST /v1/skills or check the skill_id. ` +
+            `Available Anthropic skills: docx, pdf, pptx, xlsx`,
+          );
+        }
+      } else {
+        throw badRequest(`skill "${s.skill_id}" not found`);
+      }
     } else {
       // Our inline format — pass through as-is
       const inline = s as z.infer<typeof InlineSkillSchema>;
