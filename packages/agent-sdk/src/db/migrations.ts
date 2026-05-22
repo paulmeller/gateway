@@ -787,6 +787,17 @@ export function runMigrations(db: InstanceType<typeof Database>): void {
   `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_skill_versions_skill ON skill_versions(skill_id, created_at)`);
 
+  // Skills table: ensure all columns exist (handles pre-existing tables from older versions)
+  {
+    const cols = db.prepare("PRAGMA table_info(skills)").all() as Array<{ name: string }>;
+    const names = new Set(cols.map((c) => c.name));
+    if (!names.has("current_version")) db.exec("ALTER TABLE skills ADD COLUMN current_version TEXT");
+    if (!names.has("tenant_id")) db.exec("ALTER TABLE skills ADD COLUMN tenant_id TEXT");
+    if (!names.has("archived_at")) db.exec("ALTER TABLE skills ADD COLUMN archived_at INTEGER");
+    if (!names.has("description")) db.exec("ALTER TABLE skills ADD COLUMN description TEXT");
+    if (!names.has("updated_at")) db.exec("ALTER TABLE skills ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0");
+  }
+
   // Multi-file skills: files_json stores all files in the skill directory
   const skillVersionCols = db
     .prepare(`PRAGMA table_info(skill_versions)`)
