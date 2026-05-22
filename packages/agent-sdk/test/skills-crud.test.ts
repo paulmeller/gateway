@@ -677,6 +677,120 @@ describe("Anthropic skill GitHub resolution", () => {
     expect(agent.skills[1].source).toBe("anthropic:docx");
     expect(agent.skills[1].content.length).toBeGreaterThan(0);
   });
+
+  it("docx skill includes supporting files beyond SKILL.md", async () => {
+    await bootDb();
+    const { handleCreateAgent } = await import("../src/handlers/agents");
+
+    const agentRes = await handleCreateAgent(
+      req("/v1/agents", {
+        body: {
+          name: "docx-files-agent",
+          model: { id: "claude-sonnet-4-6" },
+          skills: [{ skill_id: "docx", type: "anthropic" }],
+        },
+      }),
+    );
+    expect(agentRes.status).toBe(201);
+    const body = await agentRes.json();
+    const skill = body.skills[0];
+
+    // files should be present and have more than just SKILL.md
+    expect(skill.files).toBeDefined();
+    expect(typeof skill.files).toBe("object");
+    expect(Object.keys(skill.files).length).toBeGreaterThan(1);
+
+    // SKILL.md must be one of the files
+    expect(skill.files["SKILL.md"]).toBeDefined();
+
+    // At least one file under scripts/ should exist
+    const scriptKeys = Object.keys(skill.files).filter((k) => k.startsWith("scripts/"));
+    expect(scriptKeys.length).toBeGreaterThan(0);
+  });
+
+  it("all files in docx skill have string content (non-binary files have text)", async () => {
+    await bootDb();
+    const { handleCreateAgent } = await import("../src/handlers/agents");
+
+    const agentRes = await handleCreateAgent(
+      req("/v1/agents", {
+        body: {
+          name: "docx-nonempty-agent",
+          model: { id: "claude-sonnet-4-6" },
+          skills: [{ skill_id: "docx", type: "anthropic" }],
+        },
+      }),
+    );
+    expect(agentRes.status).toBe(201);
+    const body = await agentRes.json();
+    const skill = body.skills[0];
+
+    expect(skill.files).toBeDefined();
+    const entries = Object.entries(skill.files as Record<string, string>);
+    // Every value must be a string (empty __init__.py files are valid)
+    for (const [, content] of entries) {
+      expect(typeof content).toBe("string");
+    }
+    // Most files should have non-empty content — verify the majority do
+    const nonEmpty = entries.filter(([, c]) => c.length > 0);
+    expect(nonEmpty.length).toBeGreaterThan(entries.length / 2);
+  });
+
+  it("python scripts in docx skill are stored as plain text, not base64", async () => {
+    await bootDb();
+    const { handleCreateAgent } = await import("../src/handlers/agents");
+
+    const agentRes = await handleCreateAgent(
+      req("/v1/agents", {
+        body: {
+          name: "docx-python-agent",
+          model: { id: "claude-sonnet-4-6" },
+          skills: [{ skill_id: "docx", type: "anthropic" }],
+        },
+      }),
+    );
+    expect(agentRes.status).toBe(201);
+    const body = await agentRes.json();
+    const skill = body.skills[0];
+
+    expect(skill.files).toBeDefined();
+    const pyFiles = Object.entries(skill.files as Record<string, string>).filter(
+      ([path]) => path.endsWith(".py"),
+    );
+    expect(pyFiles.length).toBeGreaterThan(0); // docx skill has .py scripts
+
+    // No .py file should be base64-encoded — they are text
+    for (const [, content] of pyFiles) {
+      expect(content.startsWith("base64:")).toBe(false);
+    }
+
+    // At least one .py file should have substantive content (not just an empty __init__.py)
+    const nonEmpty = pyFiles.filter(([, c]) => c.length > 0);
+    expect(nonEmpty.length).toBeGreaterThan(0);
+  });
+
+  it("SKILL.md content matches top-level content field", async () => {
+    await bootDb();
+    const { handleCreateAgent } = await import("../src/handlers/agents");
+
+    const agentRes = await handleCreateAgent(
+      req("/v1/agents", {
+        body: {
+          name: "docx-skillmd-agent",
+          model: { id: "claude-sonnet-4-6" },
+          skills: [{ skill_id: "docx", type: "anthropic" }],
+        },
+      }),
+    );
+    expect(agentRes.status).toBe(201);
+    const body = await agentRes.json();
+    const skill = body.skills[0];
+
+    expect(skill.files).toBeDefined();
+    expect(skill.files["SKILL.md"]).toBeDefined();
+    // The top-level content field should be exactly SKILL.md
+    expect(skill.content).toBe(skill.files["SKILL.md"]);
+  });
 });
 
 describe("Skills DB layer", () => {
