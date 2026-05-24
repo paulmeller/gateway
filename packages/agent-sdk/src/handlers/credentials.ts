@@ -15,6 +15,7 @@ import { loadVaultForCaller } from "./vaults";
 import {
   createCredential,
   getCredential,
+  getRefreshConfig,
   listCredentials,
   updateCredential,
   deleteCredential,
@@ -275,5 +276,72 @@ export function handleDeleteCredential(
     const deleted = deleteCredential(credentialId);
     if (!deleted) throw notFound(`credential not found: ${credentialId}`);
     return jsonOk({ id: credentialId, type: "vault_credential_deleted" });
+  });
+}
+
+export function handleMcpOauthValidate(
+  request: Request,
+  vaultId: string,
+  credentialId: string,
+): Promise<Response> {
+  return routeWrap(request, async ({ auth }) => {
+    loadVaultForCaller(auth, vaultId); // tenant guard
+
+    const cred = getCredential(credentialId);
+    if (!cred || cred.vault_id !== vaultId) throw notFound(`credential not found: ${credentialId}`);
+    if (cred.auth.type !== "mcp_oauth") {
+      throw badRequest("credential is not mcp_oauth type");
+    }
+
+    const config = getRefreshConfig(credentialId);
+    if (!config) throw badRequest("credential has no refresh configuration");
+
+    // Call the token endpoint to validate the refresh token
+    const body = new URLSearchParams({
+      grant_type: "refresh_token",
+      client_id: config.client_id,
+      refresh_token: config.refresh_token,
+      ...(config.scope ? { scope: config.scope } : {}),
+    });
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/x-www-form-urlencoded",
+    };
+    if (config.token_endpoint_auth?.type === "client_secret_basic") {
+      headers.Authorization = `Basic ${btoa(`${config.client_id}:${config.token_endpoint_auth.client_secret}`)}`;
+    } else if (config.token_endpoint_auth?.client_secret) {
+      body.set("client_secret", config.token_endpoint_auth.client_secret);
+    }
+
+    try {
+      const res = await fetch(config.token_endpoint, {
+        method: "POST",
+        headers,
+        body: body.toString(),
+        signal: AbortSignal.timeout(15_000),
+      });
+
+      if (res.ok) {
+        return jsonOk({
+          type: "mcp_oauth_validation_result",
+          credential_id: credentialId,
+          valid: true,
+        });
+      }
+      const errText = await res.text().catch(() => "");
+      return jsonOk({
+        type: "mcp_oauth_validation_result",
+        credential_id: credentialId,
+        valid: false,
+        error: `token endpoint returned ${res.status}: ${errText.slice(0, 200)}`,
+      });
+    } catch (err) {
+      return jsonOk({
+        type: "mcp_oauth_validation_result",
+        credential_id: credentialId,
+        valid: false,
+        error: err instanceof Error ? err.message : "token endpoint unreachable",
+      });
+    }
   });
 }

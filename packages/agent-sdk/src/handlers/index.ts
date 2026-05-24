@@ -4,7 +4,7 @@ export { handleCreateSession, handleListSessions, handleGetSession, handleUpdate
 export { handlePostEvents, handleListEvents } from "./events";
 export { handleSessionStream, prepareSessionStream } from "./stream";
 export { handleCreateVault, handleListVaults, handleGetVault, handleUpdateVault, handleArchiveVault, handleDeleteVault, handleListEntries, handleGetEntry, handlePutEntry, handleDeleteEntry } from "./vaults";
-export { handleCreateCredential, handleListCredentials, handleGetCredential, handleUpdateCredential, handleArchiveCredential, handleDeleteCredential } from "./credentials";
+export { handleCreateCredential, handleListCredentials, handleGetCredential, handleUpdateCredential, handleArchiveCredential, handleDeleteCredential, handleMcpOauthValidate } from "./credentials";
 export { handleBatch } from "./batch";
 export { handleListThreads, handleGetThread, handleArchiveThread, handleListThreadEvents, handleStreamThreadEvents } from "./threads";
 export { handleCreateMemoryStore, handleListMemoryStores, handleGetMemoryStore, handleUpdateMemoryStore, handleDeleteMemoryStore, handleCreateMemory, handleListMemories, handleGetMemory, handleUpdateMemory, handleDeleteMemory, handleListMemoryVersions, handleGetMemoryVersion, handleRedactMemoryVersion, handleArchiveMemoryStore, handleDreamMemoryStore } from "./memory";
@@ -27,3 +27,4 @@ export { handleListAudit } from "./audit";
 export { handleGetLicense } from "./license";
 export { handleListModels } from "./models";
 export { handleListWork, handleGetWork, handleUpdateWork, handlePollWork, handleWorkStats, handleAckWork, handleHeartbeatWork, handleStopWork } from "./work";
+export { handleCreateUserProfile, handleListUserProfiles, handleGetUserProfile, handleUpdateUserProfile } from "./user-profiles";

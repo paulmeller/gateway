@@ -115,6 +115,7 @@ import {
   handleUpdateCredential,
   handleArchiveCredential,
   handleDeleteCredential,
+  handleMcpOauthValidate,
   handleUpdateMemoryStore,
   handleRedactMemoryVersion,
   handleDreamMemoryStore,
@@ -128,6 +129,10 @@ import {
   handleAckWork,
   handleHeartbeatWork,
   handleStopWork,
+  handleCreateUserProfile,
+  handleListUserProfiles,
+  handleGetUserProfile,
+  handleUpdateUserProfile,
 } from "@agentstep/agent-sdk/handlers";
 
 import { cors } from "hono/cors";
@@ -453,12 +458,12 @@ app.delete("/v1/tenants/:id", (c) => handleArchiveTenant(c.req.raw, c.req.param(
 const notImplemented = (feature: string) => (c: Context) =>
   c.json({ type: "error", error: { type: "not_implemented", message: `${feature} is an Anthropic-hosted feature and is not available on self-hosted gateways.` } }, 501);
 
-app.post("/v1/user_profiles", notImplemented("User profiles"));
-app.get("/v1/user_profiles", notImplemented("User profiles"));
-app.get("/v1/user_profiles/:id", notImplemented("User profiles"));
-app.post("/v1/user_profiles/:id", notImplemented("User profiles"));
-app.post("/v1/user_profiles/:id/enrollment_url", notImplemented("User profiles"));
-app.post("/v1/vaults/:id/credentials/:credId/mcp_oauth_validate", notImplemented("MCP OAuth validation"));
+app.post("/v1/user_profiles", (c) => handleCreateUserProfile(c.req.raw));
+app.get("/v1/user_profiles", (c) => handleListUserProfiles(c.req.raw));
+app.get("/v1/user_profiles/:id", (c) => handleGetUserProfile(c.req.raw, c.req.param("id")));
+app.post("/v1/user_profiles/:id", (c) => handleUpdateUserProfile(c.req.raw, c.req.param("id")));
+app.post("/v1/user_profiles/:id/enrollment_url", notImplemented("User profile enrollment URL (requires OAuth callback server)"));
+app.post("/v1/vaults/:id/credentials/:credId/mcp_oauth_validate", (c) => handleMcpOauthValidate(c.req.raw, c.req.param("id"), c.req.param("credId")));
 
 // ── SPA catch-all (must be last) ────────────────────────────────────────────
 app.get("*", (c) => {

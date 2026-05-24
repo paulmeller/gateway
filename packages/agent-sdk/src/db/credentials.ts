@@ -149,6 +149,16 @@ export function archiveCredential(vaultId: string, credentialId: string): VaultC
   return getCredential(credentialId);
 }
 
+/** Decrypt and return the OAuth refresh config for a credential (null if not set or not mcp_oauth). */
+export function getRefreshConfig(id: string): OAuthRefreshConfig | null {
+  const db = getDb();
+  const row = db.prepare(
+    `SELECT refresh_config_encrypted, auth_type FROM vault_credentials WHERE id = ?`,
+  ).get(id) as { refresh_config_encrypted: string | null; auth_type: string } | undefined;
+  if (!row || row.auth_type !== "mcp_oauth" || !row.refresh_config_encrypted) return null;
+  return JSON.parse(decryptValue(row.refresh_config_encrypted)) as OAuthRefreshConfig;
+}
+
 export function deleteCredential(id: string): boolean {
   const db = getDb();
   const res = db.prepare(`DELETE FROM vault_credentials WHERE id = ?`).run(id);

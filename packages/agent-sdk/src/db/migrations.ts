@@ -876,4 +876,18 @@ export function runMigrations(db: InstanceType<typeof Database>): void {
       db.exec(`CREATE INDEX IF NOT EXISTS idx_vaults_tenant ON vaults(tenant_id)`);
     }
   }
+
+  // User profiles: per-user credential scoping via trust grants
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_profiles (
+      id TEXT PRIMARY KEY,
+      external_id TEXT,
+      display_name TEXT,
+      trust_grants_json TEXT NOT NULL DEFAULT '[]',
+      tenant_id TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      UNIQUE(tenant_id, external_id)
+    )
+  `);
 }
