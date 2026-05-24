@@ -38,7 +38,7 @@ The response body is an `Agent` object at `version: 1` with `type: "agent"`.
 |---|---|---|---|
 | `name` | string | — | Display name. Must be unique within your tenant. |
 | `model` | `{ id: string, speed?: "standard" \| "fast" }` | — | Model object. `id` is the model identifier (must be supported by the chosen engine). Optional `speed` maps to `--fast` on the Claude CLI. |
-| `engine` | string | `"claude"` | Execution engine: `claude`, `opencode`, `codex`, `gemini`, `factory`, `pi`, or `anthropic`. |
+| `engine` | string | auto-inferred | Execution engine: `claude`, `opencode`, `codex`, `gemini`, `factory`, `pi`, or `anthropic`. Auto-inferred from model prefix if omitted (`gemini-*` → `gemini`, `gpt-*`/`o1-*` → `codex`, `claude-*` → `claude`). |
 | `description` | string \| null | `null` | Human-readable description (max 2048 characters). |
 | `system` | string \| null | `null` | System prompt injected before every turn. |
 | `metadata` | Record\<string, string\> | `{}` | Arbitrary key-value pairs (max 16 pairs). |
@@ -56,9 +56,20 @@ The response body is an `Agent` object at `version: 1` with `type: "agent"`.
 
 ### Engine constraints
 
+- **Auto-inference**: When `engine` is omitted, it's inferred from the model prefix: `gemini-*` → `gemini`, `gpt-*`/`o1-*`/`o3-*`/`codex-*` → `codex`, `claude-*` → `claude`. Unknown prefixes default to `claude`. You can always override by setting `engine` explicitly.
 - `tools` may only be set on the `claude` engine. Other engines manage their own tool permissions internally — passing `tools` to a non-claude agent returns a 400.
 - `model` is validated against the engine's known model list at creation time. An unsupported model returns a 400 with the list of valid models.
 - `engine` cannot be changed after creation.
+
+### Vault keys per engine
+
+Each engine requires its own API key in the vault:
+
+| Engine | Vault key | CLI installed in container |
+|--------|-----------|--------------------------|
+| `claude` | `ANTHROPIC_API_KEY` | `@anthropic-ai/claude-code` |
+| `gemini` | `GEMINI_API_KEY` | `@google/gemini-cli` |
+| `codex` | `OPENAI_API_KEY` or `CODEX_API_KEY` | `@openai/codex` |
 
 ## Update an agent
 
