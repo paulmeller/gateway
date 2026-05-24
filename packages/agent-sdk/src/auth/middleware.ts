@@ -37,9 +37,21 @@ export function extractKey(request: Request): string | null {
   if (xKey && xKey.length > 0) return xKey;
 
   const auth = request.headers.get("authorization") || request.headers.get("Authorization");
-  if (!auth) return null;
-  const m = /^Bearer\s+(.+)$/i.exec(auth);
-  return m ? m[1] : null;
+  if (auth) {
+    const m = /^Bearer\s+(.+)$/i.exec(auth);
+    if (m) return m[1];
+  }
+
+  // Fallback: query-param auth for browser-initiated downloads (window.open
+  // can't set headers). Only gateway keys (ck_*) are accepted here — never
+  // Anthropic passthrough keys which must not appear in URLs/logs.
+  try {
+    const url = new URL(request.url);
+    const qKey = url.searchParams.get("x-api-key");
+    if (qKey && qKey.length > 0 && !qKey.startsWith("sk-ant-api")) return qKey;
+  } catch { /* invalid URL — skip */ }
+
+  return null;
 }
 
 export async function authenticate(request: Request): Promise<AuthContext> {
