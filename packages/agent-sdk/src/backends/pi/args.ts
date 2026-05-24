@@ -26,6 +26,18 @@ export interface BuildPiArgsInput {
   prompt: string;
 }
 
+/**
+ * Pi CLI requires provider-prefixed model IDs (e.g., "google/gemini-2.5-flash").
+ * Normalize bare model IDs to include the provider prefix.
+ */
+function normalizePiModel(model: string): string {
+  if (model.includes("/")) return model; // Already prefixed
+  if (model.startsWith("gemini-")) return `google/${model}`;
+  if (model.startsWith("claude-")) return `anthropic/${model}`;
+  if (model.startsWith("gpt-") || model.startsWith("o1-") || model.startsWith("o3-") || model.startsWith("o4-") || model.startsWith("chatgpt-")) return `openai/${model}`;
+  return model; // Unknown prefix — pass through and let pi CLI error
+}
+
 export function buildPiArgs(input: BuildPiArgsInput): string[] {
   const args: string[] = [
     "-p",
@@ -38,7 +50,7 @@ export function buildPiArgs(input: BuildPiArgsInput): string[] {
   }
 
   if (input.agent.model) {
-    args.push("--model", input.agent.model.id);
+    args.push("--model", normalizePiModel(input.agent.model.id));
   }
 
   // Positional prompt argument — pi treats the first non-flag arg as the prompt.
