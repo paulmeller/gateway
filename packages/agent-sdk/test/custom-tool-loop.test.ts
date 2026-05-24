@@ -347,19 +347,6 @@ describe("custom tool loop prevention", () => {
   // -------------------------------------------------------------------------
 
   describe("per-turn call cap via checkToolBridgeSentinel", () => {
-    /**
-     * We can't call checkToolBridgeSentinel directly (not exported), but we
-     * can observe its behavior through the tool bridge poll interval during
-     * runTurn. Instead, we test the observable contract:
-     *
-     * - getPendingToolBridgeCalls() tracks in-flight calls
-     * - After a turn completes, the counter is reset
-     * - writeToolBridgeResponse clears the pending flag
-     *
-     * For the cap itself, we verify the module-level constant indirectly
-     * through a mock-driven integration test.
-     */
-
     it("pendingToolBridgeCalls prevents duplicate sentinel checks", async () => {
       await seedSession("sess_dup");
       const { getPendingToolBridgeCalls } = await import("../src/sessions/driver");
@@ -529,6 +516,192 @@ describe("custom tool loop prevention", () => {
 
       // pendingToolBridgeCalls should still be cleared
       expect(getPendingToolBridgeCalls().has(sessionId)).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 5. checkToolBridgeSentinel — stale sentinel / non-JSON cleanup
+  // -------------------------------------------------------------------------
+
+  describe("checkToolBridgeSentinel stale sentinel cleanup", () => {
+    const dummyTrace = {
+      trace_id: "trace_test",
+      span_id: "span_test",
+      parent_span_id: null as string | null,
+    };
+
+    it("removes pending sentinel when cat exits non-zero (file missing)", async () => {
+      await seedSession("sess_cat_fail");
+      const { checkToolBridgeSentinel, getPendingToolBridgeCalls } = await import(
+        "../src/sessions/driver"
+      );
+
+      // Grab the mock provider from registry
+      const { resolveProvider } = await import("../src/providers/registry");
+      const provider = await resolveProvider();
+
+      // exec call 1: test -f pending → exists (exit 0)
+      // exec call 2: cat request.json → fails (exit 1, stderr has cat error)
+      // exec call 3: rm -f pending → cleanup
+      execResponses = [
+        { stdout: "", stderr: "", exit_code: 0 },
+        { stdout: "", stderr: "/usr/bin/cat: /tmp/tool-bridge/request.json: No such file or directory", exit_code: 1 },
+        { stdout: "", stderr: "", exit_code: 0 },
+      ];
+
+      await checkToolBridgeSentinel("sess_cat_fail", "ca-sess-fake", provider, undefined, dummyTrace);
+
+      // Should have called rm -f to clean up the stale sentinel
+      const rmCall = execCalls.find(c => c.argv.includes("rm") && c.argv.includes("/tmp/tool-bridge/pending"));
+      expect(rmCall).toBeDefined();
+
+      // Should NOT have marked as pending (no event emitted)
+      expect(getPendingToolBridgeCalls().has("sess_cat_fail")).toBe(false);
+    });
+
+    it("removes pending sentinel when stdout is not JSON (stderr leaked into stdout)", async () => {
+      await seedSession("sess_not_json");
+      const { checkToolBridgeSentinel, getPendingToolBridgeCalls } = await import(
+        "../src/sessions/driver"
+      );
+      const { resolveProvider } = await import("../src/providers/registry");
+      const provider = await resolveProvider();
+
+      // test -f pending → exists
+      // cat request.json → exit 0 but stdout is a file path (sprites text-response path)
+      // rm -f pending → cleanup
+      execResponses = [
+        { stdout: "", stderr: "", exit_code: 0 },
+        { stdout: "/usr/bin/cat: /tmp/tool-bridge/request.json: No such file or directory", stderr: "", exit_code: 0 },
+        { stdout: "", stderr: "", exit_code: 0 },
+      ];
+
+      await checkToolBridgeSentinel("sess_not_json", "ca-sess-fake", provider, undefined, dummyTrace);
+
+      // Should have cleaned up the sentinel
+      const rmCall = execCalls.find(c => c.argv.includes("rm") && c.argv.includes("/tmp/tool-bridge/pending"));
+      expect(rmCall).toBeDefined();
+
+      expect(getPendingToolBridgeCalls().has("sess_not_json")).toBe(false);
+    });
+
+    it("removes pending sentinel on JSON parse error (truncated JSON)", async () => {
+      await seedSession("sess_truncated");
+      const { checkToolBridgeSentinel, getPendingToolBridgeCalls } = await import(
+        "../src/sessions/driver"
+      );
+      const { resolveProvider } = await import("../src/providers/registry");
+      const provider = await resolveProvider();
+
+      // test -f pending → exists
+      // cat request.json → exit 0, stdout is truncated JSON
+      // rm -f pending → cleanup
+      execResponses = [
+        { stdout: "", stderr: "", exit_code: 0 },
+        { stdout: '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"save', stderr: "", exit_code: 0 },
+        { stdout: "", stderr: "", exit_code: 0 },
+      ];
+
+      await checkToolBridgeSentinel("sess_truncated", "ca-sess-fake", provider, undefined, dummyTrace);
+
+      // Should have cleaned up the sentinel (catch block removes it)
+      const rmCall = execCalls.find(c => c.argv.includes("rm") && c.argv.includes("/tmp/tool-bridge/pending"));
+      expect(rmCall).toBeDefined();
+
+      expect(getPendingToolBridgeCalls().has("sess_truncated")).toBe(false);
+    });
+
+    it("succeeds and emits event when request.json contains valid MCP JSON", async () => {
+      await seedSession("sess_valid");
+      const { checkToolBridgeSentinel, getPendingToolBridgeCalls } = await import(
+        "../src/sessions/driver"
+      );
+      const { resolveProvider } = await import("../src/providers/registry");
+      const provider = await resolveProvider();
+
+      const validBody = JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: { name: "save_output", arguments: { data: "hello" } },
+      });
+
+      // test -f pending → exists
+      // cat request.json → valid JSON
+      execResponses = [
+        { stdout: "", stderr: "", exit_code: 0 },
+        { stdout: validBody, stderr: "", exit_code: 0 },
+      ];
+
+      await checkToolBridgeSentinel("sess_valid", "ca-sess-fake", provider, undefined, dummyTrace);
+
+      // Should have marked as pending (event was emitted)
+      expect(getPendingToolBridgeCalls().has("sess_valid")).toBe(true);
+
+      // Should NOT have called rm -f pending (no cleanup needed)
+      const rmCall = execCalls.find(c => c.argv.includes("rm") && c.argv.includes("/tmp/tool-bridge/pending"));
+      expect(rmCall).toBeUndefined();
+
+      // Clean up for other tests
+      getPendingToolBridgeCalls().delete("sess_valid");
+    });
+
+    it("does not retry after cleanup — second call with no pending returns immediately", async () => {
+      await seedSession("sess_no_retry");
+      const { checkToolBridgeSentinel } = await import("../src/sessions/driver");
+      const { resolveProvider } = await import("../src/providers/registry");
+      const provider = await resolveProvider();
+
+      // First call: sentinel exists, cat fails → cleanup
+      execResponses = [
+        { stdout: "", stderr: "", exit_code: 0 },   // test -f pending → exists
+        { stdout: "/usr/bin/cat: No such file", stderr: "", exit_code: 0 }, // cat → non-JSON
+        { stdout: "", stderr: "", exit_code: 0 },   // rm -f pending → cleanup
+      ];
+      await checkToolBridgeSentinel("sess_no_retry", "ca-sess-fake", provider, undefined, dummyTrace);
+
+      const callsAfterFirst = execCalls.length;
+
+      // Second call: sentinel was removed, test -f returns non-zero
+      execResponses = [
+        ...execResponses,
+        { stdout: "", stderr: "", exit_code: 1 },   // test -f pending → not found
+      ];
+      await checkToolBridgeSentinel("sess_no_retry", "ca-sess-fake", provider, undefined, dummyTrace);
+
+      // Should have made exactly 1 more exec call (test -f) and returned early
+      expect(execCalls.length).toBe(callsAfterFirst + 1);
+      expect(execCalls[callsAfterFirst].argv).toContain("test");
+    });
+
+    it("handles stdout with control characters before valid JSON", async () => {
+      await seedSession("sess_ctrl");
+      const { checkToolBridgeSentinel, getPendingToolBridgeCalls } = await import(
+        "../src/sessions/driver"
+      );
+      const { resolveProvider } = await import("../src/providers/registry");
+      const provider = await resolveProvider();
+
+      const validBody = JSON.stringify({
+        jsonrpc: "2.0",
+        id: 5,
+        method: "tools/call",
+        params: { name: "save_output", arguments: { x: 1 } },
+      });
+
+      // Prepend control chars (sprites multiplexing bytes)
+      const withControlChars = "\x01\x00\x00\x00" + validBody;
+
+      execResponses = [
+        { stdout: "", stderr: "", exit_code: 0 },
+        { stdout: withControlChars, stderr: "", exit_code: 0 },
+      ];
+
+      await checkToolBridgeSentinel("sess_ctrl", "ca-sess-fake", provider, undefined, dummyTrace);
+
+      // Should succeed — control chars stripped, JSON parsed
+      expect(getPendingToolBridgeCalls().has("sess_ctrl")).toBe(true);
+      getPendingToolBridgeCalls().delete("sess_ctrl");
     });
   });
 });

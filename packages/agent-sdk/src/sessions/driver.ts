@@ -1212,7 +1212,7 @@ export function getPendingToolBridgeCalls(): Set<string> {
  * during the stream loop so the MCP bridge inside the container isn't
  * blocked waiting for response.json that nobody writes.
  */
-async function checkToolBridgeSentinel(
+export async function checkToolBridgeSentinel(
   sessionId: string,
   sandboxName: string,
   provider: ContainerProvider,
@@ -1252,8 +1252,28 @@ async function checkToolBridgeSentinel(
       ["cat", TOOL_BRIDGE_REQUEST_PATH],
       { secrets, timeoutMs: 5000 },
     );
+
+    // If cat failed (file missing, permission denied, etc.), the pending
+    // sentinel is stale — remove it so we don't retry every poll interval.
+    if (result.exit_code !== 0) {
+      console.warn(
+        `[driver] tool bridge request file unreadable for ${sessionId} (exit ${result.exit_code}): ${(result.stderr || result.stdout).slice(0, 200)}`,
+      );
+      await provider.exec(sandboxName, ["rm", "-f", TOOL_BRIDGE_PENDING_PATH], { secrets }).catch(() => {});
+      return;
+    }
+
     // Strip sprites HTTP exec control chars (stdout/stderr multiplexing)
-    const clean = result.stdout.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+    const clean = result.stdout.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "").trim();
+
+    if (!clean.startsWith("{")) {
+      console.warn(
+        `[driver] tool bridge request for ${sessionId} is not JSON (starts with ${JSON.stringify(clean.slice(0, 40))}), removing stale sentinel`,
+      );
+      await provider.exec(sandboxName, ["rm", "-f", TOOL_BRIDGE_PENDING_PATH], { secrets }).catch(() => {});
+      return;
+    }
+
     const raw = JSON.parse(clean) as Record<string, unknown>;
 
     // Normalize: extract from MCP envelope if present
@@ -1270,6 +1290,9 @@ async function checkToolBridgeSentinel(
     }
   } catch (err) {
     console.warn(`[driver] failed to read tool bridge request for ${sessionId}:`, err);
+    // Remove the pending sentinel to break the retry loop — the bridge
+    // script will re-create it on the next tool call if needed.
+    await provider.exec(sandboxName, ["rm", "-f", TOOL_BRIDGE_PENDING_PATH], { secrets }).catch(() => {});
     return;
   }
 
