@@ -102,6 +102,7 @@ export function hydrateSession(row: SessionRow): Session {
       : [],
     resources,
     vault_ids: row.vault_ids_json ? (JSON.parse(row.vault_ids_json) as string[]) : [],
+    user_profile_id: row.user_profile_id ?? null,
     parent_session_id: row.parent_session_id ?? null,
     thread_depth: row.thread_depth ?? 0,
     stats: {
@@ -137,6 +138,7 @@ export function createSession(input: {
   max_wall_duration_ms?: number | null;
   resources?: SessionResource[] | null;
   vault_ids?: string[] | null;
+  user_profile_id?: string | null;
   parent_session_id?: string | null;
   thread_depth?: number;
   /** v0.4: the API key that authenticated this session creation, for cost attribution. */
@@ -161,6 +163,7 @@ export function createSession(input: {
     max_wall_duration_ms: input.max_wall_duration_ms ?? null,
     resources_json: input.resources ? JSON.stringify(input.resources) : null,
     vault_ids_json: input.vault_ids ? JSON.stringify(input.vault_ids) : null,
+    user_profile_id: input.user_profile_id ?? null,
     parent_session_id: input.parent_session_id ?? null,
     thread_depth: input.thread_depth ?? 0,
     api_key_id: input.api_key_id ?? null,

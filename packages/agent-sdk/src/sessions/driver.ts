@@ -124,7 +124,7 @@ export async function runTurn(
   // bypass, MCP auth header injection, and env var injection.
   const vaultEntries: Array<{ key: string; value: string }> = [];
   if (session.vault_ids && session.vault_ids.length > 0) {
-    const secrets = loadSessionSecrets(session.vault_ids);
+    const secrets = loadSessionSecrets(session.vault_ids, session.user_profile_id);
     vaultEntries.push(...secrets.map(s => ({ key: s.key, value: s.value })));
   }
   const hasVaultKeys = vaultEntries.length > 0;

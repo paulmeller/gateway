@@ -8,6 +8,7 @@
  */
 import { listEntries } from "../db/vaults";
 import { listCredentialsWithTokens } from "../db/credentials";
+import { getUserProfile } from "../db/user-profiles";
 
 export interface SessionSecret {
   key: string;
@@ -17,18 +18,36 @@ export interface SessionSecret {
 /**
  * Load all secrets for a set of vault IDs. Returns vault entries + credential
  * tokens (the latter mapped to MCP_AUTH_* keys when mcp_server_url is present).
+ *
+ * When userProfileId is provided, credentials are filtered by the profile's
+ * trust_grants — only credentials explicitly granted to the user are loaded.
+ * Vault entries (key/value) are always loaded regardless of profile.
  */
-export function loadSessionSecrets(vaultIds: string[]): SessionSecret[] {
+export function loadSessionSecrets(vaultIds: string[], userProfileId?: string | null): SessionSecret[] {
+  // Build credential allowlist from user profile trust grants
+  let credentialAllowlist: Set<string> | null = null;
+  if (userProfileId) {
+    const profile = getUserProfile(userProfileId);
+    if (profile && profile.trust_grants.length > 0) {
+      credentialAllowlist = new Set(
+        profile.trust_grants.map(g => `${g.vault_id}:${g.credential_id}`)
+      );
+    }
+  }
+
   const secrets: SessionSecret[] = [];
 
   for (const vid of vaultIds) {
-    // 1. Standard vault entries
+    // 1. Standard vault entries — always loaded, not filtered by profile
     for (const entry of listEntries(vid)) {
       secrets.push({ key: entry.key, value: entry.value });
     }
 
     // 2. Credentials -> derive MCP_AUTH_* keys from mcp_server_url
+    //    Filtered by trust grants when a user profile is set.
     for (const cred of listCredentialsWithTokens(vid)) {
+      if (credentialAllowlist && !credentialAllowlist.has(`${vid}:${cred.id}`)) continue;
+
       if (cred.auth.mcp_server_url) {
         // Derive a server name from the URL: extract hostname, strip common prefixes
         const serverName = deriveServerName(cred.auth.mcp_server_url);

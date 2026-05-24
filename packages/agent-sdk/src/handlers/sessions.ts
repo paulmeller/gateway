@@ -117,6 +117,7 @@ const CreateSchema = z.object({
   max_wall_duration_ms: z.number().int().positive().optional(),
   resources: z.array(ResourceSchema).optional(),
   vault_ids: z.array(z.string()).optional(),
+  user_profile_id: z.string().optional(),
 });
 
 const UpdateSchema = z.object({
@@ -292,6 +293,16 @@ export function handleCreateSession(request: Request): Promise<Response> {
         }
       }
 
+      // User profile validation: ensure it exists and belongs to the caller's tenant.
+      if (data.user_profile_id) {
+        const { getUserProfile } = await import("../db/user-profiles");
+        const profile = getUserProfile(data.user_profile_id);
+        if (!profile) throw badRequest(`user profile not found: ${data.user_profile_id}`);
+        if (profile.tenant_id && profile.tenant_id !== agentTenantId) {
+          throw badRequest(`user profile does not belong to this tenant`);
+        }
+      }
+
       // Memory store resources: validate existence, enforce max 8 per session.
       if (data.resources?.length) {
         const memStoreResources = data.resources.filter(r => r.type === "memory_store");
@@ -351,6 +362,7 @@ export function handleCreateSession(request: Request): Promise<Response> {
           max_wall_duration_ms: data.max_wall_duration_ms ?? null,
           resources: data.resources?.length ? data.resources : null,
           vault_ids: data.vault_ids?.length ? data.vault_ids : null,
+          user_profile_id: data.user_profile_id ?? null,
           api_key_id: auth.keyId,
           tenant_id: agentTenantId,
         });
@@ -431,6 +443,7 @@ export function handleCreateSession(request: Request): Promise<Response> {
         max_wall_duration_ms: data.max_wall_duration_ms ?? null,
         resources: data.resources?.length ? data.resources : null,
         vault_ids: data.vault_ids?.length ? data.vault_ids : null,
+        user_profile_id: data.user_profile_id ?? null,
         api_key_id: auth.keyId,
         tenant_id: agentTenantId,
       });

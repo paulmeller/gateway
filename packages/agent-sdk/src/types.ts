@@ -292,6 +292,8 @@ export interface SessionRow {
   vault_ids_json: string | null;
   parent_session_id: string | null;
   thread_depth: number;
+  /** User profile scoping. Null = no profile attached. */
+  user_profile_id: string | null;
   /** v0.4+: API key that authenticated the session creation. Null for pre-0.4 rows. */
   api_key_id: string | null;
   /** v0.5: tenant ownership. Null = legacy/global (pre-migration). */
@@ -356,6 +358,7 @@ export interface Session {
   outcome_evaluations: OutcomeEvaluation[];
   resources: SessionResource[];
   vault_ids: string[];
+  user_profile_id: string | null;
   parent_session_id: string | null;
   thread_depth: number;
   stats: {

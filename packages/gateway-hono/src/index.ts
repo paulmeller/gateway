@@ -133,6 +133,8 @@ import {
   handleListUserProfiles,
   handleGetUserProfile,
   handleUpdateUserProfile,
+  handleEnrollmentUrl,
+  handleOAuthCallback,
 } from "@agentstep/agent-sdk/handlers";
 
 import { cors } from "hono/cors";
@@ -462,7 +464,8 @@ app.post("/v1/user_profiles", (c) => handleCreateUserProfile(c.req.raw));
 app.get("/v1/user_profiles", (c) => handleListUserProfiles(c.req.raw));
 app.get("/v1/user_profiles/:id", (c) => handleGetUserProfile(c.req.raw, c.req.param("id")));
 app.post("/v1/user_profiles/:id", (c) => handleUpdateUserProfile(c.req.raw, c.req.param("id")));
-app.post("/v1/user_profiles/:id/enrollment_url", notImplemented("User profile enrollment URL (requires OAuth callback server)"));
+app.post("/v1/user_profiles/:id/enrollment_url", (c) => handleEnrollmentUrl(c.req.raw, c.req.param("id")));
+app.get("/v1/oauth/callback", (c) => handleOAuthCallback(c.req.raw));
 app.post("/v1/vaults/:id/credentials/:credId/mcp_oauth_validate", (c) => handleMcpOauthValidate(c.req.raw, c.req.param("id"), c.req.param("credId")));
 
 // ── SPA catch-all (must be last) ────────────────────────────────────────────

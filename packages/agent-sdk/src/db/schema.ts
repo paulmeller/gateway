@@ -146,6 +146,8 @@ export const sessions = sqliteTable("sessions", {
   api_key_id: text("api_key_id"),
   // v0.5 ALTER TABLE addition:
   tenant_id: text("tenant_id"),
+  // User profile scoping:
+  user_profile_id: text("user_profile_id"),
   created_at: integer("created_at").notNull(),
   updated_at: integer("updated_at").notNull(),
   archived_at: integer("archived_at"),

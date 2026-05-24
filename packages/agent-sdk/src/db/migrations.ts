@@ -890,4 +890,9 @@ export function runMigrations(db: InstanceType<typeof Database>): void {
       UNIQUE(tenant_id, external_id)
     )
   `);
+
+  // Add user_profile_id to sessions (safe ALTER — column may already exist)
+  try {
+    db.exec(`ALTER TABLE sessions ADD COLUMN user_profile_id TEXT`);
+  } catch { /* column already exists */ }
 }
