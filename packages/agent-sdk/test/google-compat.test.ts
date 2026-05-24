@@ -527,6 +527,221 @@ describe("Google Interactions API compatibility", () => {
     expect(buf.toString("utf8", 0, 10)).toBe("output.txt");
   });
 
+  it("POST /google/v1beta/interactions/:id/cancel updates status to cancelled", async () => {
+    await bootDb();
+    await createReadyEnv();
+
+    const fake = await import("./helpers/fake-exec");
+    fake.resetQueue();
+
+    fake.enqueueTurn({
+      ndjson: [
+        '{"type":"init","session_id":"gemini_cancel_1","model":"gemini-2.5-flash"}',
+        '{"type":"message","role":"assistant","content":"Working on it..."}',
+        '{"type":"result","stats":{"input_tokens":8,"output_tokens":4,"cost_usd":0.0001,"num_turns":1}}',
+      ],
+    });
+
+    const { handleCreateInteraction, handleCancelInteraction } = await import("../src/handlers/google-compat");
+
+    // Create an interaction first
+    const createRes = await handleCreateInteraction(req("/google/v1beta/interactions", {
+      body: { model: "gemini-2.5-flash", input: "Do something long" },
+    }));
+    expect(createRes.status).toBe(200);
+    const created = await createRes.json();
+    expect(created.id).toMatch(/^int_/);
+
+    // Cancel it
+    const cancelRes = await handleCancelInteraction(req(`/google/v1beta/interactions/${created.id}/cancel`, { method: "POST" }), created.id);
+    expect(cancelRes.status).toBe(200);
+    const cancelBody = await cancelRes.json();
+    expect(cancelBody.id).toBe(created.id);
+    expect(cancelBody.status).toBe("cancelled");
+  });
+
+  it("returns 404 when previous_interaction_id is invalid", async () => {
+    await bootDb();
+    await createReadyEnv();
+
+    const { handleCreateInteraction } = await import("../src/handlers/google-compat");
+
+    const res = await handleCreateInteraction(req("/google/v1beta/interactions", {
+      body: {
+        model: "gemini-2.5-flash",
+        input: "Follow up message",
+        previous_interaction_id: "int_nonexistent_12345",
+      },
+    }));
+    expect(res.status).toBe(404);
+  });
+
+  it("passes system_instruction to agent creation", async () => {
+    await bootDb();
+    await createReadyEnv();
+
+    const fake = await import("./helpers/fake-exec");
+    fake.resetQueue();
+
+    fake.enqueueTurn({
+      ndjson: [
+        '{"type":"init","session_id":"gemini_sys_1","model":"gemini-2.5-flash"}',
+        '{"type":"message","role":"assistant","content":"I am a pirate!"}',
+        '{"type":"result","stats":{"input_tokens":10,"output_tokens":5,"cost_usd":0.0001,"num_turns":1}}',
+      ],
+    });
+
+    const { handleCreateInteraction } = await import("../src/handlers/google-compat");
+    const { handleListAgents } = await import("../src/handlers/agents");
+
+    // Create interaction with system_instruction
+    const res = await handleCreateInteraction(req("/google/v1beta/interactions", {
+      body: {
+        model: "gemini-2.5-flash",
+        input: "Say hello",
+        system_instruction: "You are a pirate. Always talk like one.",
+      },
+    }));
+    expect(res.status).toBe(200);
+
+    // Check the auto-created agent has the system prompt set
+    const listRes = await handleListAgents(req("/v1/agents?limit=100"));
+    const listBody = await listRes.json();
+    const agent = listBody.data.find((a: any) => a.system === "You are a pirate. Always talk like one.");
+    expect(agent).toBeDefined();
+    expect(agent.system).toBe("You are a pirate. Always talk like one.");
+  });
+
+  it("maps antigravity-preview-05-2026 to gemini engine", async () => {
+    await bootDb();
+
+    const { handleCreateGoogleAgent } = await import("../src/handlers/google-compat");
+    const { handleListAgents } = await import("../src/handlers/agents");
+
+    // Create a Google agent with base_agent
+    const res = await handleCreateGoogleAgent(req("/google/v1beta/agents", {
+      body: {
+        id: "engine-test-agent",
+        base_agent: "antigravity-preview-05-2026",
+      },
+    }));
+    expect(res.status).toBe(201);
+
+    // Verify the internal agent has engine "gemini"
+    const listRes = await handleListAgents(req("/v1/agents?limit=100"));
+    const listBody = await listRes.json();
+    const agent = listBody.data.find((a: any) => a.name === "engine-test-agent");
+    expect(agent).toBeDefined();
+    expect(agent.engine).toBe("gemini");
+  });
+
+  it("extracts skills from .agents/skills/*/SKILL.md sources", async () => {
+    await bootDb();
+
+    const { handleCreateGoogleAgent } = await import("../src/handlers/google-compat");
+    const { handleListAgents } = await import("../src/handlers/agents");
+
+    const res = await handleCreateGoogleAgent(req("/google/v1beta/agents", {
+      body: {
+        id: "skills-test-agent",
+        base_agent: "antigravity-preview-05-2026",
+        base_environment: {
+          type: "container",
+          sources: [
+            { target: ".agents/skills/weather/SKILL.md", content: "# Weather Skill\nGet weather data." },
+            { target: ".agents/skills/calendar/SKILL.md", content: "# Calendar Skill\nManage events." },
+          ],
+        },
+      },
+    }));
+    expect(res.status).toBe(201);
+
+    // Verify the internal agent has skills attached
+    const listRes = await handleListAgents(req("/v1/agents?limit=100"));
+    const listBody = await listRes.json();
+    const agent = listBody.data.find((a: any) => a.name === "skills-test-agent");
+    expect(agent).toBeDefined();
+    expect(agent.skills).toBeDefined();
+    expect(Array.isArray(agent.skills)).toBe(true);
+    expect(agent.skills.length).toBe(2);
+    const skillNames = agent.skills.map((s: any) => s.name);
+    expect(skillNames).toContain("weather");
+    expect(skillNames).toContain("calendar");
+  });
+
+  it("multi-turn with previous_interaction_id sends message to same session", async () => {
+    await bootDb();
+    await createReadyEnv();
+
+    const fake = await import("./helpers/fake-exec");
+    fake.resetQueue();
+
+    // First turn
+    fake.enqueueTurn({
+      ndjson: [
+        '{"type":"init","session_id":"gemini_multi_1","model":"gemini-2.5-flash"}',
+        '{"type":"message","role":"assistant","content":"First response."}',
+        '{"type":"result","stats":{"input_tokens":5,"output_tokens":3,"cost_usd":0.0001,"num_turns":1}}',
+      ],
+    });
+
+    // Second turn (same session)
+    fake.enqueueTurn({
+      ndjson: [
+        '{"type":"init","session_id":"gemini_multi_1","model":"gemini-2.5-flash"}',
+        '{"type":"message","role":"assistant","content":"Second response."}',
+        '{"type":"result","stats":{"input_tokens":10,"output_tokens":3,"cost_usd":0.0001,"num_turns":1}}',
+      ],
+    });
+
+    const { handleCreateInteraction } = await import("../src/handlers/google-compat");
+
+    // First interaction creates the session
+    const res1 = await handleCreateInteraction(req("/google/v1beta/interactions", {
+      body: { model: "gemini-2.5-flash", input: "Hello" },
+    }));
+    expect(res1.status).toBe(200);
+    const body1 = await res1.json();
+    const firstId = body1.id;
+
+    // Second interaction with previous_interaction_id
+    const res2 = await handleCreateInteraction(req("/google/v1beta/interactions", {
+      body: {
+        model: "gemini-2.5-flash",
+        input: "Follow up",
+        previous_interaction_id: firstId,
+      },
+    }));
+    expect(res2.status).toBe(200);
+    const body2 = await res2.json();
+    expect(body2.id).toBeDefined();
+    expect(body2.id).not.toBe(firstId);
+    expect(body2.status).toBe("completed");
+
+    // Verify both interactions share the same session and seq is incremented
+    const { getDb } = await import("../src/db/client");
+    const db = getDb();
+    const rows = db.prepare(
+      `SELECT id, session_id, seq FROM google_interactions ORDER BY seq ASC`
+    ).all() as Array<{ id: string; session_id: string; seq: number }>;
+    expect(rows.length).toBe(2);
+    expect(rows[0].session_id).toBe(rows[1].session_id);
+    expect(rows[0].seq).toBe(1);
+    expect(rows[1].seq).toBe(2);
+  });
+
+  it("POST /google/v1beta/interactions/:id/cancel returns 404 for unknown", async () => {
+    await bootDb();
+
+    const { handleCancelInteraction } = await import("../src/handlers/google-compat");
+
+    const res = await handleCancelInteraction(
+      req("/google/v1beta/interactions/int_nonexistent/cancel", { method: "POST" }),
+      "int_nonexistent",
+    );
+    expect(res.status).toBe(404);
+  });
+
   it("reuses existing agent with same name on second call", async () => {
     await bootDb();
     await createReadyEnv();
