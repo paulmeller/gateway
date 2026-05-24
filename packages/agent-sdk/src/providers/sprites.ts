@@ -35,15 +35,16 @@ export const spritesProvider: ContainerProvider = {
   async create({ name, secrets }) {
     const token = secrets?.SPRITE_TOKEN;
     const sprite = await createSprite({ name, tokenOverride: token });
-    if (sprite.status === "running") return;
+    if (sprite.status === "warm" || sprite.status === "running") return;
 
-    // Container isn't ready yet — poll until it transitions to "running".
-    // Without this, exec calls immediately after create fail with 502.
+    // Container is cold — poll until it transitions to "warm" or "running".
+    // Sprites containers go cold → warm (ready for exec) → running (active exec).
+    // Most containers become warm within a few seconds.
     const deadline = Date.now() + READY_POLL_TIMEOUT_MS;
     while (Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, READY_POLL_INTERVAL_MS));
       const s = await getSprite(name, token);
-      if (s?.status === "running") return;
+      if (s?.status === "warm" || s?.status === "running") return;
     }
     throw new Error(`sprites.dev container ${name} not ready after 30s`);
   },

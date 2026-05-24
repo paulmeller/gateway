@@ -58,12 +58,21 @@ describe("sprites provider container readiness", () => {
     expect(mockGetSprite).not.toHaveBeenCalled();
   });
 
+  it("returns immediately when createSprite returns status warm", async () => {
+    mockCreateSprite.mockResolvedValue({ name: "ca-sess-test", status: "warm" });
+
+    await spritesProvider.create({ name: "ca-sess-test" });
+
+    expect(mockCreateSprite).toHaveBeenCalledTimes(1);
+    expect(mockGetSprite).not.toHaveBeenCalled();
+  });
+
   it("polls getSprite when createSprite returns status cold", async () => {
     mockCreateSprite.mockResolvedValue({ name: "ca-sess-test", status: "cold" });
     mockGetSprite
       .mockResolvedValueOnce({ name: "ca-sess-test", status: "cold" })
       .mockResolvedValueOnce({ name: "ca-sess-test", status: "cold" })
-      .mockResolvedValueOnce({ name: "ca-sess-test", status: "running" });
+      .mockResolvedValueOnce({ name: "ca-sess-test", status: "warm" });
 
     const createPromise = spritesProvider.create({ name: "ca-sess-test" });
 
@@ -76,17 +85,6 @@ describe("sprites provider container readiness", () => {
 
     expect(mockGetSprite).toHaveBeenCalledTimes(3);
     expect(mockGetSprite).toHaveBeenCalledWith("ca-sess-test", undefined);
-  });
-
-  it("polls getSprite when createSprite returns status warm", async () => {
-    mockCreateSprite.mockResolvedValue({ name: "ca-sess-test", status: "warm" });
-    mockGetSprite.mockResolvedValueOnce({ name: "ca-sess-test", status: "running" });
-
-    const createPromise = spritesProvider.create({ name: "ca-sess-test" });
-    await vi.advanceTimersByTimeAsync(500);
-    await createPromise;
-
-    expect(mockGetSprite).toHaveBeenCalledTimes(1);
   });
 
   it("times out when container never becomes running", async () => {
@@ -116,7 +114,7 @@ describe("sprites provider container readiness", () => {
 
   it("passes tokenOverride through to getSprite calls", async () => {
     mockCreateSprite.mockResolvedValue({ name: "ca-sess-test", status: "cold" });
-    mockGetSprite.mockResolvedValueOnce({ name: "ca-sess-test", status: "running" });
+    mockGetSprite.mockResolvedValueOnce({ name: "ca-sess-test", status: "warm" });
 
     const createPromise = spritesProvider.create({
       name: "ca-sess-test",
@@ -136,7 +134,7 @@ describe("sprites provider container readiness", () => {
     mockCreateSprite.mockResolvedValue({ name: "ca-sess-test", status: "cold" });
     mockGetSprite
       .mockResolvedValueOnce(null) // sprite disappeared temporarily
-      .mockResolvedValueOnce({ name: "ca-sess-test", status: "running" });
+      .mockResolvedValueOnce({ name: "ca-sess-test", status: "warm" });
 
     const createPromise = spritesProvider.create({ name: "ca-sess-test" });
     await vi.advanceTimersByTimeAsync(500);

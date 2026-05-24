@@ -232,11 +232,23 @@ export async function runTurn(
     }
   }
 
-  // Acquire sandbox if needed
+  // Acquire sandbox if needed. Retry once on transient 502 errors — the
+  // lifecycle cleans up partial containers on failure, so a retry is safe.
   console.log(`[driver] ${sessionId} acquiring container...`);
   let sandboxName: string;
   try {
-    sandboxName = await acquireForFirstTurn(sessionId);
+    try {
+      sandboxName = await acquireForFirstTurn(sessionId);
+    } catch (firstErr) {
+      const firstMsg = firstErr instanceof Error ? firstErr.message : String(firstErr);
+      if (firstMsg.includes("httpExec: 502") || firstMsg.includes("httpExec: 503")) {
+        console.warn(`[driver] ${sessionId} transient container setup error, retrying: ${firstMsg}`);
+        await new Promise((r) => setTimeout(r, 2000));
+        sandboxName = await acquireForFirstTurn(sessionId);
+      } else {
+        throw firstErr;
+      }
+    }
     console.log(`[driver] ${sessionId} container ready: ${sandboxName}`);
 
     // Resolve vault secrets once for any post-acquire provider work below.
