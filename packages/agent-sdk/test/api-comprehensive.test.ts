@@ -287,6 +287,21 @@ describe("Agents", () => {
     expect(res.status).toBe(404);
   });
 
+  it("auto-infers engine from model prefix when engine is omitted", async () => {
+    await bootDb();
+    const { handleCreateAgent } = await import("../src/handlers/agents");
+
+    // gemini-* model → engine should be "gemini"
+    const res = await handleCreateAgent(
+      req("/v1/agents", {
+        body: { name: "GeminiAgent", model: { id: "gemini-2.5-flash" } },
+      }),
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.engine).toBe("gemini");
+  });
+
   it("creates agent with tools for non-claude backend -> 400", async () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");

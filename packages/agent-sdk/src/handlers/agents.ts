@@ -337,7 +337,12 @@ export function handleCreateAgent(request: Request): Promise<Response> {
       throw conflict(`Agent with name "${parsed.data.name}" already exists`);
     }
 
-    const backendName = parsed.data.engine ?? "claude";
+    // Infer engine from model prefix if not explicitly set.
+    // e.g. "gemini-3.5-flash" → engine "gemini", "gpt-5.4" → engine "codex".
+    const { inferEngineFromModel } = await import("../backends/models");
+    const backendName = (parsed.data.engine
+      ?? inferEngineFromModel(parsed.data.model.id)
+      ?? "claude") as import("../backends/types").AnyBackendName;
 
     if (backendName === "anthropic") {
       const proxyErr = validateAnthropicProxy();

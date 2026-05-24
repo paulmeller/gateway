@@ -54,6 +54,19 @@ export const FALLBACK_MODELS: Record<string, string[]> = {
 export const MODELS = FALLBACK_MODELS;
 
 /**
+ * Infer the engine from a model ID based on well-known prefixes.
+ * Returns the inferred engine or null if the model doesn't match any
+ * known prefix (caller should default to "claude").
+ */
+export function inferEngineFromModel(model: string): string | null {
+  const base = model.replace(/^(anthropic|openai|google)\//, "");
+  if (base.startsWith("gemini-")) return "gemini";
+  if (base.startsWith("gpt-") || base.startsWith("o1-") || base.startsWith("o3-") || base.startsWith("o4-") || base.startsWith("codex-") || base.startsWith("chatgpt-")) return "codex";
+  if (base.startsWith("claude-")) return "claude";
+  return null;
+}
+
+/**
  * Check whether a model is valid for a given engine.
  *
  * 1. Check the static FALLBACK_MODELS (fast, synchronous).
