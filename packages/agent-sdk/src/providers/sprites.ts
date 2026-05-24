@@ -8,12 +8,16 @@
 import type { ContainerProvider, ProviderSecrets } from "./types";
 import {
   createSprite,
+  getSprite,
   deleteSprite,
   listSprites,
   httpExec,
 } from "../containers/client";
 import { startExec } from "../containers/exec";
 import { getConfig } from "../config/index";
+
+const READY_POLL_INTERVAL_MS = 500;
+const READY_POLL_TIMEOUT_MS = 30_000;
 
 export const spritesProvider: ContainerProvider = {
   name: "sprites",
@@ -29,7 +33,19 @@ export const spritesProvider: ContainerProvider = {
   },
 
   async create({ name, secrets }) {
-    await createSprite({ name, tokenOverride: secrets?.SPRITE_TOKEN });
+    const token = secrets?.SPRITE_TOKEN;
+    const sprite = await createSprite({ name, tokenOverride: token });
+    if (sprite.status === "running") return;
+
+    // Container isn't ready yet — poll until it transitions to "running".
+    // Without this, exec calls immediately after create fail with 502.
+    const deadline = Date.now() + READY_POLL_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, READY_POLL_INTERVAL_MS));
+      const s = await getSprite(name, token);
+      if (s?.status === "running") return;
+    }
+    throw new Error(`sprites.dev container ${name} not ready after 30s`);
   },
 
   async delete(name, secrets?) {

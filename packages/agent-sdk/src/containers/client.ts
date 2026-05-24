@@ -123,10 +123,10 @@ export async function createSprite(input: {
   return handleJson<Sprite>(res, "createSprite");
 }
 
-export async function getSprite(name: string): Promise<Sprite | null> {
+export async function getSprite(name: string, tokenOverride?: string): Promise<Sprite | null> {
   const res = await fetch(
     `${api()}/v1/sprites/${encodeURIComponent(name)}`,
-    { headers: authHeaders(), signal: signalFor() },
+    { headers: authHeaders(tokenOverride), signal: signalFor() },
   );
   if (res.status === 404) return null;
   return handleJson<Sprite>(res, "getSprite");
