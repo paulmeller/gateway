@@ -187,6 +187,10 @@ export const AgentSchema = registry.register(
     skills: z.array(AgentSkillSchema).openapi({
       description: "Skills injected into the container at session start. For Claude backend, written to .claude/skills/<name>/SKILL.md. For all backends, also written to .agents/skills/<name>/SKILL.md. Non-Claude backends also receive skills prepended to the system prompt.",
     }),
+    permission_policy: z.object({
+      always_allow: z.array(z.string()).optional(),
+      always_ask: z.array(z.string()).optional(),
+    }).nullable().optional().openapi({ description: "Per-tool permission control." }),
     model_config: ModelConfigSchema.openapi({
       description: "Model configuration options. 'fast' speed enables fast mode on Claude (claude engine only).",
     }),
@@ -454,6 +458,7 @@ export const SessionSchema = registry.register(
     vault_ids: z.array(z.string()).nullable().openapi({
       description: "Vault IDs whose entries are injected as environment variables.",
     }),
+    user_profile_id: z.string().nullable().optional().openapi({ description: "User profile ID for credential scoping." }),
     parent_session_id: z.string().nullable().openapi({
       description: "Parent session ID if this is a child thread session.",
     }),
@@ -492,6 +497,16 @@ export const CreateSessionRequestSchema = registry.register(
         content: z.string().optional(),
       })).optional(),
       vault_ids: z.array(z.string()).optional(),
+      user_profile_id: z.string().optional().openapi({ description: "Links session to a user profile for per-user credential scoping." }),
+      outcomes: z.object({
+        description: z.string(),
+        rubric: z.array(z.object({
+          name: z.string(),
+          description: z.string(),
+          weight: z.number().optional(),
+        })).optional(),
+        max_iterations: z.number().int().optional(),
+      }).optional().openapi({ description: "Success criteria with optional rubric for self-evaluation." }),
     })
     .openapi({
       example: {
@@ -764,6 +779,60 @@ export const VaultEntryListResponseSchema = registry.register(
   "VaultEntryListResponse",
   z.object({ data: z.array(VaultEntrySchema) }),
 );
+
+// ---------------------------------------------------------------------------
+// User Profiles
+// ---------------------------------------------------------------------------
+
+export const TrustGrantSchema = registry.register("TrustGrant", z.object({
+  type: z.literal("vault_credential"),
+  vault_id: z.string(),
+  credential_id: z.string(),
+}));
+
+export const UserProfileSchema = registry.register("UserProfile", z.object({
+  type: z.literal("user_profile"),
+  id: z.string(),
+  external_id: z.string().nullable(),
+  display_name: z.string().nullable(),
+  trust_grants: z.array(TrustGrantSchema),
+  created_at: z.string(),
+  updated_at: z.string(),
+}));
+
+export const UserProfileCreateSchema = registry.register("UserProfileCreate", z.object({
+  external_id: z.string().optional(),
+  display_name: z.string().optional(),
+  trust_grants: z.array(TrustGrantSchema).optional(),
+}));
+
+export const UserProfileUpdateSchema = registry.register("UserProfileUpdate", z.object({
+  external_id: z.string().nullish(),
+  display_name: z.string().nullish(),
+  trust_grants: z.array(TrustGrantSchema).optional(),
+}));
+
+export const UserProfileListSchema = listEnvelope("UserProfileList", UserProfileSchema);
+
+export const EnrollmentUrlRequestSchema = registry.register("EnrollmentUrlRequest", z.object({
+  vault_id: z.string(),
+  credential_id: z.string().optional(),
+  display_name: z.string().optional(),
+  authorize_url: z.string(),
+  token_endpoint: z.string(),
+  client_id: z.string(),
+  client_secret: z.string().optional(),
+  scope: z.string().optional(),
+  redirect_uri: z.string().optional(),
+}));
+
+export const EnrollmentUrlResponseSchema = registry.register("EnrollmentUrlResponse", z.object({
+  type: z.literal("enrollment_url"),
+  url: z.string(),
+  state: z.string(),
+  redirect_uri: z.string(),
+  expires_in: z.number(),
+}));
 
 // ---------------------------------------------------------------------------
 // Delete responses

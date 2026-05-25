@@ -146,7 +146,7 @@ describe("File response shape", () => {
 describe("File list pagination", () => {
   beforeEach(() => freshDbEnv());
 
-  it("returns pagination envelope (data, next_page)", async () => {
+  it("returns pagination envelope (data, has_more, first_id, last_id)", async () => {
     const { key, sessionId } = await seedSession();
     const { handleListFiles } = await import("../src/handlers/files");
 
@@ -159,11 +159,9 @@ describe("File list pagination", () => {
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
     expect(body).toHaveProperty("data");
-    expect(body).toHaveProperty("next_page");
-    expect(body).not.toHaveProperty("has_more");
-    expect(body).not.toHaveProperty("first_id");
-    expect(body).not.toHaveProperty("last_id");
-    expect(body.next_page).toBeNull();
+    expect(body).toHaveProperty("has_more");
+    expect(body).toHaveProperty("first_id");
+    expect(body).toHaveProperty("last_id");
   });
 
   it("after_id cursor returns next page", async () => {
@@ -178,15 +176,15 @@ describe("File list pagination", () => {
     // Get first page (limit 2)
     const page1 = listFiles({ limit: 2, scope_id: "sess_fa" });
     expect(page1.data.length).toBe(2);
-    expect(page1.next_page).toBeTruthy();
+    expect(page1.has_more).toBe(true);
 
-    // Decode cursor to get the last ID for before_id pagination
-    const lastId = Buffer.from(page1.next_page!, "base64url").toString("utf8");
+    // Use last_id for cursor pagination
+    const lastId = page1.last_id!;
 
     // Get second page using cursor
     const page2 = listFiles({ limit: 2, scope_id: "sess_fa", before_id: lastId });
     expect(page2.data.length).toBe(1);
-    expect(page2.next_page).toBeNull();
+    expect(page2.has_more).toBe(false);
   });
 
   it("scope_id filters correctly", async () => {

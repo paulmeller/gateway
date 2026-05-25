@@ -109,6 +109,13 @@ import {
   // Auth
   WhoamiResponseSchema,
   LicenseResponseSchema,
+  // User Profiles
+  UserProfileSchema,
+  UserProfileCreateSchema,
+  UserProfileUpdateSchema,
+  UserProfileListSchema,
+  EnrollmentUrlRequestSchema,
+  EnrollmentUrlResponseSchema,
 } from "./schemas";
 
 // Security scheme: the Managed Agents spec uses `x-api-key` header auth
@@ -2083,6 +2090,106 @@ registry.registerPath({
 });
 
 // ---------------------------------------------------------------------------
+// /v1/user_profiles
+// ---------------------------------------------------------------------------
+
+registry.registerPath({
+  method: "post",
+  path: "/v1/user_profiles",
+  tags: ["User Profiles"],
+  summary: "Create user profile",
+  security: [{ ApiKey: [] }],
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: UserProfileCreateSchema } },
+    },
+  },
+  responses: {
+    201: {
+      description: "Created",
+      content: { "application/json": { schema: UserProfileSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/v1/user_profiles",
+  tags: ["User Profiles"],
+  summary: "List user profiles",
+  security: [{ ApiKey: [] }],
+  responses: {
+    200: {
+      description: "OK",
+      content: { "application/json": { schema: UserProfileListSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/v1/user_profiles/{id}",
+  tags: ["User Profiles"],
+  summary: "Get user profile",
+  security: [{ ApiKey: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: "OK",
+      content: { "application/json": { schema: UserProfileSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/v1/user_profiles/{id}",
+  tags: ["User Profiles"],
+  summary: "Update user profile",
+  security: [{ ApiKey: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      required: true,
+      content: { "application/json": { schema: UserProfileUpdateSchema } },
+    },
+  },
+  responses: {
+    200: {
+      description: "OK",
+      content: { "application/json": { schema: UserProfileSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/v1/user_profiles/{id}/enrollment_url",
+  tags: ["User Profiles"],
+  summary: "Generate OAuth enrollment URL",
+  security: [{ ApiKey: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: {
+      required: true,
+      content: { "application/json": { schema: EnrollmentUrlRequestSchema } },
+    },
+  },
+  responses: {
+    200: {
+      description: "OK",
+      content: { "application/json": { schema: EnrollmentUrlResponseSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+// ---------------------------------------------------------------------------
 // /v1/batch
 // ---------------------------------------------------------------------------
 
@@ -2107,6 +2214,89 @@ registry.registerPath({
     },
     ...ErrorResponses,
   },
+});
+
+// ---------------------------------------------------------------------------
+// Google Interactions API compatibility
+// ---------------------------------------------------------------------------
+
+registry.registerPath({
+  method: "post",
+  path: "/google/v1beta/interactions",
+  tags: ["Google Compat"],
+  summary: "Create interaction (Google compat)",
+  description: "Google Interactions API compatibility. Accepts google-genai SDK format.",
+  responses: { 200: { description: "OK" } },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/google/v1beta/interactions/{id}",
+  tags: ["Google Compat"],
+  summary: "Get interaction (Google compat)",
+  request: { params: z.object({ id: z.string() }) },
+  responses: { 200: { description: "OK" } },
+});
+
+registry.registerPath({
+  method: "delete",
+  path: "/google/v1beta/interactions/{id}",
+  tags: ["Google Compat"],
+  summary: "Delete interaction (Google compat)",
+  request: { params: z.object({ id: z.string() }) },
+  responses: { 200: { description: "OK" } },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/google/v1beta/interactions/{id}/cancel",
+  tags: ["Google Compat"],
+  summary: "Cancel interaction (Google compat)",
+  request: { params: z.object({ id: z.string() }) },
+  responses: { 200: { description: "OK" } },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/google/v1beta/agents",
+  tags: ["Google Compat"],
+  summary: "Create agent (Google compat)",
+  responses: { 201: { description: "Created" } },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/google/v1beta/agents",
+  tags: ["Google Compat"],
+  summary: "List agents (Google compat)",
+  responses: { 200: { description: "OK" } },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/google/v1beta/agents/{id}",
+  tags: ["Google Compat"],
+  summary: "Get agent (Google compat)",
+  request: { params: z.object({ id: z.string() }) },
+  responses: { 200: { description: "OK" } },
+});
+
+registry.registerPath({
+  method: "delete",
+  path: "/google/v1beta/agents/{id}",
+  tags: ["Google Compat"],
+  summary: "Delete agent (Google compat)",
+  request: { params: z.object({ id: z.string() }) },
+  responses: { 200: { description: "OK" } },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/google/v1beta/files/{fileRef}",
+  tags: ["Google Compat"],
+  summary: "Download environment files (Google compat)",
+  request: { params: z.object({ fileRef: z.string() }) },
+  responses: { 200: { description: "Tar archive", content: { "application/x-tar": { schema: z.string().openapi({ description: "Raw tar archive bytes." }) } } } },
 });
 
 // ---------------------------------------------------------------------------
@@ -2147,6 +2337,8 @@ export function buildOpenApiDocument(opts: { serverUrl: string }): unknown {
       { name: "Audit", description: "Admin audit trail" },
       { name: "Auth", description: "Caller identity and license info" },
       { name: "Batch", description: "Atomic batch operations" },
+      { name: "User Profiles", description: "User profile management and OAuth enrollment" },
+      { name: "Google Compat", description: "Google Interactions API compatibility layer" },
     ],
   });
 }
