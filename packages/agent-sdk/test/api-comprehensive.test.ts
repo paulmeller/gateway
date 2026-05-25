@@ -156,6 +156,19 @@ describe("Agents", () => {
     expect(body.model).toEqual({ id: "claude-sonnet-4-6" });
   });
 
+  it("creates an agent with bare string model -> 201", async () => {
+    await bootDb();
+    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const res = await handleCreateAgent(
+      req("/v1/agents", {
+        body: { name: "String Model Agent", model: "claude-sonnet-4-6" },
+      }),
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.model).toEqual({ id: "claude-sonnet-4-6" });
+  });
+
   it("creates an agent with empty name -> 400", async () => {
     await bootDb();
     const { handleCreateAgent } = await import("../src/handlers/agents");
@@ -732,9 +745,9 @@ describe("Sessions", () => {
     await createTestSession(agent.id as string, env.id as string);
     const { handleListSessions } = await import("../src/handlers/sessions");
     const res = await handleListSessions(req("/v1/sessions?limit=2"));
-    const body = (await res.json()) as { data: Array<{ id: string }>; next_page: string | null };
+    const body = (await res.json()) as { data: Array<{ id: string }>; has_more: boolean; first_id: string | null; last_id: string | null };
     expect(body.data.length).toBe(2);
-    expect(body.next_page).toBeTypeOf("string");
+    expect(body.has_more).toBe(true);
   });
 
   it("creates session with title", async () => {
@@ -2101,9 +2114,9 @@ describe("Pagination & Ordering", () => {
     await createTestAgent({ name: "P2" });
     const { handleListAgents } = await import("../src/handlers/agents");
     const res = await handleListAgents(req("/v1/agents?limit=1"));
-    const body = (await res.json()) as { data: Array<{ id: string }>; next_page: string | null };
+    const body = (await res.json()) as { data: Array<{ id: string }>; has_more: boolean; first_id: string | null; last_id: string | null };
     expect(body.data.length).toBe(1);
-    expect(body.next_page).toBeTypeOf("string");
+    expect(body.has_more).toBe(true);
   });
 
   it("agents list order=asc works", async () => {
@@ -2124,9 +2137,9 @@ describe("Pagination & Ordering", () => {
     await createTestEnv({ name: "EP2" });
     const { handleListEnvironments } = await import("../src/handlers/environments");
     const res = await handleListEnvironments(req("/v1/environments?limit=1"));
-    const body = (await res.json()) as { data: unknown[]; next_page: string | null };
+    const body = (await res.json()) as { data: unknown[]; has_more: boolean; first_id: string | null; last_id: string | null };
     expect(body.data.length).toBe(1);
-    expect(body.next_page).toBeTypeOf("string");
+    expect(body.has_more).toBe(true);
   });
 
   it("sessions list order=asc works", async () => {
@@ -2163,9 +2176,9 @@ describe("Pagination & Ordering", () => {
       req(`/v1/sessions/${session.id}/events?limit=1`),
       session.id as string,
     );
-    const body = (await res.json()) as { data: Array<{ id: string }>; next_page: string | null };
+    const body = (await res.json()) as { data: Array<{ id: string }>; has_more: boolean; first_id: string | null; last_id: string | null };
     expect(body.data.length).toBe(1);
-    expect(body.next_page).toBeTypeOf("string");
+    expect(body.has_more).toBe(true);
   });
 });
 

@@ -224,7 +224,10 @@ async function resolveSkillInputs(
 
 const CreateSchema = z.object({
   name: z.string().min(1),
-  model: z.object({ id: z.string().min(1), speed: z.enum(["standard", "fast"]).optional() }),
+  model: z.union([
+    z.string().min(1).transform((s) => ({ id: s })),
+    z.object({ id: z.string().min(1), speed: z.enum(["standard", "fast"]).optional() }),
+  ]),
   description: z.string().max(2048).optional(),
   metadata: z.record(z.string(), z.string().max(512)).optional(),
   system: z.string().nullish(),
@@ -282,7 +285,10 @@ const CreateSchema = z.object({
 const UpdateSchema = z.object({
   version: z.number().int().min(1),
   name: z.string().min(1).optional(),
-  model: z.object({ id: z.string().min(1), speed: z.enum(["standard", "fast"]).optional() }).optional(),
+  model: z.union([
+    z.string().min(1).transform((s) => ({ id: s })),
+    z.object({ id: z.string().min(1), speed: z.enum(["standard", "fast"]).optional() }),
+  ]).optional(),
   description: z.string().max(2048).optional(),
   metadata: z.record(z.string(), z.string().max(512)).optional(),
   system: z.string().nullish(),
@@ -370,7 +376,7 @@ export function handleCreateAgent(request: Request): Promise<Response> {
     const backend = resolveBackend(backendName);
 
     const modelId = parsed.data.model.id;
-    const modelSpeed = parsed.data.model.speed;
+    const modelSpeed = "speed" in parsed.data.model ? parsed.data.model.speed : undefined;
 
     // Validate model is supported by this engine
     const { isValidModelForEngine, FALLBACK_MODELS } = await import("../backends/models");
@@ -438,7 +444,7 @@ export function handleListAgents(request: Request): Promise<Response> {
     const limit = url.searchParams.get("limit");
     const order = url.searchParams.get("order") as "asc" | "desc" | null;
     const includeArchived = url.searchParams.get("include_archived") === "true";
-    const cursor = decodeCursor(url.searchParams.get("page"));
+    const cursor = decodeCursor(url.searchParams.get("after_id") ?? url.searchParams.get("page"));
 
     const requestedLimit = limit ? Number(limit) : 20;
     const data = listAgents({
@@ -488,7 +494,7 @@ export function handleUpdateAgent(request: Request, id: string): Promise<Respons
     }
 
     const modelId = parsed.data.model?.id;
-    const modelSpeed = parsed.data.model?.speed;
+    const modelSpeed = parsed.data.model && "speed" in parsed.data.model ? parsed.data.model.speed : undefined;
 
     // Convert array→record for DB storage
     let mcpRecord: Record<string, unknown> | undefined;
@@ -565,7 +571,7 @@ export function handleListAgentVersions(request: Request, id: string): Promise<R
     loadAgentForCaller(auth, id); // tenant guard
     const url = new URL(req.url);
     const limit = url.searchParams.get("limit");
-    const cursorRaw = decodeCursor(url.searchParams.get("page"));
+    const cursorRaw = decodeCursor(url.searchParams.get("after_id") ?? url.searchParams.get("page"));
     const cursor = cursorRaw ? Number(cursorRaw) : undefined;
 
     const requestedLimit = limit ? Number(limit) : 20;
@@ -574,12 +580,9 @@ export function handleListAgentVersions(request: Request, id: string): Promise<R
       cursor,
     });
 
-    // Pagination: use version number as cursor (base64url encoded)
     const hasMore = data.length === requestedLimit;
-    const nextPage =
-      hasMore && data.length > 0
-        ? Buffer.from(String(data[data.length - 1].version)).toString("base64url")
-        : null;
-    return jsonOk({ data, next_page: nextPage });
+    const firstId = data.length > 0 ? String(data[0].version) : null;
+    const lastId = data.length > 0 ? String(data[data.length - 1].version) : null;
+    return jsonOk({ data, has_more: hasMore, first_id: firstId, last_id: lastId });
   });
 }

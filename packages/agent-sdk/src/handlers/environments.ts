@@ -171,7 +171,7 @@ export function handleListEnvironments(request: Request): Promise<Response> {
     const limit = url.searchParams.get("limit");
     const order = url.searchParams.get("order") as "asc" | "desc" | null;
     const includeArchived = url.searchParams.get("include_archived") === "true";
-    const cursor = decodeCursor(url.searchParams.get("page"));
+    const cursor = decodeCursor(url.searchParams.get("after_id") ?? url.searchParams.get("page"));
 
     const requestedLimit = limit ? Number(limit) : 20;
     const data = listEnvironments({

@@ -634,7 +634,7 @@ export function handleListSessions(request: Request): Promise<Response> {
     const limit = url.searchParams.get("limit");
     const order = url.searchParams.get("order") as "asc" | "desc" | null;
     const includeArchived = url.searchParams.get("include_archived") === "true";
-    const cursor = decodeCursor(url.searchParams.get("page"));
+    const cursor = decodeCursor(url.searchParams.get("after_id") ?? url.searchParams.get("page"));
     const agentId = url.searchParams.get("agent_id") ?? undefined;
     const agentVersion = url.searchParams.get("agent_version");
     const environmentId = url.searchParams.get("environment_id") ?? undefined;

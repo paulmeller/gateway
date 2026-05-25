@@ -114,7 +114,9 @@ export function getFileRecord(id: string): FileRecord | null {
 
 export interface FileListResult {
   data: FileRecord[];
-  next_page: string | null;
+  has_more: boolean;
+  first_id: string | null;
+  last_id: string | null;
 }
 
 export function listFiles(opts?: { limit?: number; scope_id?: string; before_id?: string; after_id?: string }): FileListResult {
@@ -145,10 +147,7 @@ export function listFiles(opts?: { limit?: number; scope_id?: string; before_id?
     const hasMore = rows.length > limit;
     if (hasMore) rows.pop();
     const records = rows.map(hydrate);
-    const nextPage = hasMore && records.length > 0
-      ? Buffer.from(records[records.length - 1].id).toString("base64url")
-      : null;
-    return { data: records, next_page: nextPage };
+    return { data: records, has_more: hasMore, first_id: records[0]?.id ?? null, last_id: records[records.length - 1]?.id ?? null };
   }
 
   // Unscoped listing (global admin)
@@ -165,10 +164,7 @@ export function listFiles(opts?: { limit?: number; scope_id?: string; before_id?
   const hasMore = rows.length > limit;
   if (hasMore) rows.pop();
   const records = rows.map(hydrate);
-  const nextPage = hasMore && records.length > 0
-    ? Buffer.from(records[records.length - 1].id).toString("base64url")
-    : null;
-  return { data: records, next_page: nextPage };
+  return { data: records, has_more: hasMore, first_id: records[0]?.id ?? null, last_id: records[records.length - 1]?.id ?? null };
 }
 
 export function countFilesForScope(scopeId: string): number {

@@ -92,18 +92,22 @@ export function paginatedOk<T extends { id: string }>(
   requestedLimit: number,
 ): Response {
   const hasMore = data.length === requestedLimit;
-  const nextPage =
-    hasMore && data.length > 0
-      ? Buffer.from(data[data.length - 1].id).toString("base64url")
-      : null;
-  return jsonOk({ data, next_page: nextPage });
+  const firstId = data.length > 0 ? data[0].id : null;
+  const lastId = data.length > 0 ? data[data.length - 1].id : null;
+  return jsonOk({ data, has_more: hasMore, first_id: firstId, last_id: lastId });
 }
 
-/** Decode an opaque page cursor back to the original ID. */
+/**
+ * Decode a pagination cursor. Accepts either:
+ * - A raw ID string (Anthropic-style after_id)
+ * - A base64url-encoded ID (legacy next_page cursor)
+ */
 export function decodeCursor(
   page: string | null | undefined,
 ): string | undefined {
   if (!page) return undefined;
+  // If it looks like one of our ID prefixes, it's a raw ID (Anthropic style)
+  if (page.includes("_")) return page;
   try {
     return Buffer.from(page, "base64url").toString("utf8");
   } catch {

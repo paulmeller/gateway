@@ -201,7 +201,10 @@ export const CreateAgentRequestSchema = registry.register(
   z
     .object({
       name: z.string().min(1).openapi({ example: "my-agent" }),
-      model: z.object({ id: z.string().min(1), speed: z.enum(["standard", "fast"]).optional() }).openapi({ description: "Model configuration. `id` is the bare model identifier (e.g. `gemini-2.5-flash`, `claude-sonnet-4-6`, `gpt-5.4`). Do not include provider prefixes.", example: { id: "claude-sonnet-4-6" } }),
+      model: z.union([
+        z.string().openapi({ example: "claude-sonnet-4-6" }),
+        z.object({ id: z.string().min(1), speed: z.enum(["standard", "fast"]).optional() }).openapi({ example: { id: "claude-sonnet-4-6" } }),
+      ]).openapi({ description: "Model identifier — either a bare string (`\"claude-sonnet-4-6\"`) or an object (`{id, speed?}`). Do not include provider prefixes." }),
       description: z.string().max(2048).optional().openapi({
         description: "Human-readable description of the agent.",
       }),
@@ -733,10 +736,12 @@ export const BatchResponseSchema = registry.register(
 function listEnvelope<T extends z.ZodTypeAny>(
   name: string,
   item: T,
-): z.ZodObject<{ data: z.ZodArray<T>; next_page: z.ZodNullable<z.ZodString> }> {
+): z.ZodObject<{ data: z.ZodArray<T>; has_more: z.ZodBoolean; first_id: z.ZodNullable<z.ZodString>; last_id: z.ZodNullable<z.ZodString> }> {
   const schema = z.object({
     data: z.array(item),
-    next_page: z.string().nullable(),
+    has_more: z.boolean(),
+    first_id: z.string().nullable(),
+    last_id: z.string().nullable(),
   });
   return registry.register(name, schema) as unknown as typeof schema;
 }
@@ -817,7 +822,9 @@ export const FileListResponseSchema = registry.register(
   "FileListResponse",
   z.object({
     data: z.array(FileRecordSchema),
-    next_page: z.string().nullable().openapi({ description: "Opaque cursor for the next page, or null if no more results." }),
+    has_more: z.boolean().openapi({ description: "Whether more results exist beyond this page." }),
+    first_id: z.string().nullable().openapi({ description: "ID of the first item in this page." }),
+    last_id: z.string().nullable().openapi({ description: "ID of the last item in this page. Pass as after_id for the next page." }),
   }),
 );
 
@@ -1198,7 +1205,9 @@ export const AuditListResponseSchema = registry.register(
   "AuditListResponse",
   z.object({
     data: z.array(AuditEntrySchema),
-    next_page: z.string().nullable(),
+    has_more: z.boolean(),
+    first_id: z.string().nullable(),
+    last_id: z.string().nullable(),
   }),
 );
 

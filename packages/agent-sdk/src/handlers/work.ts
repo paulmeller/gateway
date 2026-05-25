@@ -29,7 +29,7 @@ export function handleListWork(request: Request, envId: string): Promise<Respons
     assertSelfHostedEnv(envId);
     const url = new URL(req.url);
     const requestedLimit = Number(url.searchParams.get("limit") || "20");
-    const cursor = decodeCursor(url.searchParams.get("page"));
+    const cursor = decodeCursor(url.searchParams.get("after_id") ?? url.searchParams.get("page"));
     const state = (url.searchParams.get("state") as WorkState) ?? undefined;
 
     const items = listWorkItems(envId, { limit: requestedLimit, cursor, state });
