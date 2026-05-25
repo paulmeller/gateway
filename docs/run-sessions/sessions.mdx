@@ -39,6 +39,8 @@ Omitting `version` always uses the agent's current version at session creation t
 | `metadata` | object | No | Arbitrary key-value pairs attached to the session |
 | `max_budget_usd` | number | No | Hard spending cap in USD; the session terminates when exceeded |
 | `vault_ids` | string[] | No | Vault IDs whose secrets are injected into the container at turn start |
+| `user_profile_id` | string | No | Optional. Links this session to a user profile for per-user credential scoping via trust grants. |
+| `outcomes` | object | No | Optional. Success criteria with rubric for self-evaluation. See [Outcomes](/run-sessions/outcomes). |
 | `resources` | object[] | No | Files, URIs, GitHub repositories, or memory stores to mount into the session |
 
 ### Resources

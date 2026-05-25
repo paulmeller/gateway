@@ -37,7 +37,7 @@ The response body is an `Agent` object at `version: 1` with `type: "agent"`.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `name` | string | — | Display name. Must be unique within your tenant. |
-| `model` | `{ id: string, speed?: "standard" \| "fast" }` | — | Model object. `id` is the model identifier (must be supported by the chosen engine). Optional `speed` maps to `--fast` on the Claude CLI. |
+| `model` | `string \| { id: string, speed?: "standard" \| "fast" }` | — | Model identifier. Pass as bare string (`"claude-sonnet-4-6"`) or object (`{ id: "...", speed: "fast" }`). Engine is auto-inferred from model prefix if `engine` is omitted. |
 | `engine` | string | auto-inferred | Execution engine: `claude`, `opencode`, `codex`, `gemini`, `factory`, `pi`, or `anthropic`. Auto-inferred from model prefix if omitted (`gemini-*` → `gemini`, `gpt-*`/`o1-*` → `codex`, `claude-*` → `claude`). |
 | `description` | string \| null | `null` | Human-readable description (max 2048 characters). |
 | `system` | string \| null | `null` | System prompt injected before every turn. |
@@ -51,6 +51,7 @@ The response body is an `Agent` object at `version: 1` with `type: "agent"`.
 | `multiagent` | object \| null | `null` | Multi-agent coordinator config. Set to `{ type: "coordinator", agents: [...] }` to enable thread-based delegation. See [Multi-Agent](/build-agents/multi-agent). |
 | `threads_enabled` | boolean | `false` | Adds a synthetic `spawn_agent` custom tool so the agent can delegate sub-tasks. |
 | `confirmation_mode` | boolean | `false` | Enables the permission bridge. Claude runs with `default` permission mode and pauses before destructive tool calls. |
+| `permission_policy` | object \| null | `null` | Per-tool permission control. `always_allow` lists tools that run without confirmation; `always_ask` lists tools that require explicit approval via `user.tool_confirmation` events. See below. |
 | `callable_agents` | array | `[]` | Agents this agent may spawn when `threads_enabled` is `true`. Each entry is `{type:"agent", id, version?}`. |
 | `model_config` | object | `{}` | Engine-level model hints (deprecated in favor of `model.speed`). |
 
@@ -70,6 +71,26 @@ Each engine requires its own API key in the vault:
 | `claude` | `ANTHROPIC_API_KEY` | `@anthropic-ai/claude-code` |
 | `gemini` | `GEMINI_API_KEY` | `@google/gemini-cli` |
 | `codex` | `OPENAI_API_KEY` or `CODEX_API_KEY` | `@openai/codex` |
+
+### Permission policies
+
+Control per-tool permissions instead of the all-or-nothing `confirmation_mode`:
+
+```json
+{
+  "name": "safe-agent",
+  "model": "claude-sonnet-4-6",
+  "permission_policy": {
+    "always_allow": ["Read", "Grep", "Glob", "WebSearch"],
+    "always_ask": ["Write", "Edit", "Bash"]
+  }
+}
+```
+
+- `always_allow` — tools that run without confirmation
+- `always_ask` — tools that pause and emit `agent.tool_confirmation_request`; client must respond with `user.tool_confirmation` (allow/deny)
+- Tools not in either list follow the engine's default behavior
+- Setting `permission_policy` automatically enables `--permission-mode default` on the Claude CLI
 
 ## Update an agent
 

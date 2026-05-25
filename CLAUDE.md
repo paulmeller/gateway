@@ -99,7 +99,7 @@ libsql (SQLite) with WAL mode. Schema is idempotent (`CREATE TABLE IF NOT EXISTS
 
 ### Tests
 
-800+ tests across 50+ test files:
+1,400+ tests across 50+ test files:
 - `packages/agent-sdk/test/api-comprehensive.test.ts` (~200) — full API surface + settings masking
 - `packages/agent-sdk/test/cli-local-backend.test.ts` — CLI handler-based flow
 - `packages/agent-sdk/test/translator-*.test.ts` — all backend translators + error handling
