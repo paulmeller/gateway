@@ -2,6 +2,10 @@
   "name": "managed-agents",
   "description": "AgentStep Gateway — self-hosted Anthropic Managed Agents-compatible API",
   "private": true,
+  "license": "Apache-2.0",
+  "repository": { "type": "git", "url": "https://github.com/agentstep/gateway.git" },
+  "homepage": "https://www.agentstep.com",
+  "bugs": { "url": "https://github.com/agentstep/gateway/issues" },
   "workspaces": [
     "packages/agent-sdk",
     "packages/gateway",
