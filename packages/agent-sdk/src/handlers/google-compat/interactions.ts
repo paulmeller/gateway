@@ -125,15 +125,37 @@ export function handleCreateInteraction(request: Request): Promise<Response> {
     const modelId = data.model || "gemini-2.5-flash";
     const agentName = data.agent || `auto-${modelId.replace(/[^a-z0-9-]/g, "-")}`;
 
-    // Try to find existing agent: first by exact name, then by matching model ID.
-    // Reusing an existing agent preserves its vault associations.
+    // Try to find an existing agent. Priority:
+    //   1. Explicit agent name match (user passed `agent` field)
+    //   2. Any agent with matching model that has vaults (can authenticate)
+    //   3. Any agent with matching model (may not have vaults)
+    //   4. Create a new agent
     const listReq = new Request(request.url.replace(/\/google\/v1beta\/interactions.*/, `/v1/agents?limit=1000`), {
       headers: request.headers,
     });
     const listRes = await handleListAgents(listReq);
     const listBody = await listRes.json() as { data: Array<{ id: string; name: string; model?: { id: string } }> };
-    const existing = listBody.data?.find(a => a.name === agentName)
-      ?? (data.agent ? undefined : listBody.data?.find(a => a.model?.id === modelId));
+
+    const { listVaults } = await import("../../db/vaults");
+    const { tenantFilter: getTenantFilter } = await import("../../auth/scope");
+    const allVaults = listVaults({ tenantFilter: getTenantFilter(auth) })
+      .filter(v => !v.archived_at);
+
+    let existing: { id: string; name: string } | undefined;
+    if (data.agent) {
+      // Explicit agent name — must match exactly
+      existing = listBody.data?.find(a => a.name === agentName);
+    } else {
+      // Model-based search: find agents with this model, prefer ones with vaults
+      const modelMatches = listBody.data?.filter(a => a.model?.id === modelId) ?? [];
+      const withVaults = modelMatches.filter(a =>
+        allVaults.some(v => v.agent_id === a.id || !v.agent_id),
+      );
+      // Prefer an agent that has its OWN scoped vault
+      existing = modelMatches.find(a => allVaults.some(v => v.agent_id === a.id))
+        ?? withVaults[0]
+        ?? modelMatches[0];
+    }
 
     if (existing) {
       agentId = existing.id;
@@ -180,16 +202,9 @@ export function handleCreateInteraction(request: Request): Promise<Response> {
 
     if (!environmentId) throw badRequest("no environment available");
 
-    // Resolve vault IDs: find vaults scoped to THIS agent or unscoped (no agent_id).
-    // Agent-scoped vaults belonging to other agents are excluded — the session
-    // handler rejects cross-agent vault references.
-    const { listVaults } = await import("../../db/vaults");
-    const { tenantFilter: getTenantFilter } = await import("../../auth/scope");
-    const tenantVaults = listVaults({
-      tenantFilter: getTenantFilter(auth),
-    });
-    const vaultIds = tenantVaults
-      .filter(v => !v.archived_at && (v.agent_id === agentId || !v.agent_id))
+    // Resolve vault IDs: reuse allVaults from agent resolution above
+    const vaultIds = allVaults
+      .filter(v => v.agent_id === agentId || !v.agent_id)
       .map(v => v.id);
 
     // Create session — use agent ID as a string (handleCreateSession accepts either string or {id, version})
