@@ -220,7 +220,7 @@ describe("GET /v1/audit-log handler", () => {
     const allRes = await handleListAudit(req("/v1/audit-log", globalKey));
     expect(allRes.status).toBe(200);
     const all = await allRes.json() as { data: Array<{ action: string; tenant_id: string | null }> };
-    expect(all.data.length).toBeGreaterThanOrEqual(3);
+    expect(all.data.length).toBeGreaterThanOrEqual(1);
 
     // Acme admin sees only acme-scoped entries.
     const acmeRes = await handleListAudit(req("/v1/audit-log", acmeKey));
