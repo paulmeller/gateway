@@ -710,7 +710,7 @@ export const BatchOperationSchema = registry.register(
   "BatchOperation",
   z.object({
     method: z.string().openapi({ example: "POST" }),
-    path: z.string().openapi({ example: "/v1/agents" }),
+    path: z.string().openapi({ example: "/anthropic/v1/agents" }),
     body: z.record(z.unknown()).optional(),
   }),
 );

@@ -26,24 +26,24 @@ Or with curl:
 npm install -g @agentstep/gateway && gateway serve
 
 # Create an agent
-curl -X POST http://localhost:4000/v1/agents \
+curl -X POST http://localhost:4000/anthropic/v1/agents \
   -H "x-api-key: $(cat data/.api-key)" \
   -H "content-type: application/json" \
   -d '{"name": "fixer", "model": "claude-sonnet-4-6", "tools": [{"type": "agent_toolset_20260401"}]}'
 
 # Create an environment (Docker sandbox)
-curl -X POST http://localhost:4000/v1/environments \
+curl -X POST http://localhost:4000/anthropic/v1/environments \
   -H "x-api-key: $(cat data/.api-key)" \
   -H "content-type: application/json" \
   -d '{"name": "dev", "config": {"provider": "docker"}}'
 
 # Start a session and send a message
-curl -X POST http://localhost:4000/v1/sessions \
+curl -X POST http://localhost:4000/anthropic/v1/sessions \
   -H "x-api-key: $(cat data/.api-key)" \
   -H "content-type: application/json" \
   -d '{"agent": "<agent_id>", "environment_id": "<env_id>"}'
 
-curl -X POST http://localhost:4000/v1/sessions/<session_id>/events \
+curl -X POST http://localhost:4000/anthropic/v1/sessions/<session_id>/events \
   -H "x-api-key: $(cat data/.api-key)" \
   -H "content-type: application/json" \
   -d '{"events": [{"type": "user.message", "content": [{"type": "text", "text": "Fix the lint errors in src/utils.js"}]}]}'
@@ -90,18 +90,18 @@ Prerequisites: Node.js 22+, and at least one of `ANTHROPIC_API_KEY`, `OPENAI_API
 1. **Create an agent** -- name, model, engine, system prompt, tools, MCP servers.
 2. **Create an environment** -- pick a sandbox provider (Docker, Sprites, E2B, ...).
 3. **Start a session** -- the gateway lazy-acquires a container on first turn.
-4. **Send messages** -- `POST /v1/sessions/:id/events` with `user.message`.
-5. **Stream results** -- `GET /v1/sessions/:id/stream` returns SSE events: `agent.message`, `agent.tool_use`, `session.status_idle`.
+4. **Send messages** -- `POST /anthropic/v1/sessions/:id/events` with `user.message`.
+5. **Stream results** -- `GET /anthropic/v1/sessions/:id/stream` returns SSE events: `agent.message`, `agent.tool_use`, `session.status_idle`.
 
 Each turn drives the agent CLI inside the container. NDJSON output is translated into the Managed Agents event model and streamed to your client.
 
 ## Anthropic Compatibility
 
-The gateway implements the Anthropic Managed Agents API: `/v1/agents`, `/v1/vaults`, `/v1/environments`, `/v1/sessions`, `/v1/sessions/:id/events`, and SSE streaming. Three modes:
+The gateway implements the Anthropic Managed Agents API: `/anthropic/v1/agents`, `/anthropic/v1/vaults`, `/anthropic/v1/environments`, `/anthropic/v1/sessions`, `/anthropic/v1/sessions/:id/events`, and SSE streaming. Three modes:
 
 1. **Local** -- agent runs in your sandbox. No data leaves your machine.
 2. **Sync-and-proxy** -- set `provider: "anthropic"`. The gateway syncs your agent config to Anthropic, creates a hosted session, and proxies traffic. Anthropic runs the sandbox; you keep the config and observability.
-3. **Passthrough** -- set `ANTHROPIC_PASSTHROUGH_ENABLED=true`. Callers with their own `sk-ant-api*` keys are forwarded to Anthropic transparently. Same URLs, so any Anthropic SDK works as a drop-in.
+3. **Passthrough** -- set `ANTHROPIC_PASSTHROUGH_ENABLED=true`. Callers with their own `sk-ant-api*` keys are forwarded to Anthropic transparently. Point your Anthropic SDK's base URL at `https://<gateway>/anthropic` and it works as a drop-in.
 
 See [`docs/guides/anthropic-integration.mdx`](docs/guides/anthropic-integration.mdx) for details.
 

@@ -62,9 +62,9 @@ export function handleCreateInteraction(request: Request): Promise<Response> {
       ? data.input
       : JSON.stringify(data.input);
 
-    const { handleCreateAgent, handleListAgents } = await import("../agents");
-    const { handleCreateSession } = await import("../sessions");
-    const { handlePostEvents } = await import("../events");
+    const { handleCreateAgent, handleListAgents } = await import("../anthropic-compat/agents");
+    const { handleCreateSession } = await import("../anthropic-compat/sessions");
+    const { handlePostEvents } = await import("../anthropic-compat/events");
 
     let agentId: string;
     let environmentId: string | undefined;
@@ -187,7 +187,7 @@ export function handleCreateInteraction(request: Request): Promise<Response> {
       environmentId = readyEnv.id;
     } else {
       // Create a default environment directly in DB (avoid async setup)
-      const { handleCreateEnvironment } = await import("../environments");
+      const { handleCreateEnvironment } = await import("../anthropic-compat/environments");
       const envReq = new Request(request.url.replace(/\/google\/v1beta\/interactions.*/, `/v1/environments`), {
         method: "POST",
         headers: request.headers,
@@ -339,7 +339,7 @@ export function handleDeleteInteraction(request: Request, id: string): Promise<R
     db.prepare(`DELETE FROM google_interactions WHERE id = ?`).run(id);
 
     // Optionally delete the session
-    const { handleDeleteSession } = await import("../sessions");
+    const { handleDeleteSession } = await import("../anthropic-compat/sessions");
     const sessReq = new Request(request.url.replace(/\/google\/v1beta\/interactions.*/, `/v1/sessions/${row.session_id}`), {
       method: "DELETE",
       headers: request.headers,
@@ -364,7 +364,7 @@ export function handleCancelInteraction(request: Request, id: string): Promise<R
     if (!row) throw notFound(`interaction not found: ${id}`);
 
     // Post an interrupt event to the session
-    const { handlePostEvents } = await import("../events");
+    const { handlePostEvents } = await import("../anthropic-compat/events");
     const eventsReq = new Request(request.url.replace(/\/google\/v1beta\/interactions.*/, `/v1/sessions/${row.session_id}/events`), {
       method: "POST",
       headers: request.headers,

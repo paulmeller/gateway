@@ -153,6 +153,7 @@ const app = new Hono();
 // CORS: only allow same-origin requests. Without this, any site can make
 // authenticated API calls if the user's API key is in localStorage.
 app.use("/v1/*", cors({ origin: (origin) => origin, credentials: true }));
+app.use("/anthropic/v1/*", cors({ origin: (origin) => origin, credentials: true }));
 
 // Security headers for all responses
 app.use("*", async (c, next) => {
@@ -207,15 +208,6 @@ const serveUI = (c: Context) =>
     sentryDsn: process.env.SENTRY_DSN,
   });
 
-// ── /anthropic/v1/* alias — rewrite to /v1/* so the same handlers serve both
-app.use("/anthropic/v1/*", async (c, next) => {
-  const rewritten = new URL(c.req.url);
-  rewritten.pathname = rewritten.pathname.replace(/^\/anthropic\/v1/, "/v1");
-  const newReq = new Request(rewritten.toString(), c.req.raw);
-  const res = await app.fetch(newReq, c.env);
-  return res;
-});
-
 // ── Health ────────────────────────────────────────────────────────────────
 app.get("/api/health", (c) => c.json({ status: "ok" }));
 
@@ -224,18 +216,18 @@ app.get("/v1/openapi.json", (c) => handleGetOpenApiSpec(c.req.raw));
 app.get("/v1/docs", () => handleGetDocs());
 
 // ── Agents ───────────────────────────────────────────────────────────────
-app.post("/v1/agents", (c) => handleCreateAgent(c.req.raw));
-app.get("/v1/agents", (c) => handleListAgents(c.req.raw));
+app.post("/anthropic/v1/agents", (c) => handleCreateAgent(c.req.raw));
+app.get("/anthropic/v1/agents", (c) => handleListAgents(c.req.raw));
 // Sub-resource routes must be registered BEFORE the generic :id routes
-app.post("/v1/agents/:id/archive", (c) => handleArchiveAgent(c.req.raw, c.req.param("id")));
-app.get("/v1/agents/:id/versions", (c) => handleListAgentVersions(c.req.raw, c.req.param("id")));
-app.get("/v1/agents/:id", (c) => handleGetAgent(c.req.raw, c.req.param("id")));
-app.post("/v1/agents/:id", (c) => handleUpdateAgent(c.req.raw, c.req.param("id")));
-app.delete("/v1/agents/:id", (c) => handleDeleteAgent(c.req.raw, c.req.param("id")));
+app.post("/anthropic/v1/agents/:id/archive", (c) => handleArchiveAgent(c.req.raw, c.req.param("id")));
+app.get("/anthropic/v1/agents/:id/versions", (c) => handleListAgentVersions(c.req.raw, c.req.param("id")));
+app.get("/anthropic/v1/agents/:id", (c) => handleGetAgent(c.req.raw, c.req.param("id")));
+app.post("/anthropic/v1/agents/:id", (c) => handleUpdateAgent(c.req.raw, c.req.param("id")));
+app.delete("/anthropic/v1/agents/:id", (c) => handleDeleteAgent(c.req.raw, c.req.param("id")));
 
 // ── Environments ─────────────────────────────────────────────────────────
-app.post("/v1/environments", (c) => handleCreateEnvironment(c.req.raw));
-app.get("/v1/environments", (c) => handleListEnvironments(c.req.raw));
+app.post("/anthropic/v1/environments", (c) => handleCreateEnvironment(c.req.raw));
+app.get("/anthropic/v1/environments", (c) => handleListEnvironments(c.req.raw));
 // Work queue routes (self_hosted environments) — must be before generic :id routes
 app.get("/v1/environments/:id/work/poll", (c) => handlePollWork(c.req.raw, c.req.param("id")));
 app.get("/v1/environments/:id/work/stats", (c) => handleWorkStats(c.req.raw, c.req.param("id")));
@@ -245,22 +237,22 @@ app.post("/v1/environments/:id/work/:workId/stop", (c) => handleStopWork(c.req.r
 app.get("/v1/environments/:id/work/:workId", (c) => handleGetWork(c.req.raw, c.req.param("id"), c.req.param("workId")));
 app.post("/v1/environments/:id/work/:workId", (c) => handleUpdateWork(c.req.raw, c.req.param("id"), c.req.param("workId")));
 app.get("/v1/environments/:id/work", (c) => handleListWork(c.req.raw, c.req.param("id")));
-app.post("/v1/environments/:id/archive", (c) => handleArchiveEnvironment(c.req.raw, c.req.param("id")));
-app.get("/v1/environments/:id", (c) => handleGetEnvironment(c.req.raw, c.req.param("id")));
-app.post("/v1/environments/:id", (c) => handleUpdateEnvironment(c.req.raw, c.req.param("id")));
-app.delete("/v1/environments/:id", (c) => handleDeleteEnvironment(c.req.raw, c.req.param("id")));
+app.post("/anthropic/v1/environments/:id/archive", (c) => handleArchiveEnvironment(c.req.raw, c.req.param("id")));
+app.get("/anthropic/v1/environments/:id", (c) => handleGetEnvironment(c.req.raw, c.req.param("id")));
+app.post("/anthropic/v1/environments/:id", (c) => handleUpdateEnvironment(c.req.raw, c.req.param("id")));
+app.delete("/anthropic/v1/environments/:id", (c) => handleDeleteEnvironment(c.req.raw, c.req.param("id")));
 
 // ── Sessions ─────────────────────────────────────────────────────────────
-app.post("/v1/sessions", (c) => handleCreateSession(c.req.raw));
-app.get("/v1/sessions", (c) => handleListSessions(c.req.raw));
-app.get("/v1/sessions/:id", (c) => handleGetSession(c.req.raw, c.req.param("id")));
-app.post("/v1/sessions/:id", (c) => handleUpdateSession(c.req.raw, c.req.param("id")));
-app.delete("/v1/sessions/:id", (c) => handleDeleteSession(c.req.raw, c.req.param("id")));
-app.post("/v1/sessions/:id/archive", (c) => handleArchiveSession(c.req.raw, c.req.param("id")));
+app.post("/anthropic/v1/sessions", (c) => handleCreateSession(c.req.raw));
+app.get("/anthropic/v1/sessions", (c) => handleListSessions(c.req.raw));
+app.get("/anthropic/v1/sessions/:id", (c) => handleGetSession(c.req.raw, c.req.param("id")));
+app.post("/anthropic/v1/sessions/:id", (c) => handleUpdateSession(c.req.raw, c.req.param("id")));
+app.delete("/anthropic/v1/sessions/:id", (c) => handleDeleteSession(c.req.raw, c.req.param("id")));
+app.post("/anthropic/v1/sessions/:id/archive", (c) => handleArchiveSession(c.req.raw, c.req.param("id")));
 
 // ── Events ───────────────────────────────────────────────────────────────
-app.post("/v1/sessions/:id/events", (c) => handlePostEvents(c.req.raw, c.req.param("id")));
-app.get("/v1/sessions/:id/events", (c) => handleListEvents(c.req.raw, c.req.param("id")));
+app.post("/anthropic/v1/sessions/:id/events", (c) => handlePostEvents(c.req.raw, c.req.param("id")));
+app.get("/anthropic/v1/sessions/:id/events", (c) => handleListEvents(c.req.raw, c.req.param("id")));
 
 // ── Stream (SSE) ─────────────────────────────────────────────────────────
 // Uses Hono's streamSSE helper instead of raw Response for Node.js compat.
@@ -269,7 +261,7 @@ app.get("/v1/sessions/:id/events", (c) => handleListEvents(c.req.raw, c.req.para
 import { streamSSE } from "hono/streaming";
 import { prepareSessionStream } from "@agentstep/agent-sdk/handlers";
 import { listEvents, rowToManagedEvent } from "@agentstep/agent-sdk";
-app.get("/v1/sessions/:id/events/stream", async (c) => {
+app.get("/anthropic/v1/sessions/:id/events/stream", async (c) => {
   const sessionId = c.req.param("id");
   const prepared = await prepareSessionStream(c.req.raw, sessionId);
 
@@ -337,49 +329,49 @@ app.get("/v1/sessions/:id/events/stream", async (c) => {
 });
 
 // ── Session Resources ───────────────────────────────────────────────────
-app.post("/v1/sessions/:id/resources", (c) => handleAddResource(c.req.raw, c.req.param("id")));
-app.get("/v1/sessions/:id/resources", (c) => handleListResources(c.req.raw, c.req.param("id")));
-app.get("/v1/sessions/:id/resources/:rid", (c) => handleGetResource(c.req.raw, c.req.param("id"), c.req.param("rid")));
-app.post("/v1/sessions/:id/resources/:rid", (c) => handleUpdateResource(c.req.raw, c.req.param("id"), c.req.param("rid")));
-app.delete("/v1/sessions/:id/resources/:rid", (c) => handleDeleteResource(c.req.raw, c.req.param("id"), c.req.param("rid")));
+app.post("/anthropic/v1/sessions/:id/resources", (c) => handleAddResource(c.req.raw, c.req.param("id")));
+app.get("/anthropic/v1/sessions/:id/resources", (c) => handleListResources(c.req.raw, c.req.param("id")));
+app.get("/anthropic/v1/sessions/:id/resources/:rid", (c) => handleGetResource(c.req.raw, c.req.param("id"), c.req.param("rid")));
+app.post("/anthropic/v1/sessions/:id/resources/:rid", (c) => handleUpdateResource(c.req.raw, c.req.param("id"), c.req.param("rid")));
+app.delete("/anthropic/v1/sessions/:id/resources/:rid", (c) => handleDeleteResource(c.req.raw, c.req.param("id"), c.req.param("rid")));
 
 // ── Files ────────────────────────────────────────────────────────────────
-app.post("/v1/files", (c) => handleUploadFile(c.req.raw));
-app.get("/v1/files", (c) => handleListFiles(c.req.raw));
-app.get("/v1/files/:id", (c) => handleGetFile(c.req.raw, c.req.param("id")));
-app.get("/v1/files/:id/content", (c) => handleGetFileContent(c.req.raw, c.req.param("id")));
-app.delete("/v1/files/:id", (c) => handleDeleteFile(c.req.raw, c.req.param("id")));
+app.post("/anthropic/v1/files", (c) => handleUploadFile(c.req.raw));
+app.get("/anthropic/v1/files", (c) => handleListFiles(c.req.raw));
+app.get("/anthropic/v1/files/:id", (c) => handleGetFile(c.req.raw, c.req.param("id")));
+app.get("/anthropic/v1/files/:id/content", (c) => handleGetFileContent(c.req.raw, c.req.param("id")));
+app.delete("/anthropic/v1/files/:id", (c) => handleDeleteFile(c.req.raw, c.req.param("id")));
 
 // ── Threads ──────────────────────────────────────────────────────────────
-app.get("/v1/sessions/:id/threads", (c) => handleListThreads(c.req.raw, c.req.param("id")));
-app.get("/v1/sessions/:id/threads/:tid", (c) => handleGetThread(c.req.raw, c.req.param("id"), c.req.param("tid")));
-app.post("/v1/sessions/:id/threads/:tid/archive", (c) => handleArchiveThread(c.req.raw, c.req.param("id"), c.req.param("tid")));
-app.get("/v1/sessions/:id/threads/:tid/events", (c) => handleListThreadEvents(c.req.raw, c.req.param("id"), c.req.param("tid")));
-app.get("/v1/sessions/:id/threads/:tid/stream", (c) => handleStreamThreadEvents(c.req.raw, c.req.param("id"), c.req.param("tid")));
+app.get("/anthropic/v1/sessions/:id/threads", (c) => handleListThreads(c.req.raw, c.req.param("id")));
+app.get("/anthropic/v1/sessions/:id/threads/:tid", (c) => handleGetThread(c.req.raw, c.req.param("id"), c.req.param("tid")));
+app.post("/anthropic/v1/sessions/:id/threads/:tid/archive", (c) => handleArchiveThread(c.req.raw, c.req.param("id"), c.req.param("tid")));
+app.get("/anthropic/v1/sessions/:id/threads/:tid/events", (c) => handleListThreadEvents(c.req.raw, c.req.param("id"), c.req.param("tid")));
+app.get("/anthropic/v1/sessions/:id/threads/:tid/stream", (c) => handleStreamThreadEvents(c.req.raw, c.req.param("id"), c.req.param("tid")));
 
 // ── Vaults ───────────────────────────────────────────────────────────────
-app.post("/v1/vaults", (c) => handleCreateVault(c.req.raw));
-app.get("/v1/vaults", (c) => handleListVaults(c.req.raw));
+app.post("/anthropic/v1/vaults", (c) => handleCreateVault(c.req.raw));
+app.get("/anthropic/v1/vaults", (c) => handleListVaults(c.req.raw));
 // Sub-resource routes must be registered BEFORE the generic :id routes
-app.post("/v1/vaults/:id/archive", (c) => handleArchiveVault(c.req.raw, c.req.param("id")));
-app.get("/v1/vaults/:id", (c) => handleGetVault(c.req.raw, c.req.param("id")));
-app.post("/v1/vaults/:id", (c) => handleUpdateVault(c.req.raw, c.req.param("id")));
-app.delete("/v1/vaults/:id", (c) => handleDeleteVault(c.req.raw, c.req.param("id")));
+app.post("/anthropic/v1/vaults/:id/archive", (c) => handleArchiveVault(c.req.raw, c.req.param("id")));
+app.get("/anthropic/v1/vaults/:id", (c) => handleGetVault(c.req.raw, c.req.param("id")));
+app.post("/anthropic/v1/vaults/:id", (c) => handleUpdateVault(c.req.raw, c.req.param("id")));
+app.delete("/anthropic/v1/vaults/:id", (c) => handleDeleteVault(c.req.raw, c.req.param("id")));
 
 // Vault credentials (Anthropic-compatible) — registered BEFORE :key routes
-app.post("/v1/vaults/:id/credentials", (c) => handleCreateCredential(c.req.raw, c.req.param("id")));
-app.get("/v1/vaults/:id/credentials", (c) => handleListCredentials(c.req.raw, c.req.param("id")));
+app.post("/anthropic/v1/vaults/:id/credentials", (c) => handleCreateCredential(c.req.raw, c.req.param("id")));
+app.get("/anthropic/v1/vaults/:id/credentials", (c) => handleListCredentials(c.req.raw, c.req.param("id")));
 // Sub-resource routes must be registered BEFORE the generic :credId routes
-app.post("/v1/vaults/:id/credentials/:credId/archive", (c) => handleArchiveCredential(c.req.raw, c.req.param("id"), c.req.param("credId")));
-app.get("/v1/vaults/:id/credentials/:credId", (c) => handleGetCredential(c.req.raw, c.req.param("id"), c.req.param("credId")));
-app.post("/v1/vaults/:id/credentials/:credId", (c) => handleUpdateCredential(c.req.raw, c.req.param("id"), c.req.param("credId")));
-app.delete("/v1/vaults/:id/credentials/:credId", (c) => handleDeleteCredential(c.req.raw, c.req.param("id"), c.req.param("credId")));
+app.post("/anthropic/v1/vaults/:id/credentials/:credId/archive", (c) => handleArchiveCredential(c.req.raw, c.req.param("id"), c.req.param("credId")));
+app.get("/anthropic/v1/vaults/:id/credentials/:credId", (c) => handleGetCredential(c.req.raw, c.req.param("id"), c.req.param("credId")));
+app.post("/anthropic/v1/vaults/:id/credentials/:credId", (c) => handleUpdateCredential(c.req.raw, c.req.param("id"), c.req.param("credId")));
+app.delete("/anthropic/v1/vaults/:id/credentials/:credId", (c) => handleDeleteCredential(c.req.raw, c.req.param("id"), c.req.param("credId")));
 
 // Vault entries
-app.get("/v1/vaults/:id/entries", (c) => handleListEntries(c.req.raw, c.req.param("id")));
-app.get("/v1/vaults/:id/entries/:key", (c) => handleGetEntry(c.req.raw, c.req.param("id"), c.req.param("key")));
-app.put("/v1/vaults/:id/entries/:key", (c) => handlePutEntry(c.req.raw, c.req.param("id"), c.req.param("key")));
-app.delete("/v1/vaults/:id/entries/:key", (c) => handleDeleteEntry(c.req.raw, c.req.param("id"), c.req.param("key")));
+app.get("/anthropic/v1/vaults/:id/entries", (c) => handleListEntries(c.req.raw, c.req.param("id")));
+app.get("/anthropic/v1/vaults/:id/entries/:key", (c) => handleGetEntry(c.req.raw, c.req.param("id"), c.req.param("key")));
+app.put("/anthropic/v1/vaults/:id/entries/:key", (c) => handlePutEntry(c.req.raw, c.req.param("id"), c.req.param("key")));
+app.delete("/anthropic/v1/vaults/:id/entries/:key", (c) => handleDeleteEntry(c.req.raw, c.req.param("id"), c.req.param("key")));
 
 // ── Memory Stores ────────────────────────────────────────────────────────
 app.post("/v1/memory_stores", (c) => handleCreateMemoryStore(c.req.raw));
@@ -478,13 +470,13 @@ app.delete("/v1/tenants/:id", (c) => handleArchiveTenant(c.req.raw, c.req.param(
 const notImplemented = (feature: string) => (c: Context) =>
   c.json({ type: "error", error: { type: "not_implemented", message: `${feature} is an Anthropic-hosted feature and is not available on self-hosted gateways.` } }, 501);
 
-app.post("/v1/user_profiles", (c) => handleCreateUserProfile(c.req.raw));
-app.get("/v1/user_profiles", (c) => handleListUserProfiles(c.req.raw));
-app.get("/v1/user_profiles/:id", (c) => handleGetUserProfile(c.req.raw, c.req.param("id")));
-app.post("/v1/user_profiles/:id", (c) => handleUpdateUserProfile(c.req.raw, c.req.param("id")));
-app.post("/v1/user_profiles/:id/enrollment_url", (c) => handleEnrollmentUrl(c.req.raw, c.req.param("id")));
-app.get("/v1/oauth/callback", (c) => handleOAuthCallback(c.req.raw));
-app.post("/v1/vaults/:id/credentials/:credId/mcp_oauth_validate", (c) => handleMcpOauthValidate(c.req.raw, c.req.param("id"), c.req.param("credId")));
+app.post("/anthropic/v1/user_profiles", (c) => handleCreateUserProfile(c.req.raw));
+app.get("/anthropic/v1/user_profiles", (c) => handleListUserProfiles(c.req.raw));
+app.get("/anthropic/v1/user_profiles/:id", (c) => handleGetUserProfile(c.req.raw, c.req.param("id")));
+app.post("/anthropic/v1/user_profiles/:id", (c) => handleUpdateUserProfile(c.req.raw, c.req.param("id")));
+app.post("/anthropic/v1/user_profiles/:id/enrollment_url", (c) => handleEnrollmentUrl(c.req.raw, c.req.param("id")));
+app.get("/anthropic/v1/oauth/callback", (c) => handleOAuthCallback(c.req.raw));
+app.post("/anthropic/v1/vaults/:id/credentials/:credId/mcp_oauth_validate", (c) => handleMcpOauthValidate(c.req.raw, c.req.param("id"), c.req.param("credId")));
 
 // ── Google Interactions API compat ───────────────────────────────────────────
 // Auth header translation: x-goog-api-key -> x-api-key
@@ -508,7 +500,7 @@ app.get("/google/v1beta/files/:fileRef", (c) => handleGetEnvironmentFiles(c.req.
 // ── SPA catch-all (must be last) ────────────────────────────────────────────
 app.get("*", (c) => {
   const path = c.req.path;
-  if (path === "/v1" || path.startsWith("/v1/") || path === "/api" || path.startsWith("/api/")) {
+  if (path === "/v1" || path.startsWith("/v1/") || path === "/anthropic/v1" || path.startsWith("/anthropic/v1/") || path === "/api" || path.startsWith("/api/")) {
     return c.json({ error: { type: "not_found_error", message: "Not found" } }, 404);
   }
   return serveUI(c);

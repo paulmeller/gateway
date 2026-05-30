@@ -140,9 +140,9 @@ describe("Anthropic API spec alignment", () => {
   describe("Agent response shape", () => {
     it("has all Anthropic-required fields", async () => {
       await bootDb();
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       const res = await handleCreateAgent(
-        req("/v1/agents", {
+        req("/anthropic/v1/agents", {
           body: { name: "spec-test-agent", model: { id: "claude-sonnet-4-6" } },
         }),
       );
@@ -156,9 +156,9 @@ describe("Anthropic API spec alignment", () => {
 
     it("type field is 'agent'", async () => {
       await bootDb();
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       const res = await handleCreateAgent(
-        req("/v1/agents", {
+        req("/anthropic/v1/agents", {
           body: { name: "type-test", model: { id: "claude-sonnet-4-6" } },
         }),
       );
@@ -168,9 +168,9 @@ describe("Anthropic API spec alignment", () => {
 
     it("model is an object with id field", async () => {
       await bootDb();
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       const res = await handleCreateAgent(
-        req("/v1/agents", {
+        req("/anthropic/v1/agents", {
           body: { name: "model-test", model: { id: "claude-sonnet-4-6" } },
         }),
       );
@@ -183,9 +183,9 @@ describe("Anthropic API spec alignment", () => {
 
     it("mcp_servers is an array", async () => {
       await bootDb();
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       const res = await handleCreateAgent(
-        req("/v1/agents", {
+        req("/anthropic/v1/agents", {
           body: { name: "mcp-test", model: { id: "claude-sonnet-4-6" } },
         }),
       );
@@ -195,9 +195,9 @@ describe("Anthropic API spec alignment", () => {
 
     it("tools is an array", async () => {
       await bootDb();
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       const res = await handleCreateAgent(
-        req("/v1/agents", {
+        req("/anthropic/v1/agents", {
           body: { name: "tools-test", model: { id: "claude-sonnet-4-6" } },
         }),
       );
@@ -207,9 +207,9 @@ describe("Anthropic API spec alignment", () => {
 
     it("skills is an array", async () => {
       await bootDb();
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       const res = await handleCreateAgent(
-        req("/v1/agents", {
+        req("/anthropic/v1/agents", {
           body: { name: "skills-test", model: { id: "claude-sonnet-4-6" } },
         }),
       );
@@ -219,9 +219,9 @@ describe("Anthropic API spec alignment", () => {
 
     it("metadata is an object", async () => {
       await bootDb();
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       const res = await handleCreateAgent(
-        req("/v1/agents", {
+        req("/anthropic/v1/agents", {
           body: { name: "meta-test", model: { id: "claude-sonnet-4-6" } },
         }),
       );
@@ -232,9 +232,9 @@ describe("Anthropic API spec alignment", () => {
 
     it("version is an integer", async () => {
       await bootDb();
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       const res = await handleCreateAgent(
-        req("/v1/agents", {
+        req("/anthropic/v1/agents", {
           body: { name: "version-test", model: { id: "claude-sonnet-4-6" } },
         }),
       );
@@ -246,9 +246,9 @@ describe("Anthropic API spec alignment", () => {
 
     it("timestamps are ISO 8601 strings or null", async () => {
       await bootDb();
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       const res = await handleCreateAgent(
-        req("/v1/agents", {
+        req("/anthropic/v1/agents", {
           body: { name: "ts-test", model: { id: "claude-sonnet-4-6" } },
         }),
       );
@@ -269,18 +269,18 @@ describe("Anthropic API spec alignment", () => {
   describe("Session response shape", () => {
     it("has all Anthropic-required fields", async () => {
       await bootDb();
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       const agentRes = await handleCreateAgent(
-        req("/v1/agents", {
+        req("/anthropic/v1/agents", {
           body: { name: "session-agent", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const agent = await agentRes.json();
       const env = await createReadyEnv({ name: "session-env" });
 
-      const { handleCreateSession } = await import("../src/handlers/sessions");
+      const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
       const res = await handleCreateSession(
-        req("/v1/sessions", {
+        req("/anthropic/v1/sessions", {
           body: { agent: agent.id, environment_id: env.id },
         }),
       );
@@ -294,18 +294,18 @@ describe("Anthropic API spec alignment", () => {
 
     it("type field is 'session'", async () => {
       await bootDb();
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       const agentRes = await handleCreateAgent(
-        req("/v1/agents", {
+        req("/anthropic/v1/agents", {
           body: { name: "session-type-agent", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const agent = await agentRes.json();
       const env = await createReadyEnv({ name: "session-type-env" });
 
-      const { handleCreateSession } = await import("../src/handlers/sessions");
+      const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
       const res = await handleCreateSession(
-        req("/v1/sessions", {
+        req("/anthropic/v1/sessions", {
           body: { agent: agent.id, environment_id: env.id },
         }),
       );
@@ -315,18 +315,18 @@ describe("Anthropic API spec alignment", () => {
 
     it("embedded agent has all required fields", async () => {
       await bootDb();
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       const agentRes = await handleCreateAgent(
-        req("/v1/agents", {
+        req("/anthropic/v1/agents", {
           body: { name: "embed-agent", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const agent = await agentRes.json();
       const env = await createReadyEnv({ name: "embed-env" });
 
-      const { handleCreateSession } = await import("../src/handlers/sessions");
+      const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
       const res = await handleCreateSession(
-        req("/v1/sessions", {
+        req("/anthropic/v1/sessions", {
           body: { agent: agent.id, environment_id: env.id },
         }),
       );
@@ -345,18 +345,18 @@ describe("Anthropic API spec alignment", () => {
 
     it("usage has cache_creation as nested object (not flat)", async () => {
       await bootDb();
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       const agentRes = await handleCreateAgent(
-        req("/v1/agents", {
+        req("/anthropic/v1/agents", {
           body: { name: "usage-agent", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const agent = await agentRes.json();
       const env = await createReadyEnv({ name: "usage-env" });
 
-      const { handleCreateSession } = await import("../src/handlers/sessions");
+      const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
       const res = await handleCreateSession(
-        req("/v1/sessions", {
+        req("/anthropic/v1/sessions", {
           body: { agent: agent.id, environment_id: env.id },
         }),
       );
@@ -375,18 +375,18 @@ describe("Anthropic API spec alignment", () => {
 
     it("stats has duration_seconds and active_seconds", async () => {
       await bootDb();
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       const agentRes = await handleCreateAgent(
-        req("/v1/agents", {
+        req("/anthropic/v1/agents", {
           body: { name: "stats-agent", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const agent = await agentRes.json();
       const env = await createReadyEnv({ name: "stats-env" });
 
-      const { handleCreateSession } = await import("../src/handlers/sessions");
+      const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
       const res = await handleCreateSession(
-        req("/v1/sessions", {
+        req("/anthropic/v1/sessions", {
           body: { agent: agent.id, environment_id: env.id },
         }),
       );
@@ -400,18 +400,18 @@ describe("Anthropic API spec alignment", () => {
 
     it("vault_ids is an array", async () => {
       await bootDb();
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       const agentRes = await handleCreateAgent(
-        req("/v1/agents", {
+        req("/anthropic/v1/agents", {
           body: { name: "vault-agent", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const agent = await agentRes.json();
       const env = await createReadyEnv({ name: "vault-env" });
 
-      const { handleCreateSession } = await import("../src/handlers/sessions");
+      const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
       const res = await handleCreateSession(
-        req("/v1/sessions", {
+        req("/anthropic/v1/sessions", {
           body: { agent: agent.id, environment_id: env.id },
         }),
       );
@@ -421,18 +421,18 @@ describe("Anthropic API spec alignment", () => {
 
     it("resources is an array", async () => {
       await bootDb();
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       const agentRes = await handleCreateAgent(
-        req("/v1/agents", {
+        req("/anthropic/v1/agents", {
           body: { name: "res-agent", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const agent = await agentRes.json();
       const env = await createReadyEnv({ name: "res-env" });
 
-      const { handleCreateSession } = await import("../src/handlers/sessions");
+      const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
       const res = await handleCreateSession(
-        req("/v1/sessions", {
+        req("/anthropic/v1/sessions", {
           body: { agent: agent.id, environment_id: env.id },
         }),
       );
@@ -448,17 +448,17 @@ describe("Anthropic API spec alignment", () => {
     it("has all Anthropic-required fields", async () => {
       await bootDb();
       // Vaults require an agent_id
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       const agentRes = await handleCreateAgent(
-        req("/v1/agents", {
+        req("/anthropic/v1/agents", {
           body: { name: "vault-spec-agent", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const agent = await agentRes.json();
 
-      const { handleCreateVault } = await import("../src/handlers/vaults");
+      const { handleCreateVault } = await import("../src/handlers/anthropic-compat/vaults");
       const res = await handleCreateVault(
-        req("/v1/vaults", {
+        req("/anthropic/v1/vaults", {
           body: { display_name: "spec-test-vault", agent_id: agent.id },
         }),
       );
@@ -472,17 +472,17 @@ describe("Anthropic API spec alignment", () => {
 
     it("type field is 'vault'", async () => {
       await bootDb();
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       const agentRes = await handleCreateAgent(
-        req("/v1/agents", {
+        req("/anthropic/v1/agents", {
           body: { name: "vault-type-agent", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const agent = await agentRes.json();
 
-      const { handleCreateVault } = await import("../src/handlers/vaults");
+      const { handleCreateVault } = await import("../src/handlers/anthropic-compat/vaults");
       const res = await handleCreateVault(
-        req("/v1/vaults", {
+        req("/anthropic/v1/vaults", {
           body: { display_name: "type-vault", agent_id: agent.id },
         }),
       );
@@ -492,17 +492,17 @@ describe("Anthropic API spec alignment", () => {
 
     it("metadata is an object", async () => {
       await bootDb();
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       const agentRes = await handleCreateAgent(
-        req("/v1/agents", {
+        req("/anthropic/v1/agents", {
           body: { name: "vault-meta-agent", model: { id: "claude-sonnet-4-6" } },
         }),
       );
       const agent = await agentRes.json();
 
-      const { handleCreateVault } = await import("../src/handlers/vaults");
+      const { handleCreateVault } = await import("../src/handlers/anthropic-compat/vaults");
       const res = await handleCreateVault(
-        req("/v1/vaults", {
+        req("/anthropic/v1/vaults", {
           body: { display_name: "meta-vault", agent_id: agent.id, metadata: { env: "test" } },
         }),
       );
@@ -524,8 +524,8 @@ describe("Anthropic API spec alignment", () => {
       await bootDb();
       const env = await createReadyEnv({ name: "spec-test-env" });
 
-      const { handleGetEnvironment } = await import("../src/handlers/environments");
-      const res = await handleGetEnvironment(req(`/v1/environments/${env.id}`), env.id as string);
+      const { handleGetEnvironment } = await import("../src/handlers/anthropic-compat/environments");
+      const res = await handleGetEnvironment(req(`/anthropic/v1/environments/${env.id}`), env.id as string);
       expect(res.status).toBe(200);
       const body = await res.json();
 
@@ -538,8 +538,8 @@ describe("Anthropic API spec alignment", () => {
       await bootDb();
       const env = await createReadyEnv({ name: "type-env" });
 
-      const { handleGetEnvironment } = await import("../src/handlers/environments");
-      const res = await handleGetEnvironment(req(`/v1/environments/${env.id}`), env.id as string);
+      const { handleGetEnvironment } = await import("../src/handlers/anthropic-compat/environments");
+      const res = await handleGetEnvironment(req(`/anthropic/v1/environments/${env.id}`), env.id as string);
       const body = await res.json();
       expect(body.type).toBe("environment");
     });
@@ -548,8 +548,8 @@ describe("Anthropic API spec alignment", () => {
       await bootDb();
       const env = await createReadyEnv({ name: "config-env" });
 
-      const { handleGetEnvironment } = await import("../src/handlers/environments");
-      const res = await handleGetEnvironment(req(`/v1/environments/${env.id}`), env.id as string);
+      const { handleGetEnvironment } = await import("../src/handlers/anthropic-compat/environments");
+      const res = await handleGetEnvironment(req(`/anthropic/v1/environments/${env.id}`), env.id as string);
       const body = await res.json();
       expect(typeof body.config).toBe("object");
       expect(body.config).toHaveProperty("type");
@@ -559,8 +559,8 @@ describe("Anthropic API spec alignment", () => {
       await bootDb();
       const env = await createReadyEnv({ name: "meta-env" });
 
-      const { handleGetEnvironment } = await import("../src/handlers/environments");
-      const res = await handleGetEnvironment(req(`/v1/environments/${env.id}`), env.id as string);
+      const { handleGetEnvironment } = await import("../src/handlers/anthropic-compat/environments");
+      const res = await handleGetEnvironment(req(`/anthropic/v1/environments/${env.id}`), env.id as string);
       const body = await res.json();
       expect(typeof body.metadata).toBe("object");
       expect(body.metadata).not.toBeNull();
@@ -573,13 +573,13 @@ describe("Anthropic API spec alignment", () => {
   describe("List response shape — has_more pagination", () => {
     it("agents list has data + has_more/first_id/last_id, no next_page", async () => {
       await bootDb();
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       await handleCreateAgent(
-        req("/v1/agents", { body: { name: "list-a1", model: { id: "claude-sonnet-4-6" } } }),
+        req("/anthropic/v1/agents", { body: { name: "list-a1", model: { id: "claude-sonnet-4-6" } } }),
       );
 
-      const { handleListAgents } = await import("../src/handlers/agents");
-      const res = await handleListAgents(req("/v1/agents"));
+      const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
+      const res = await handleListAgents(req("/anthropic/v1/agents"));
       expect(res.status).toBe(200);
       const body = await res.json();
 
@@ -593,20 +593,20 @@ describe("Anthropic API spec alignment", () => {
 
     it("sessions list has data + has_more/first_id/last_id, no next_page", async () => {
       await bootDb();
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       const agentRes = await handleCreateAgent(
-        req("/v1/agents", { body: { name: "list-session-agent", model: { id: "claude-sonnet-4-6" } } }),
+        req("/anthropic/v1/agents", { body: { name: "list-session-agent", model: { id: "claude-sonnet-4-6" } } }),
       );
       const agent = await agentRes.json();
       const env = await createReadyEnv({ name: "list-session-env" });
 
-      const { handleCreateSession } = await import("../src/handlers/sessions");
+      const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
       await handleCreateSession(
-        req("/v1/sessions", { body: { agent: agent.id, environment_id: env.id } }),
+        req("/anthropic/v1/sessions", { body: { agent: agent.id, environment_id: env.id } }),
       );
 
-      const { handleListSessions } = await import("../src/handlers/sessions");
-      const res = await handleListSessions(req("/v1/sessions"));
+      const { handleListSessions } = await import("../src/handlers/anthropic-compat/sessions");
+      const res = await handleListSessions(req("/anthropic/v1/sessions"));
       expect(res.status).toBe(200);
       const body = await res.json();
 
@@ -622,8 +622,8 @@ describe("Anthropic API spec alignment", () => {
       await bootDb();
       await createReadyEnv({ name: "list-env-1" });
 
-      const { handleListEnvironments } = await import("../src/handlers/environments");
-      const res = await handleListEnvironments(req("/v1/environments"));
+      const { handleListEnvironments } = await import("../src/handlers/anthropic-compat/environments");
+      const res = await handleListEnvironments(req("/anthropic/v1/environments"));
       expect(res.status).toBe(200);
       const body = await res.json();
 
@@ -637,19 +637,19 @@ describe("Anthropic API spec alignment", () => {
 
     it("vaults list has data + has_more/first_id/last_id, no next_page", async () => {
       await bootDb();
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       const agentRes = await handleCreateAgent(
-        req("/v1/agents", { body: { name: "list-vault-agent", model: { id: "claude-sonnet-4-6" } } }),
+        req("/anthropic/v1/agents", { body: { name: "list-vault-agent", model: { id: "claude-sonnet-4-6" } } }),
       );
       const agent = await agentRes.json();
 
-      const { handleCreateVault } = await import("../src/handlers/vaults");
+      const { handleCreateVault } = await import("../src/handlers/anthropic-compat/vaults");
       await handleCreateVault(
-        req("/v1/vaults", { body: { display_name: "list-vault", agent_id: agent.id } }),
+        req("/anthropic/v1/vaults", { body: { display_name: "list-vault", agent_id: agent.id } }),
       );
 
-      const { handleListVaults } = await import("../src/handlers/vaults");
-      const res = await handleListVaults(req("/v1/vaults"));
+      const { handleListVaults } = await import("../src/handlers/anthropic-compat/vaults");
+      const res = await handleListVaults(req("/anthropic/v1/vaults"));
       expect(res.status).toBe(200);
       const body = await res.json();
 
@@ -663,13 +663,13 @@ describe("Anthropic API spec alignment", () => {
 
     it("has_more is false when all results fit in one page", async () => {
       await bootDb();
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       await handleCreateAgent(
-        req("/v1/agents", { body: { name: "single-page", model: { id: "claude-sonnet-4-6" } } }),
+        req("/anthropic/v1/agents", { body: { name: "single-page", model: { id: "claude-sonnet-4-6" } } }),
       );
 
-      const { handleListAgents } = await import("../src/handlers/agents");
-      const res = await handleListAgents(req("/v1/agents"));
+      const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
+      const res = await handleListAgents(req("/anthropic/v1/agents"));
       const body = await res.json();
       expect(body.has_more).toBe(false);
     });
@@ -681,14 +681,14 @@ describe("Anthropic API spec alignment", () => {
   describe("Cross-resource consistency", () => {
     it("list items match single-resource shape", async () => {
       await bootDb();
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       const createRes = await handleCreateAgent(
-        req("/v1/agents", { body: { name: "consistency-agent", model: { id: "claude-sonnet-4-6" } } }),
+        req("/anthropic/v1/agents", { body: { name: "consistency-agent", model: { id: "claude-sonnet-4-6" } } }),
       );
       const created = await createRes.json();
 
-      const { handleListAgents } = await import("../src/handlers/agents");
-      const listRes = await handleListAgents(req("/v1/agents"));
+      const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
+      const listRes = await handleListAgents(req("/anthropic/v1/agents"));
       const listBody = await listRes.json();
       const listed = listBody.data[0];
 
@@ -703,21 +703,21 @@ describe("Anthropic API spec alignment", () => {
 
     it("session from list matches single session shape", async () => {
       await bootDb();
-      const { handleCreateAgent } = await import("../src/handlers/agents");
+      const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
       const agentRes = await handleCreateAgent(
-        req("/v1/agents", { body: { name: "list-sess-agent", model: { id: "claude-sonnet-4-6" } } }),
+        req("/anthropic/v1/agents", { body: { name: "list-sess-agent", model: { id: "claude-sonnet-4-6" } } }),
       );
       const agent = await agentRes.json();
       const env = await createReadyEnv({ name: "list-sess-env" });
 
-      const { handleCreateSession } = await import("../src/handlers/sessions");
+      const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
       const createRes = await handleCreateSession(
-        req("/v1/sessions", { body: { agent: agent.id, environment_id: env.id } }),
+        req("/anthropic/v1/sessions", { body: { agent: agent.id, environment_id: env.id } }),
       );
       const created = await createRes.json();
 
-      const { handleListSessions } = await import("../src/handlers/sessions");
-      const listRes = await handleListSessions(req("/v1/sessions"));
+      const { handleListSessions } = await import("../src/handlers/anthropic-compat/sessions");
+      const listRes = await handleListSessions(req("/anthropic/v1/sessions"));
       const listBody = await listRes.json();
       const listed = listBody.data[0];
 

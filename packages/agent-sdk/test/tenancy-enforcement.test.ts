@@ -109,11 +109,11 @@ describe("v0.5 tenant enforcement — agents", () => {
   it("list + get + patch + delete are scoped to caller's tenant", async () => {
     const { globalKey, acmeAdminKey } = await bootTenants();
     const { handleCreateAgent, handleListAgents, handleGetAgent, handleUpdateAgent, handleDeleteAgent } =
-      await import("../src/handlers/agents");
+      await import("../src/handlers/anthropic-compat/agents");
 
     // Global admin creates one agent in each tenant.
     const defRes = await handleCreateAgent(
-      req("/v1/agents", globalKey, {
+      req("/anthropic/v1/agents", globalKey, {
         body: { name: "default-a", model: { id: "claude-sonnet-4-6" }, tenant_id: "tenant_default" },
       }),
     );
@@ -121,7 +121,7 @@ describe("v0.5 tenant enforcement — agents", () => {
     const defAgent = await readJson(defRes);
 
     const acmeRes = await handleCreateAgent(
-      req("/v1/agents", globalKey, {
+      req("/anthropic/v1/agents", globalKey, {
         body: { name: "acme-a", model: { id: "claude-sonnet-4-6" }, tenant_id: "tenant_acme" },
       }),
     );
@@ -130,7 +130,7 @@ describe("v0.5 tenant enforcement — agents", () => {
 
     // Global admin sees both.
     const allList = await readJson(
-      await handleListAgents(req("/v1/agents", globalKey)),
+      await handleListAgents(req("/anthropic/v1/agents", globalKey)),
     );
     const allIds = (allList.data as Array<{ id: string }>).map(a => a.id);
     expect(allIds).toContain(defAgent.id);
@@ -138,7 +138,7 @@ describe("v0.5 tenant enforcement — agents", () => {
 
     // Acme admin sees only their tenant's agent.
     const acmeList = await readJson(
-      await handleListAgents(req("/v1/agents", acmeAdminKey)),
+      await handleListAgents(req("/anthropic/v1/agents", acmeAdminKey)),
     );
     const acmeIds = (acmeList.data as Array<{ id: string }>).map(a => a.id);
     expect(acmeIds).toContain(acmeAgent.id);
@@ -147,21 +147,21 @@ describe("v0.5 tenant enforcement — agents", () => {
     // Acme admin can't fetch default-tenant agent — 404 (not 403) to
     // prevent id-probing across tenants.
     const crossGet = await handleGetAgent(
-      req(`/v1/agents/${defAgent.id}`, acmeAdminKey),
+      req(`/anthropic/v1/agents/${defAgent.id}`, acmeAdminKey),
       defAgent.id as string,
     );
     expect(crossGet.status).toBe(404);
 
     // Cross-tenant patch → 404.
     const crossPatch = await handleUpdateAgent(
-      req(`/v1/agents/${defAgent.id}`, acmeAdminKey, { body: { name: "stolen" } }),
+      req(`/anthropic/v1/agents/${defAgent.id}`, acmeAdminKey, { body: { name: "stolen" } }),
       defAgent.id as string,
     );
     expect(crossPatch.status).toBe(404);
 
     // Cross-tenant delete → 404.
     const crossDel = await handleDeleteAgent(
-      req(`/v1/agents/${defAgent.id}`, acmeAdminKey, { method: "DELETE" }),
+      req(`/anthropic/v1/agents/${defAgent.id}`, acmeAdminKey, { method: "DELETE" }),
       defAgent.id as string,
     );
     expect(crossDel.status).toBe(404);
@@ -169,11 +169,11 @@ describe("v0.5 tenant enforcement — agents", () => {
 
   it("tenant user cannot create an agent in another tenant", async () => {
     const { acmeAdminKey } = await bootTenants();
-    const { handleCreateAgent, handleListAgents } = await import("../src/handlers/agents");
+    const { handleCreateAgent, handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
 
     // Body tenant_id is ignored for tenant users — their own tenant always wins.
     const res = await handleCreateAgent(
-      req("/v1/agents", acmeAdminKey, {
+      req("/anthropic/v1/agents", acmeAdminKey, {
         body: { name: "still-acme", model: { id: "claude-sonnet-4-6" }, tenant_id: "tenant_default" },
       }),
     );
@@ -188,7 +188,7 @@ describe("v0.5 tenant enforcement — agents", () => {
       rawKey: "ck_test_default_admin_0001",
     });
     const defList = await readJson(
-      await handleListAgents(req("/v1/agents", def.key)),
+      await handleListAgents(req("/anthropic/v1/agents", def.key)),
     );
     const names = (defList.data as Array<{ name: string }>).map(a => a.name);
     expect(names).not.toContain("still-acme");
@@ -201,7 +201,7 @@ describe("v0.5 tenant enforcement — environments", () => {
   it("list + get are scoped; cross-tenant get → 404", async () => {
     const { globalKey, acmeAdminKey } = await bootTenants();
     const { handleListEnvironments, handleGetEnvironment } = await import(
-      "../src/handlers/environments"
+      "../src/handlers/anthropic-compat/environments"
     );
     // Seed env rows directly in each tenant to avoid provider checks.
     const { getDb } = await import("../src/db/client");
@@ -222,7 +222,7 @@ describe("v0.5 tenant enforcement — environments", () => {
 
     // Global admin sees both.
     const all = await readJson(
-      await handleListEnvironments(req("/v1/environments", globalKey)),
+      await handleListEnvironments(req("/anthropic/v1/environments", globalKey)),
     );
     const allIds = (all.data as Array<{ id: string }>).map(e => e.id);
     expect(allIds).toContain(defEnvId);
@@ -230,7 +230,7 @@ describe("v0.5 tenant enforcement — environments", () => {
 
     // Acme admin sees only their tenant.
     const acme = await readJson(
-      await handleListEnvironments(req("/v1/environments", acmeAdminKey)),
+      await handleListEnvironments(req("/anthropic/v1/environments", acmeAdminKey)),
     );
     const acmeIds = (acme.data as Array<{ id: string }>).map(e => e.id);
     expect(acmeIds).toContain(acmeEnvId);
@@ -238,7 +238,7 @@ describe("v0.5 tenant enforcement — environments", () => {
 
     // Acme admin cross-tenant GET → 404.
     const crossGet = await handleGetEnvironment(
-      req(`/v1/environments/${defEnvId}`, acmeAdminKey),
+      req(`/anthropic/v1/environments/${defEnvId}`, acmeAdminKey),
       defEnvId,
     );
     expect(crossGet.status).toBe(404);
@@ -250,8 +250,8 @@ describe("v0.5 tenant enforcement — sessions", () => {
 
   it("cross-tenant agent + env is refused with 400", async () => {
     const { globalKey } = await bootTenants();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
-    const { handleCreateSession } = await import("../src/handlers/sessions");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
+    const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
     const { getDb } = await import("../src/db/client");
     const { newId } = await import("../src/util/ids");
     const { nowMs } = await import("../src/util/clock");
@@ -259,7 +259,7 @@ describe("v0.5 tenant enforcement — sessions", () => {
     // Agent in default tenant, env in acme tenant — both created by the
     // global admin who can pick tenants.
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", globalKey, {
+      req("/anthropic/v1/agents", globalKey, {
         body: { name: "cross-a", model: { id: "claude-sonnet-4-6" }, tenant_id: "tenant_default" },
       }),
     );
@@ -274,7 +274,7 @@ describe("v0.5 tenant enforcement — sessions", () => {
       .run(envId, nowMs());
 
     const res = await handleCreateSession(
-      req("/v1/sessions", globalKey, {
+      req("/anthropic/v1/sessions", globalKey, {
         body: { agent: agent.id, environment_id: envId },
       }),
     );
@@ -286,16 +286,16 @@ describe("v0.5 tenant enforcement — sessions", () => {
 
   it("session create stamps tenant_id from the agent/env tenant", async () => {
     const { acmeAdminKey } = await bootTenants();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
     const { handleCreateSession, handleListSessions } = await import(
-      "../src/handlers/sessions"
+      "../src/handlers/anthropic-compat/sessions"
     );
     const { getDb } = await import("../src/db/client");
     const { newId } = await import("../src/util/ids");
     const { nowMs } = await import("../src/util/clock");
 
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", acmeAdminKey, {
+      req("/anthropic/v1/agents", acmeAdminKey, {
         body: { name: "acme-agent", model: { id: "claude-sonnet-4-6" } },
       }),
     );
@@ -310,7 +310,7 @@ describe("v0.5 tenant enforcement — sessions", () => {
       .run(envId, nowMs());
 
     const createRes = await handleCreateSession(
-      req("/v1/sessions", acmeAdminKey, {
+      req("/anthropic/v1/sessions", acmeAdminKey, {
         body: { agent: agent.id, environment_id: envId },
       }),
     );
@@ -332,7 +332,7 @@ describe("v0.5 tenant enforcement — sessions", () => {
       rawKey: "ck_test_default_admin_sess",
     });
     const defList = await readJson(
-      await handleListSessions(req("/v1/sessions", def.key)),
+      await handleListSessions(req("/anthropic/v1/sessions", def.key)),
     );
     const defIds = (defList.data as Array<{ id: string }>).map(s => s.id);
     expect(defIds).not.toContain(session.id);
@@ -344,8 +344,8 @@ describe("v0.5 tenant enforcement — session fallback", () => {
 
   it("cross-tenant fallback tuples are silently skipped", async () => {
     const { globalKey } = await bootTenants();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
-    const { handleCreateSession } = await import("../src/handlers/sessions");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
+    const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
     const { getDb } = await import("../src/db/client");
     const { newId } = await import("../src/util/ids");
     const { nowMs } = await import("../src/util/clock");
@@ -353,7 +353,7 @@ describe("v0.5 tenant enforcement — session fallback", () => {
     // Primary agent + primary env in default tenant.
     const primaryAgent = await readJson(
       await handleCreateAgent(
-        req("/v1/agents", globalKey, {
+        req("/anthropic/v1/agents", globalKey, {
           body: { name: "primary", model: { id: "claude-sonnet-4-6" }, tenant_id: "tenant_default" },
         }),
       ),
@@ -398,7 +398,7 @@ describe("v0.5 tenant enforcement — session fallback", () => {
     // so `tryCreate` throws "environment is not ready" (which is normally
     // retryable), and the only fallback is cross-tenant and gets skipped.
     const res = await handleCreateSession(
-      req("/v1/sessions", globalKey, {
+      req("/anthropic/v1/sessions", globalKey, {
         body: { agent: primaryAgent.id, environment_id: primaryEnvId },
       }),
     );
@@ -414,15 +414,15 @@ describe("v0.5 tenant enforcement — session fallback", () => {
     // another tenant". Before the fix, both landed in the same bucket
     // with the "different tenant" message, misleading the operator.
     const { globalKey } = await bootTenants();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
-    const { handleCreateSession } = await import("../src/handlers/sessions");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
+    const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
     const { getDb } = await import("../src/db/client");
     const { newId } = await import("../src/util/ids");
     const { nowMs } = await import("../src/util/clock");
 
     const primary = await readJson(
       await handleCreateAgent(
-        req("/v1/agents", globalKey, {
+        req("/anthropic/v1/agents", globalKey, {
           body: { name: "has-stale-fallback", model: { id: "claude-sonnet-4-6" }, tenant_id: "tenant_default" },
         }),
       ),
@@ -441,7 +441,7 @@ describe("v0.5 tenant enforcement — session fallback", () => {
       .run(fallbackJson, primary.id);
 
     const res = await handleCreateSession(
-      req("/v1/sessions", globalKey, {
+      req("/anthropic/v1/sessions", globalKey, {
         body: { agent: primary.id, environment_id: primaryEnvId },
       }),
     );
@@ -453,22 +453,22 @@ describe("v0.5 tenant enforcement — session fallback", () => {
 
   it("same-tenant fallback still works", async () => {
     const { acmeAdminKey } = await bootTenants();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
-    const { handleCreateSession } = await import("../src/handlers/sessions");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
+    const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
     const { getDb } = await import("../src/db/client");
     const { newId } = await import("../src/util/ids");
     const { nowMs } = await import("../src/util/clock");
 
     const primary = await readJson(
       await handleCreateAgent(
-        req("/v1/agents", acmeAdminKey, {
+        req("/anthropic/v1/agents", acmeAdminKey, {
           body: { name: "primary", model: { id: "claude-sonnet-4-6" } },
         }),
       ),
     );
     const backup = await readJson(
       await handleCreateAgent(
-        req("/v1/agents", acmeAdminKey, {
+        req("/anthropic/v1/agents", acmeAdminKey, {
           body: { name: "backup", model: { id: "claude-sonnet-4-6" } },
         }),
       ),
@@ -494,7 +494,7 @@ describe("v0.5 tenant enforcement — session fallback", () => {
     );
 
     const res = await handleCreateSession(
-      req("/v1/sessions", acmeAdminKey, {
+      req("/anthropic/v1/sessions", acmeAdminKey, {
         body: { agent: primary.id, environment_id: brokenEnv },
       }),
     );
@@ -578,30 +578,30 @@ describe("v0.5 tenant enforcement — proxied (Anthropic backend) sessions", () 
     markProxied("sess_proxy_acme",    "session", "tenant_acme");
 
     const { handleGetSession, handleDeleteSession, handleArchiveSession } =
-      await import("../src/handlers/sessions");
-    const { handleSessionStream } = await import("../src/handlers/stream");
+      await import("../src/handlers/anthropic-compat/sessions");
+    const { handleSessionStream } = await import("../src/handlers/anthropic-compat/stream");
 
     // Acme admin trying to access tenant_default's proxy session: 404
     // (not 403) so there's no id-existence probe.
     const getRes = await handleGetSession(
-      req("/v1/sessions/sess_proxy_default", acmeAdminKey), "sess_proxy_default",
+      req("/anthropic/v1/sessions/sess_proxy_default", acmeAdminKey), "sess_proxy_default",
     );
     expect(getRes.status).toBe(404);
 
     const delRes = await handleDeleteSession(
-      req("/v1/sessions/sess_proxy_default", acmeAdminKey, { method: "DELETE" }),
+      req("/anthropic/v1/sessions/sess_proxy_default", acmeAdminKey, { method: "DELETE" }),
       "sess_proxy_default",
     );
     expect(delRes.status).toBe(404);
 
     const archRes = await handleArchiveSession(
-      req("/v1/sessions/sess_proxy_default/archive", acmeAdminKey, { method: "POST" }),
+      req("/anthropic/v1/sessions/sess_proxy_default/archive", acmeAdminKey, { method: "POST" }),
       "sess_proxy_default",
     );
     expect(archRes.status).toBe(404);
 
     const streamRes = await handleSessionStream(
-      req("/v1/sessions/sess_proxy_default/stream", acmeAdminKey),
+      req("/anthropic/v1/sessions/sess_proxy_default/stream", acmeAdminKey),
       "sess_proxy_default",
     );
     expect(streamRes.status).toBe(404);
@@ -619,16 +619,16 @@ describe("v0.5 tenant enforcement — proxied (Anthropic backend) sessions", () 
     markProxied("agent_proxy_default", "agent", "tenant_default");
     markProxied("env_proxy_default", "environment", "tenant_default");
 
-    const { handleGetAgent } = await import("../src/handlers/agents");
-    const { handleGetEnvironment } = await import("../src/handlers/environments");
+    const { handleGetAgent } = await import("../src/handlers/anthropic-compat/agents");
+    const { handleGetEnvironment } = await import("../src/handlers/anthropic-compat/environments");
 
     const a = await handleGetAgent(
-      req("/v1/agents/agent_proxy_default", acmeAdminKey), "agent_proxy_default",
+      req("/anthropic/v1/agents/agent_proxy_default", acmeAdminKey), "agent_proxy_default",
     );
     expect(a.status).toBe(404);
 
     const e = await handleGetEnvironment(
-      req("/v1/environments/env_proxy_default", acmeAdminKey), "env_proxy_default",
+      req("/anthropic/v1/environments/env_proxy_default", acmeAdminKey), "env_proxy_default",
     );
     expect(e.status).toBe(404);
   });
@@ -732,10 +732,10 @@ describe("v0.5 tenant enforcement — session-scoped subresources", () => {
     const { acmeAdminKey } = await bootTenants();
     const sess = await seedSession("tenant_default");
 
-    const { handlePostEvents, handleListEvents } = await import("../src/handlers/events");
+    const { handlePostEvents, handleListEvents } = await import("../src/handlers/anthropic-compat/events");
 
     const postRes = await handlePostEvents(
-      req(`/v1/sessions/${sess}/events`, acmeAdminKey, {
+      req(`/anthropic/v1/sessions/${sess}/events`, acmeAdminKey, {
         body: { events: [{ type: "user.interrupt" }] },
       }),
       sess,
@@ -743,7 +743,7 @@ describe("v0.5 tenant enforcement — session-scoped subresources", () => {
     expect(postRes.status).toBe(404);
 
     const listRes = await handleListEvents(
-      req(`/v1/sessions/${sess}/events`, acmeAdminKey),
+      req(`/anthropic/v1/sessions/${sess}/events`, acmeAdminKey),
       sess,
     );
     expect(listRes.status).toBe(404);
@@ -752,9 +752,9 @@ describe("v0.5 tenant enforcement — session-scoped subresources", () => {
   it("stream from another tenant returns 404", async () => {
     const { acmeAdminKey } = await bootTenants();
     const sess = await seedSession("tenant_default");
-    const { handleSessionStream } = await import("../src/handlers/stream");
+    const { handleSessionStream } = await import("../src/handlers/anthropic-compat/stream");
     const res = await handleSessionStream(
-      req(`/v1/sessions/${sess}/stream`, acmeAdminKey),
+      req(`/anthropic/v1/sessions/${sess}/stream`, acmeAdminKey),
       sess,
     );
     expect(res.status).toBe(404);
@@ -763,14 +763,14 @@ describe("v0.5 tenant enforcement — session-scoped subresources", () => {
   it("resources from another tenant returns 404", async () => {
     const { acmeAdminKey } = await bootTenants();
     const sess = await seedSession("tenant_default");
-    const { handleAddResource, handleListResources } = await import("../src/handlers/resources");
+    const { handleAddResource, handleListResources } = await import("../src/handlers/anthropic-compat/resources");
     const listRes = await handleListResources(
-      req(`/v1/sessions/${sess}/resources`, acmeAdminKey),
+      req(`/anthropic/v1/sessions/${sess}/resources`, acmeAdminKey),
       sess,
     );
     expect(listRes.status).toBe(404);
     const addRes = await handleAddResource(
-      req(`/v1/sessions/${sess}/resources`, acmeAdminKey, {
+      req(`/anthropic/v1/sessions/${sess}/resources`, acmeAdminKey, {
         body: { type: "uri", uri: "https://x" },
       }),
       sess,
@@ -781,9 +781,9 @@ describe("v0.5 tenant enforcement — session-scoped subresources", () => {
   it("threads from another tenant returns 404", async () => {
     const { acmeAdminKey } = await bootTenants();
     const sess = await seedSession("tenant_default");
-    const { handleListThreads } = await import("../src/handlers/threads");
+    const { handleListThreads } = await import("../src/handlers/anthropic-compat/threads");
     const res = await handleListThreads(
-      req(`/v1/sessions/${sess}/threads`, acmeAdminKey),
+      req(`/anthropic/v1/sessions/${sess}/threads`, acmeAdminKey),
       sess,
     );
     expect(res.status).toBe(404);
@@ -792,9 +792,9 @@ describe("v0.5 tenant enforcement — session-scoped subresources", () => {
   it("files scope_id from another tenant returns 404", async () => {
     const { acmeAdminKey } = await bootTenants();
     const sess = await seedSession("tenant_default");
-    const { handleListFiles } = await import("../src/handlers/files");
+    const { handleListFiles } = await import("../src/handlers/anthropic-compat/files");
     const res = await handleListFiles(
-      req(`/v1/files?scope_id=${sess}`, acmeAdminKey),
+      req(`/anthropic/v1/files?scope_id=${sess}`, acmeAdminKey),
     );
     expect(res.status).toBe(404);
   });

@@ -1,13 +1,13 @@
 import { z } from "zod";
-import { routeWrap, jsonOk, paginatedOk, decodeCursor } from "../http";
-import { getDb } from "../db/client";
-import { createAgent, getAgent, updateAgent, archiveAgent, listAgents, listAgentVersions } from "../db/agents";
-import { resolveBackend } from "../backends/registry";
-import { isProxied, markProxied, unmarkProxied, getProxiedTenantId } from "../db/proxy";
-import { forwardToAnthropic, validateAnthropicProxy } from "../proxy/forward";
-import { badRequest, notFound, conflict } from "../errors";
-import { assertResourceTenant, resolveCreateTenant, tenantFilter } from "../auth/scope";
-import type { AgentSkill, AuthContext } from "../types";
+import { routeWrap, jsonOk, paginatedOk, decodeCursor } from "../../http";
+import { getDb } from "../../db/client";
+import { createAgent, getAgent, updateAgent, archiveAgent, listAgents, listAgentVersions } from "../../db/agents";
+import { resolveBackend } from "../../backends/registry";
+import { isProxied, markProxied, unmarkProxied, getProxiedTenantId } from "../../db/proxy";
+import { forwardToAnthropic, validateAnthropicProxy } from "../../proxy/forward";
+import { badRequest, notFound, conflict } from "../../errors";
+import { assertResourceTenant, resolveCreateTenant, tenantFilter } from "../../auth/scope";
+import type { AgentSkill, AuthContext } from "../../types";
 
 /**
  * Load the tenant_id column for an agent row directly. The public
@@ -168,7 +168,7 @@ async function resolveSkillInputs(
   for (const s of skills) {
     // Anthropic format: reference to a DB-stored or hosted skill
     if ("skill_id" in s && s.skill_id) {
-      const { getSkill: dbGetSkill, getSkillVersion: dbGetSkillVersion } = await import("../db/skills");
+      const { getSkill: dbGetSkill, getSkillVersion: dbGetSkillVersion } = await import("../../db/skills");
       const dbSkill = dbGetSkill(s.skill_id);
 
       if (dbSkill) {
@@ -353,10 +353,10 @@ export function handleCreateAgent(request: Request): Promise<Response> {
 
     // Infer engine from model prefix if not explicitly set.
     // e.g. "gemini-3.5-flash" → engine "gemini", "gpt-5.4" → engine "codex".
-    const { inferEngineFromModel } = await import("../backends/models");
+    const { inferEngineFromModel } = await import("../../backends/models");
     const backendName = (parsed.data.engine
       ?? inferEngineFromModel(parsed.data.model.id)
-      ?? "claude") as import("../backends/types").AnyBackendName;
+      ?? "claude") as import("../../backends/types").AnyBackendName;
 
     if (backendName === "anthropic") {
       const proxyErr = validateAnthropicProxy();
@@ -379,7 +379,7 @@ export function handleCreateAgent(request: Request): Promise<Response> {
     const modelSpeed = "speed" in parsed.data.model ? parsed.data.model.speed : undefined;
 
     // Validate model is supported by this engine
-    const { isValidModelForEngine, FALLBACK_MODELS } = await import("../backends/models");
+    const { isValidModelForEngine, FALLBACK_MODELS } = await import("../../backends/models");
     if (!isValidModelForEngine(backendName, modelId)) {
       throw badRequest(
         `Model "${modelId}" is not supported by the ${backendName} engine. ` +
@@ -420,7 +420,7 @@ export function handleCreateAgent(request: Request): Promise<Response> {
       metadata: parsed.data.metadata,
       system: parsed.data.system ?? null,
       tools: parsed.data.tools ?? [{ type: "agent_toolset_20260401" }],
-      mcp_servers: mcpRecord as Record<string, import("../types").McpServerConfig>,
+      mcp_servers: mcpRecord as Record<string, import("../../types").McpServerConfig>,
       backend: backendName,
       webhook_url: parsed.data.webhook_url ?? null,
       webhook_events: parsed.data.webhook_events,

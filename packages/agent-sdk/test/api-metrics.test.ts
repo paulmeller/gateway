@@ -64,14 +64,14 @@ vi.mock("../src/containers/lifecycle", () => ({
 describe("normalizeRoute", () => {
   it("collapses prefixed ULIDs into :id", async () => {
     const { normalizeRoute } = await import("../src/observability/api-metrics");
-    expect(normalizeRoute("/v1/sessions/sess_01HXXXXXXXXXXXXXXXXXXXXXXX")).toBe(
-      "/v1/sessions/:id",
+    expect(normalizeRoute("/anthropic/v1/sessions/sess_01HXXXXXXXXXXXXXXXXXXXXXXX")).toBe(
+      "/anthropic/v1/sessions/:id",
     );
     expect(
-      normalizeRoute("/v1/sessions/sess_01HXXXXXXXXXXXXXXXXXXXXXXX/events"),
-    ).toBe("/v1/sessions/:id/events");
-    expect(normalizeRoute("/v1/agents/agent_01HYYYYYYYYYYYYYYYYYYYYYYY")).toBe(
-      "/v1/agents/:id",
+      normalizeRoute("/anthropic/v1/sessions/sess_01HXXXXXXXXXXXXXXXXXXXXXXX/events"),
+    ).toBe("/anthropic/v1/sessions/:id/events");
+    expect(normalizeRoute("/anthropic/v1/agents/agent_01HYYYYYYYYYYYYYYYYYYYYYYY")).toBe(
+      "/anthropic/v1/agents/:id",
     );
   });
 
@@ -90,7 +90,7 @@ describe("normalizeRoute", () => {
   it("leaves short static segments alone", async () => {
     const { normalizeRoute } = await import("../src/observability/api-metrics");
     expect(normalizeRoute("/v1/metrics/api")).toBe("/v1/metrics/api");
-    expect(normalizeRoute("/v1/agents")).toBe("/v1/agents");
+    expect(normalizeRoute("/anthropic/v1/agents")).toBe("/anthropic/v1/agents");
   });
 });
 
@@ -106,13 +106,13 @@ describe("recordApiRequest + snapshotApiMetrics", () => {
     resetApiMetrics();
 
     // Three 200s on /v1/agents with increasing latencies
-    recordApiRequest("/v1/agents", 10, 200);
-    recordApiRequest("/v1/agents", 50, 200);
-    recordApiRequest("/v1/agents", 500, 200);
+    recordApiRequest("/anthropic/v1/agents", 10, 200);
+    recordApiRequest("/anthropic/v1/agents", 50, 200);
+    recordApiRequest("/anthropic/v1/agents", 500, 200);
     // One 404 on /v1/agents/:id
-    recordApiRequest("/v1/agents/:id", 5, 404);
+    recordApiRequest("/anthropic/v1/agents/:id", 5, 404);
     // One 500 on /v1/sessions
-    recordApiRequest("/v1/sessions", 800, 500);
+    recordApiRequest("/anthropic/v1/sessions", 800, 500);
 
     const snap = snapshotApiMetrics();
     expect(snap.totals.count).toBe(5);
@@ -123,7 +123,7 @@ describe("recordApiRequest + snapshotApiMetrics", () => {
     expect(snap.totals.error_rate).toBeCloseTo(1 / 5, 5);
 
     // Per-route breakdown
-    const agents = snap.routes.find((r) => r.route === "/v1/agents")!;
+    const agents = snap.routes.find((r) => r.route === "/anthropic/v1/agents")!;
     expect(agents).toBeDefined();
     expect(agents.count).toBe(3);
     expect(agents.status_2xx).toBe(3);
@@ -131,13 +131,13 @@ describe("recordApiRequest + snapshotApiMetrics", () => {
     // With 3 samples sorted = [10, 50, 500]. p50 idx = floor(0.5 * 3) = 1 → 50
     expect(agents.p50_ms).toBe(50);
 
-    const agentsId = snap.routes.find((r) => r.route === "/v1/agents/:id")!;
+    const agentsId = snap.routes.find((r) => r.route === "/anthropic/v1/agents/:id")!;
     expect(agentsId.count).toBe(1);
     expect(agentsId.status_4xx).toBe(1);
     // 404 alone is not an error — error_rate stays 0, status_4xx surfaces separately
     expect(agentsId.error_rate).toBe(0);
 
-    const sessions = snap.routes.find((r) => r.route === "/v1/sessions")!;
+    const sessions = snap.routes.find((r) => r.route === "/anthropic/v1/sessions")!;
     expect(sessions.status_5xx).toBe(1);
     expect(sessions.error_rate).toBe(1);
 
@@ -249,8 +249,8 @@ describe("handleGetApiMetrics", () => {
     const { createApiKey } = await import("../src/db/api_keys");
     createApiKey({ name: "t", permissions: ["*"], rawKey: "test-api-key-apim3" });
 
-    recordApiRequest("/v1/agents", 25, 200);
-    recordApiRequest("/v1/agents", 80, 200);
+    recordApiRequest("/anthropic/v1/agents", 25, 200);
+    recordApiRequest("/anthropic/v1/agents", 80, 200);
 
     const { handleGetApiMetrics } = await import("../src/handlers/metrics");
     const res = await handleGetApiMetrics(
@@ -268,7 +268,7 @@ describe("handleGetApiMetrics", () => {
     expect(body.window_minutes).toBe(60);
     // +1 for the self-request we just made
     expect(body.totals.count).toBeGreaterThanOrEqual(2);
-    expect(body.routes.find((r) => r.route === "/v1/agents")?.count).toBe(2);
+    expect(body.routes.find((r) => r.route === "/anthropic/v1/agents")?.count).toBe(2);
     expect(body.timeline.length).toBeGreaterThan(0);
   });
 

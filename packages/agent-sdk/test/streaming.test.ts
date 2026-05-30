@@ -389,10 +389,10 @@ describe("streaming — prepareSessionStream", () => {
     const { ensureInitialized } = await import("../src/init");
     await ensureInitialized();
 
-    const { prepareSessionStream } = await import("../src/handlers/stream");
+    const { prepareSessionStream } = await import("../src/handlers/anthropic-compat/stream");
 
     const request = new Request(
-      `http://localhost/v1/sessions/sess_hdr/events/stream`,
+      `http://localhost/anthropic/v1/sessions/sess_hdr/events/stream`,
       {
         headers: {
           "x-api-key": "test-api-key-stream",
@@ -415,10 +415,10 @@ describe("streaming — prepareSessionStream", () => {
     const { ensureInitialized } = await import("../src/init");
     await ensureInitialized();
 
-    const { prepareSessionStream } = await import("../src/handlers/stream");
+    const { prepareSessionStream } = await import("../src/handlers/anthropic-compat/stream");
 
     const request = new Request(
-      `http://localhost/v1/sessions/sess_qp/events/stream?after_seq=17`,
+      `http://localhost/anthropic/v1/sessions/sess_qp/events/stream?after_seq=17`,
       {
         headers: {
           "x-api-key": "test-api-key-stream",
@@ -439,10 +439,10 @@ describe("streaming — prepareSessionStream", () => {
     const { ensureInitialized } = await import("../src/init");
     await ensureInitialized();
 
-    const { prepareSessionStream } = await import("../src/handlers/stream");
+    const { prepareSessionStream } = await import("../src/handlers/anthropic-compat/stream");
 
     const request = new Request(
-      `http://localhost/v1/sessions/sess_noauth/events/stream`,
+      `http://localhost/anthropic/v1/sessions/sess_noauth/events/stream`,
       {
         headers: {
           // No x-api-key header

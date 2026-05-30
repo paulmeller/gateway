@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { routeWrap, jsonOk, paginatedOk } from "../http";
-import { getDb } from "../db/client";
-import { createVault, getVault, updateVault, archiveVault, deleteVault, listVaults, listEntries, getEntry, setEntry, deleteEntry } from "../db/vaults";
-import { getAgent } from "../db/agents";
-import { badRequest, notFound, conflict } from "../errors";
-import { assertResourceTenant, resolveCreateTenant, tenantFilter } from "../auth/scope";
-import type { AuthContext } from "../types";
+import { routeWrap, jsonOk, paginatedOk } from "../../http";
+import { getDb } from "../../db/client";
+import { createVault, getVault, updateVault, archiveVault, deleteVault, listVaults, listEntries, getEntry, setEntry, deleteEntry } from "../../db/vaults";
+import { getAgent } from "../../db/agents";
+import { badRequest, notFound, conflict } from "../../errors";
+import { assertResourceTenant, resolveCreateTenant, tenantFilter } from "../../auth/scope";
+import type { AuthContext } from "../../types";
 
 function getVaultTenantId(id: string): string | null | undefined {
   const row = getDb()

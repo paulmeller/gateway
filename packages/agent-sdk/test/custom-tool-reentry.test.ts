@@ -60,14 +60,14 @@ describe("executeServerSideTool", () => {
 
   it("returns null for unknown tools", async () => {
     await boot();
-    const { executeServerSideTool } = await import("../src/handlers/events");
+    const { executeServerSideTool } = await import("../src/handlers/anthropic-compat/events");
     const result = await executeServerSideTool("unknown_tool", { foo: "bar" }, "sess_fake");
     expect(result).toBeNull();
   });
 
   it("handles memory view command", async () => {
     await boot();
-    const { executeServerSideTool } = await import("../src/handlers/events");
+    const { executeServerSideTool } = await import("../src/handlers/anthropic-compat/events");
     const { createOrUpsertMemory } = await import("../src/db/memory");
 
     const store = await createTestStore("test-store");
@@ -82,7 +82,7 @@ describe("executeServerSideTool", () => {
 
   it("handles memory search command", async () => {
     await boot();
-    const { executeServerSideTool } = await import("../src/handlers/events");
+    const { executeServerSideTool } = await import("../src/handlers/anthropic-compat/events");
     const { createOrUpsertMemory } = await import("../src/db/memory");
 
     const store = await createTestStore("search-store");
@@ -102,7 +102,7 @@ describe("executeServerSideTool", () => {
 
   it("handles memory create command", async () => {
     await boot();
-    const { executeServerSideTool } = await import("../src/handlers/events");
+    const { executeServerSideTool } = await import("../src/handlers/anthropic-compat/events");
 
     const store = await createTestStore("create-store");
 
@@ -120,7 +120,7 @@ describe("executeServerSideTool", () => {
 
   it("handles memory update command", async () => {
     await boot();
-    const { executeServerSideTool } = await import("../src/handlers/events");
+    const { executeServerSideTool } = await import("../src/handlers/anthropic-compat/events");
     const { createOrUpsertMemory } = await import("../src/db/memory");
 
     const store = await createTestStore("update-store");
@@ -138,7 +138,7 @@ describe("executeServerSideTool", () => {
 
   it("returns error for update of nonexistent memory", async () => {
     await boot();
-    const { executeServerSideTool } = await import("../src/handlers/events");
+    const { executeServerSideTool } = await import("../src/handlers/anthropic-compat/events");
 
     const result = await executeServerSideTool("memory", {
       command: "update",
@@ -152,7 +152,7 @@ describe("executeServerSideTool", () => {
 
   it("handles memory delete command", async () => {
     await boot();
-    const { executeServerSideTool } = await import("../src/handlers/events");
+    const { executeServerSideTool } = await import("../src/handlers/anthropic-compat/events");
     const { createOrUpsertMemory, getMemory } = await import("../src/db/memory");
 
     const store = await createTestStore("del-store");
@@ -172,7 +172,7 @@ describe("executeServerSideTool", () => {
 
   it("returns error for missing store_id on view", async () => {
     await boot();
-    const { executeServerSideTool } = await import("../src/handlers/events");
+    const { executeServerSideTool } = await import("../src/handlers/anthropic-compat/events");
 
     const result = await executeServerSideTool("memory", { command: "view" }, "sess_fake");
     expect(result).not.toBeNull();
@@ -182,7 +182,7 @@ describe("executeServerSideTool", () => {
 
   it("returns error for unknown memory command", async () => {
     await boot();
-    const { executeServerSideTool } = await import("../src/handlers/events");
+    const { executeServerSideTool } = await import("../src/handlers/anthropic-compat/events");
 
     const result = await executeServerSideTool("memory", { command: "teleport" }, "sess_fake");
     expect(result).not.toBeNull();
@@ -192,7 +192,7 @@ describe("executeServerSideTool", () => {
 
   it("handles memory_ prefixed tools", async () => {
     await boot();
-    const { executeServerSideTool } = await import("../src/handlers/events");
+    const { executeServerSideTool } = await import("../src/handlers/anthropic-compat/events");
 
     const store = await createTestStore("prefix-store");
 
@@ -207,7 +207,7 @@ describe("executeServerSideTool", () => {
 
   it("handles list_stores command", async () => {
     await boot();
-    const { executeServerSideTool } = await import("../src/handlers/events");
+    const { executeServerSideTool } = await import("../src/handlers/anthropic-compat/events");
 
     await createTestStore("store-a");
     await createTestStore("store-b");
@@ -220,7 +220,7 @@ describe("executeServerSideTool", () => {
 
   it("returns error for search missing query", async () => {
     await boot();
-    const { executeServerSideTool } = await import("../src/handlers/events");
+    const { executeServerSideTool } = await import("../src/handlers/anthropic-compat/events");
 
     const store = await createTestStore("search-no-q");
 
@@ -235,7 +235,7 @@ describe("executeServerSideTool", () => {
 
   it("returns error for create missing content", async () => {
     await boot();
-    const { executeServerSideTool } = await import("../src/handlers/events");
+    const { executeServerSideTool } = await import("../src/handlers/anthropic-compat/events");
 
     const store = await createTestStore("create-no-content");
 
@@ -250,7 +250,7 @@ describe("executeServerSideTool", () => {
 
   it("returns error for delete nonexistent memory", async () => {
     await boot();
-    const { executeServerSideTool } = await import("../src/handlers/events");
+    const { executeServerSideTool } = await import("../src/handlers/anthropic-compat/events");
 
     const result = await executeServerSideTool("memory", {
       command: "delete",
@@ -264,7 +264,7 @@ describe("executeServerSideTool", () => {
 
 describe("activeTees guard", () => {
   it("prevents concurrent tee instances for the same session", async () => {
-    const { _activeTees } = await import("../src/handlers/events");
+    const { _activeTees } = await import("../src/handlers/anthropic-compat/events");
 
     // Simulate an active tee
     _activeTees.add("sess_test_guard");
@@ -276,7 +276,7 @@ describe("activeTees guard", () => {
   });
 
   it("allows different sessions to tee concurrently", async () => {
-    const { _activeTees } = await import("../src/handlers/events");
+    const { _activeTees } = await import("../src/handlers/anthropic-compat/events");
 
     _activeTees.add("sess_a");
     _activeTees.add("sess_b");

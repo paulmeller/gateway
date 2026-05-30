@@ -25,11 +25,11 @@ AgentStep Gateway is a self-hosted, open-source server that implements the Anthr
 
 ## How it works
 
-1. **Create an agent** — define the model, engine, and system prompt via `POST /v1/agents`.
-2. **Create an environment** — choose a sandbox provider (Docker, Sprites, E2B, …) via `POST /v1/environments`. The gateway provisions the container and waits for it to be ready.
-3. **Start a session** — `POST /v1/sessions` links an agent version to an environment and returns a session ID.
-4. **Send a turn** — `POST /v1/sessions/:id/turns` with a user message. The turn driver runs the engine inside the sandbox, streaming NDJSON events from the process back through a translator.
-5. **Consume the stream** — open `GET /v1/sessions/:id/stream` (SSE) to receive typed events in real time, or poll `GET /v1/sessions/:id/events` for the full log.
+1. **Create an agent** — define the model, engine, and system prompt via `POST /anthropic/v1/agents`.
+2. **Create an environment** — choose a sandbox provider (Docker, Sprites, E2B, …) via `POST /anthropic/v1/environments`. The gateway provisions the container and waits for it to be ready.
+3. **Start a session** — `POST /anthropic/v1/sessions` links an agent version to an environment and returns a session ID.
+4. **Send a turn** — `POST /anthropic/v1/sessions/:id/turns` with a user message. The turn driver runs the engine inside the sandbox, streaming NDJSON events from the process back through a translator.
+5. **Consume the stream** — open `GET /anthropic/v1/sessions/:id/stream` (SSE) to receive typed events in real time, or poll `GET /anthropic/v1/sessions/:id/events` for the full log.
 
 ## Self-hosted vs Anthropic's hosted Managed Agents
 

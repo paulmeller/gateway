@@ -98,7 +98,7 @@ ant --base-url http://localhost:4000 \
 
 ```bash
 # Just change the URL — the header shape is identical
-curl http://localhost:4000/v1/agents \
+curl http://localhost:4000/anthropic/v1/agents \
   -H "x-api-key: your-gateway-key" \
   -H "anthropic-version: 2023-06-01" \
   -H "anthropic-beta: managed-agents-2026-04-01" \
@@ -129,7 +129,7 @@ gateway vaults put-entry <vault-id> GEMINI_API_KEY AIza...
 Then reference the vault when creating sessions:
 
 ```json
-POST /v1/sessions
+POST /anthropic/v1/sessions
 {
   "agent_id": "agnt_...",
   "environment_id": "env_...",
@@ -142,7 +142,7 @@ POST /v1/sessions
 On Anthropic's platform, the container runtime is opaque. With the gateway, you choose:
 
 ```json
-POST /v1/environments
+POST /anthropic/v1/environments
 {
   "name": "dev",
   "config": {
@@ -158,13 +158,13 @@ See [Provider Comparison](/infrastructure/provider-comparison) for help choosing
 
 ### Fully compatible
 
-- `POST /v1/agents` — create, update, archive, list, get (including versioning)
-- `POST /v1/environments` — create, update, archive, list, get
-- `POST /v1/sessions` — create with `agent_id`, `environment_id`, `vault_ids`, `resources`
-- `POST /v1/sessions/:id/events` — send user messages and tool results
-- `GET /v1/sessions/:id/stream` — SSE event stream with the same event types
-- `GET /v1/sessions/:id/events` — paginated event list
-- `POST /v1/vaults` — create, list, get, archive, put/get/delete entries
+- `POST /anthropic/v1/agents` — create, update, archive, list, get (including versioning)
+- `POST /anthropic/v1/environments` — create, update, archive, list, get
+- `POST /anthropic/v1/sessions` — create with `agent_id`, `environment_id`, `vault_ids`, `resources`
+- `POST /anthropic/v1/sessions/:id/events` — send user messages and tool results
+- `GET /anthropic/v1/sessions/:id/stream` — SSE event stream with the same event types
+- `GET /anthropic/v1/sessions/:id/events` — paginated event list
+- `POST /anthropic/v1/vaults` — create, list, get, archive, put/get/delete entries
 - `POST /v1/credentials` — create, list, get, archive
 
 ### Pagination shape
@@ -207,7 +207,7 @@ If you want to keep some sessions on Anthropic's infrastructure while running ot
 gateway settings set anthropic_passthrough_enabled true
 
 # Now sk-ant-api* keys are forwarded to Anthropic
-curl http://localhost:4000/v1/agents \
+curl http://localhost:4000/anthropic/v1/agents \
   -H "x-api-key: sk-ant-api03-YOUR-ANTHROPIC-KEY" \
   -H "anthropic-version: 2023-06-01" \
   -H "anthropic-beta: managed-agents-2026-04-01" \

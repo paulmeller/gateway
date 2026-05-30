@@ -275,7 +275,7 @@ describe("Per-key cost dashboard (PR2)", () => {
   it("sessions capture api_key_id from the authenticating context", async () => {
     const { adminKey, adminId } = await bootDb();
     const { createAgent } = await import("../src/db/agents");
-    const { handleCreateSession } = await import("../src/handlers/sessions");
+    const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
 
     const agent = createAgent({
       name: "test",
@@ -291,7 +291,7 @@ describe("Per-key cost dashboard (PR2)", () => {
       `INSERT INTO environments (id, name, config_json, state, tenant_id, created_at) VALUES (?, ?, ?, 'ready', 'tenant_default', ?)`,
     ).run(envId, "env-test", JSON.stringify({ type: "self_hosted", provider: "docker" }), Date.now());
 
-    const res = await handleCreateSession(req("/v1/sessions", {
+    const res = await handleCreateSession(req("/anthropic/v1/sessions", {
       apiKey: adminKey,
       body: { agent: agent.id, environment_id: envId },
     }));
@@ -705,8 +705,8 @@ describe("Session fallback (PR3)", () => {
       JSON.stringify([{ agent_id: fallbackTarget.agentId, environment_id: fallbackTarget.envId }]),
     );
 
-    const { handleCreateSession } = await import("../src/handlers/sessions");
-    const res = await handleCreateSession(req("/v1/sessions", {
+    const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
+    const res = await handleCreateSession(req("/anthropic/v1/sessions", {
       body: { agent: primary.agentId, environment_id: primary.envId },
     }));
     expect(res.status).toBe(201);
@@ -724,8 +724,8 @@ describe("Session fallback (PR3)", () => {
       JSON.stringify([{ agent_id: fallbackTarget.agentId, environment_id: fallbackTarget.envId }]),
     );
 
-    const { handleCreateSession } = await import("../src/handlers/sessions");
-    const res = await handleCreateSession(req("/v1/sessions", {
+    const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
+    const res = await handleCreateSession(req("/anthropic/v1/sessions", {
       body: { agent: primary.agentId, environment_id: primary.envId },
     }));
     const session = await res.json() as { id: string };
@@ -750,8 +750,8 @@ describe("Session fallback (PR3)", () => {
       a.agentId,
     );
 
-    const { handleCreateSession } = await import("../src/handlers/sessions");
-    const res = await handleCreateSession(req("/v1/sessions", {
+    const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
+    const res = await handleCreateSession(req("/anthropic/v1/sessions", {
       body: { agent: a.agentId, environment_id: a.envId },
     }));
     expect(res.status).toBe(400);
@@ -779,8 +779,8 @@ describe("Session fallback (PR3)", () => {
       rawKey: "ck_scoped_nofallback_12345",
     });
 
-    const { handleCreateSession } = await import("../src/handlers/sessions");
-    const res = await handleCreateSession(req("/v1/sessions", {
+    const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
+    const res = await handleCreateSession(req("/anthropic/v1/sessions", {
       apiKey: scopedKey,
       body: { agent: primary.agentId, environment_id: primary.envId },
     }));

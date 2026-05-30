@@ -173,7 +173,7 @@ export class LocalBackend implements Backend {
     async create(input: { name: string; model: string; system?: string; backend?: string; confirmation_mode?: boolean }) {
       const { handleCreateAgent } = await import("@agentstep/agent-sdk/handlers");
       const { model, ...rest } = input;
-      return callHandler(handleCreateAgent, "POST", url("/v1/agents"), { ...rest, model: { id: model } });
+      return callHandler(handleCreateAgent, "POST", url("/anthropic/v1/agents"), { ...rest, model: { id: model } });
     },
 
     async list(opts?: { limit?: number; order?: string; include_archived?: boolean }): Promise<Paginated<any>> {
@@ -181,7 +181,7 @@ export class LocalBackend implements Backend {
       return callHandler<Paginated<any>>(
         handleListAgents,
         "GET",
-        url("/v1/agents", {
+        url("/anthropic/v1/agents", {
           limit: opts?.limit,
           order: opts?.order,
           include_archived: opts?.include_archived,
@@ -224,7 +224,7 @@ export class LocalBackend implements Backend {
   environments = {
     async create(input: { name: string; config: Record<string, unknown> }) {
       const { handleCreateEnvironment } = await import("@agentstep/agent-sdk/handlers");
-      return callHandler(handleCreateEnvironment, "POST", url("/v1/environments"), input);
+      return callHandler(handleCreateEnvironment, "POST", url("/anthropic/v1/environments"), input);
     },
 
     async list(opts?: { limit?: number; order?: string; include_archived?: boolean }): Promise<Paginated<any>> {
@@ -232,7 +232,7 @@ export class LocalBackend implements Backend {
       return callHandler<Paginated<any>>(
         handleListEnvironments,
         "GET",
-        url("/v1/environments", {
+        url("/anthropic/v1/environments", {
           limit: opts?.limit,
           order: opts?.order,
           include_archived: opts?.include_archived,
@@ -259,7 +259,7 @@ export class LocalBackend implements Backend {
   sessions = {
     async create(input: { agent: string | { id: string; version: number; type?: string }; environment_id: string; title?: string; max_budget_usd?: number }) {
       const { handleCreateSession } = await import("@agentstep/agent-sdk/handlers");
-      return callHandler(handleCreateSession, "POST", url("/v1/sessions"), input);
+      return callHandler(handleCreateSession, "POST", url("/anthropic/v1/sessions"), input);
     },
 
     async list(opts?: { limit?: number; order?: string; agent_id?: string; environment_id?: string; status?: string; include_archived?: boolean }): Promise<Paginated<any>> {
@@ -267,7 +267,7 @@ export class LocalBackend implements Backend {
       return callHandler<Paginated<any>>(
         handleListSessions,
         "GET",
-        url("/v1/sessions", {
+        url("/anthropic/v1/sessions", {
           limit: opts?.limit,
           order: opts?.order,
           agent_id: opts?.agent_id,
@@ -363,7 +363,7 @@ export class LocalBackend implements Backend {
   vaults = {
     async create(input: { agent_id: string; name: string }) {
       const { handleCreateVault } = await import("@agentstep/agent-sdk/handlers");
-      return callHandler(handleCreateVault, "POST", url("/v1/vaults"), input);
+      return callHandler(handleCreateVault, "POST", url("/anthropic/v1/vaults"), input);
     },
 
     async list(opts?: { agent_id?: string }) {
@@ -371,7 +371,7 @@ export class LocalBackend implements Backend {
       return callHandler<{ data: any[] }>(
         handleListVaults,
         "GET",
-        url("/v1/vaults", { agent_id: opts?.agent_id }),
+        url("/anthropic/v1/vaults", { agent_id: opts?.agent_id }),
       );
     },
 

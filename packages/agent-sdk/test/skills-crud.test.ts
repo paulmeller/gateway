@@ -377,7 +377,7 @@ describe("Anthropic skill format on agent create", () => {
   it("accepts skill_id references and resolves content from DB", async () => {
     await bootDb();
     const { handleCreateSkill } = await import("../src/handlers/skills-write");
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
 
     // First create a DB-stored skill
     const skillRes = await handleCreateSkill(
@@ -388,16 +388,16 @@ describe("Anthropic skill format on agent create", () => {
     const skill = await skillRes.json();
 
     // Create an environment for the agent
-    const { handleCreateEnvironment } = await import("../src/handlers/environments");
+    const { handleCreateEnvironment } = await import("../src/handlers/anthropic-compat/environments");
     await handleCreateEnvironment(
-      req("/v1/environments", {
+      req("/anthropic/v1/environments", {
         body: { name: "test-env", config: { type: "cloud" } },
       }),
     );
 
     // Create an agent with Anthropic-format skill reference
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", {
+      req("/anthropic/v1/agents", {
         body: {
           name: "skill-agent",
           model: { id: "claude-sonnet-4-20250514" },
@@ -418,7 +418,7 @@ describe("Anthropic skill format on agent create", () => {
   it("accepts skill_id with explicit version", async () => {
     await bootDb();
     const { handleCreateSkill, handleCreateSkillVersion } = await import("../src/handlers/skills-write");
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
 
     const skillRes = await handleCreateSkill(
       req("/v1/skills", { body: { name: "ver-skill", content: "v1" } }),
@@ -433,7 +433,7 @@ describe("Anthropic skill format on agent create", () => {
 
     // Create an agent referencing the first version
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", {
+      req("/anthropic/v1/agents", {
         body: {
           name: "ver-agent",
           model: { id: "claude-sonnet-4-20250514" },
@@ -449,10 +449,10 @@ describe("Anthropic skill format on agent create", () => {
 
   it("returns 400 for non-existent skill_id", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
 
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", {
+      req("/anthropic/v1/agents", {
         body: {
           name: "bad-skill-agent",
           model: { id: "claude-sonnet-4-20250514" },
@@ -466,7 +466,7 @@ describe("Anthropic skill format on agent create", () => {
   it("accepts mixed inline and ref skills", async () => {
     await bootDb();
     const { handleCreateSkill } = await import("../src/handlers/skills-write");
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
 
     const skillRes = await handleCreateSkill(
       req("/v1/skills", { body: { name: "ref-skill", content: "ref content" } }),
@@ -474,7 +474,7 @@ describe("Anthropic skill format on agent create", () => {
     const skill = await skillRes.json();
 
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", {
+      req("/anthropic/v1/agents", {
         body: {
           name: "mixed-agent",
           model: { id: "claude-sonnet-4-20250514" },
@@ -542,10 +542,10 @@ describe("Anthropic skill GitHub resolution", () => {
 
   it("resolves anthropic skill from GitHub when not in DB", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
 
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", {
+      req("/anthropic/v1/agents", {
         body: {
           name: "docx-agent",
           model: { id: "claude-sonnet-4-6" },
@@ -564,7 +564,7 @@ describe("Anthropic skill GitHub resolution", () => {
   it("DB skill takes precedence over GitHub when skill_id matches DB id", async () => {
     await bootDb();
     const { handleCreateSkill } = await import("../src/handlers/skills-write");
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
 
     // Upload a local skill named "docx" to DB
     const skillRes = await handleCreateSkill(
@@ -576,7 +576,7 @@ describe("Anthropic skill GitHub resolution", () => {
 
     // Reference it by DB id with type: "anthropic" — DB should win
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", {
+      req("/anthropic/v1/agents", {
         body: {
           name: "db-docx-agent",
           model: { id: "claude-sonnet-4-6" },
@@ -594,10 +594,10 @@ describe("Anthropic skill GitHub resolution", () => {
 
   it("returns 400 for non-existent anthropic skill", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
 
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", {
+      req("/anthropic/v1/agents", {
         body: {
           name: "bad-anthropic-agent",
           model: { id: "claude-sonnet-4-6" },
@@ -612,11 +612,11 @@ describe("Anthropic skill GitHub resolution", () => {
 
   it("resolves anthropic skill without explicit type field (implicit GitHub fallback)", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
 
     // "docx" is not in the local DB (fresh DB), so it falls back to GitHub
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", {
+      req("/anthropic/v1/agents", {
         body: {
           name: "docx-implicit-agent",
           model: { id: "claude-sonnet-4-6" },
@@ -633,10 +633,10 @@ describe("Anthropic skill GitHub resolution", () => {
 
   it("returns 400 for custom type with missing skill (no GitHub fallback)", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
 
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", {
+      req("/anthropic/v1/agents", {
         body: {
           name: "custom-missing-agent",
           model: { id: "claude-sonnet-4-6" },
@@ -651,10 +651,10 @@ describe("Anthropic skill GitHub resolution", () => {
 
   it("resolves mixed inline + anthropic skills", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
 
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", {
+      req("/anthropic/v1/agents", {
         body: {
           name: "mixed-anthropic-agent",
           model: { id: "claude-sonnet-4-6" },
@@ -680,10 +680,10 @@ describe("Anthropic skill GitHub resolution", () => {
 
   it.skipIf(process.env.CI)("docx skill includes supporting files beyond SKILL.md", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
 
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", {
+      req("/anthropic/v1/agents", {
         body: {
           name: "docx-files-agent",
           model: { id: "claude-sonnet-4-6" },
@@ -706,10 +706,10 @@ describe("Anthropic skill GitHub resolution", () => {
 
   it("all files in docx skill have string content (non-binary files have text)", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
 
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", {
+      req("/anthropic/v1/agents", {
         body: {
           name: "docx-nonempty-agent",
           model: { id: "claude-sonnet-4-6" },
@@ -734,10 +734,10 @@ describe("Anthropic skill GitHub resolution", () => {
 
   it.skipIf(process.env.CI)("python scripts in docx skill are stored as plain text, not base64", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
 
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", {
+      req("/anthropic/v1/agents", {
         body: {
           name: "docx-python-agent",
           model: { id: "claude-sonnet-4-6" },
@@ -761,10 +761,10 @@ describe("Anthropic skill GitHub resolution", () => {
 
   it("SKILL.md content matches top-level content field", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
 
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", {
+      req("/anthropic/v1/agents", {
         body: {
           name: "docx-skillmd-agent",
           model: { id: "claude-sonnet-4-6" },
@@ -832,11 +832,11 @@ describe("Agent update with Anthropic skills", () => {
 
   it("updates an existing agent to add an Anthropic skill", async () => {
     await bootDb();
-    const { handleCreateAgent, handleUpdateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent, handleUpdateAgent } = await import("../src/handlers/anthropic-compat/agents");
 
     // Create agent without skills
     const createRes = await handleCreateAgent(
-      req("/v1/agents", {
+      req("/anthropic/v1/agents", {
         body: {
           name: "update-skill-test",
           model: { id: "claude-sonnet-4-6" },
@@ -849,7 +849,7 @@ describe("Agent update with Anthropic skills", () => {
 
     // Update to add docx skill
     const updateRes = await handleUpdateAgent(
-      req(`/v1/agents/${agent.id}`, {
+      req(`/anthropic/v1/agents/${agent.id}`, {
         method: "POST",
         body: {
           version: agent.version,

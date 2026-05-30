@@ -218,36 +218,36 @@ export function buildApp() {
   });
 
   // ── Agents ───────────────────────────────────────────────────────────
-  route(app, "post", "/v1/agents", handleCreateAgent);
-  route(app, "get", "/v1/agents", handleListAgents);
-  route(app, "get", "/v1/agents/:id", handleGetAgent, "id");
-  route(app, "post", "/v1/agents/:id", handleUpdateAgent, "id");
-  route(app, "delete", "/v1/agents/:id", handleDeleteAgent, "id");
+  route(app, "post", "/anthropic/v1/agents", handleCreateAgent);
+  route(app, "get", "/anthropic/v1/agents", handleListAgents);
+  route(app, "get", "/anthropic/v1/agents/:id", handleGetAgent, "id");
+  route(app, "post", "/anthropic/v1/agents/:id", handleUpdateAgent, "id");
+  route(app, "delete", "/anthropic/v1/agents/:id", handleDeleteAgent, "id");
 
   // ── Environments ─────────────────────────────────────────────────────
-  route(app, "post", "/v1/environments", handleCreateEnvironment);
-  route(app, "get", "/v1/environments", handleListEnvironments);
-  route(app, "get", "/v1/environments/:id", handleGetEnvironment, "id");
-  route(app, "delete", "/v1/environments/:id", handleDeleteEnvironment, "id");
-  route(app, "post", "/v1/environments/:id/archive", handleArchiveEnvironment, "id");
+  route(app, "post", "/anthropic/v1/environments", handleCreateEnvironment);
+  route(app, "get", "/anthropic/v1/environments", handleListEnvironments);
+  route(app, "get", "/anthropic/v1/environments/:id", handleGetEnvironment, "id");
+  route(app, "delete", "/anthropic/v1/environments/:id", handleDeleteEnvironment, "id");
+  route(app, "post", "/anthropic/v1/environments/:id/archive", handleArchiveEnvironment, "id");
 
   // ── Sessions ─────────────────────────────────────────────────────────
-  route(app, "post", "/v1/sessions", handleCreateSession);
-  route(app, "get", "/v1/sessions", handleListSessions);
-  route(app, "get", "/v1/sessions/:id", handleGetSession, "id");
-  route(app, "post", "/v1/sessions/:id", handleUpdateSession, "id");
-  route(app, "delete", "/v1/sessions/:id", handleDeleteSession, "id");
-  route(app, "post", "/v1/sessions/:id/archive", handleArchiveSession, "id");
+  route(app, "post", "/anthropic/v1/sessions", handleCreateSession);
+  route(app, "get", "/anthropic/v1/sessions", handleListSessions);
+  route(app, "get", "/anthropic/v1/sessions/:id", handleGetSession, "id");
+  route(app, "post", "/anthropic/v1/sessions/:id", handleUpdateSession, "id");
+  route(app, "delete", "/anthropic/v1/sessions/:id", handleDeleteSession, "id");
+  route(app, "post", "/anthropic/v1/sessions/:id/archive", handleArchiveSession, "id");
 
   // ── Events ───────────────────────────────────────────────────────────
-  route(app, "post", "/v1/sessions/:id/events", handlePostEvents, "id");
-  route(app, "get", "/v1/sessions/:id/events", handleListEvents, "id");
+  route(app, "post", "/anthropic/v1/sessions/:id/events", handlePostEvents, "id");
+  route(app, "get", "/anthropic/v1/sessions/:id/events", handleListEvents, "id");
 
   // ── Stream (SSE) ─────────────────────────────────────────────────────
   // Uses prepareSessionStream + reply.raw.write for proper SSE flushing.
   // The generic route() helper pipes through sendWebResponse which buffers
   // ReadableStream bodies — SSE requires immediate chunk flushing.
-  app.get("/v1/sessions/:id/events/stream", async (req, reply) => {
+  app.get("/anthropic/v1/sessions/:id/events/stream", async (req, reply) => {
     const { id } = req.params as { id: string };
     const prepared = await prepareSessionStream(toWebRequest(req), id);
 
@@ -292,54 +292,54 @@ export function buildApp() {
   });
 
   // ── Threads ──────────────────────────────────────────────────────────
-  route(app, "get", "/v1/sessions/:id/threads", handleListThreads, "id");
+  route(app, "get", "/anthropic/v1/sessions/:id/threads", handleListThreads, "id");
 
   // ── Session Resources ───────────────────────────────────────────────
-  route(app, "post", "/v1/sessions/:id/resources", handleAddResource, "id");
-  route(app, "get", "/v1/sessions/:id/resources", handleListResources, "id");
-  app.get("/v1/sessions/:id/resources/:rid", async (req, reply) => {
+  route(app, "post", "/anthropic/v1/sessions/:id/resources", handleAddResource, "id");
+  route(app, "get", "/anthropic/v1/sessions/:id/resources", handleListResources, "id");
+  app.get("/anthropic/v1/sessions/:id/resources/:rid", async (req, reply) => {
     const { id, rid } = req.params as { id: string; rid: string };
     await sendWebResponse(reply, await handleGetResource(toWebRequest(req), id, rid));
   });
-  app.delete("/v1/sessions/:id/resources/:rid", async (req, reply) => {
+  app.delete("/anthropic/v1/sessions/:id/resources/:rid", async (req, reply) => {
     const { id, rid } = req.params as { id: string; rid: string };
     await sendWebResponse(reply, await handleDeleteResource(toWebRequest(req), id, rid));
   });
 
   // ── Files ───────────────────────────────────────────────────────────
-  route(app, "post", "/v1/files", handleUploadFile);
-  route(app, "get", "/v1/files", handleListFiles);
-  route(app, "get", "/v1/files/:id", handleGetFile, "id");
-  route(app, "get", "/v1/files/:id/content", handleGetFileContent, "id");
-  route(app, "delete", "/v1/files/:id", handleDeleteFile, "id");
+  route(app, "post", "/anthropic/v1/files", handleUploadFile);
+  route(app, "get", "/anthropic/v1/files", handleListFiles);
+  route(app, "get", "/anthropic/v1/files/:id", handleGetFile, "id");
+  route(app, "get", "/anthropic/v1/files/:id/content", handleGetFileContent, "id");
+  route(app, "delete", "/anthropic/v1/files/:id", handleDeleteFile, "id");
 
   // ── Vaults ───────────────────────────────────────────────────────────
-  route(app, "post", "/v1/vaults", handleCreateVault);
-  route(app, "get", "/v1/vaults", handleListVaults);
-  route(app, "get", "/v1/vaults/:id", handleGetVault, "id");
-  route(app, "delete", "/v1/vaults/:id", handleDeleteVault, "id");
+  route(app, "post", "/anthropic/v1/vaults", handleCreateVault);
+  route(app, "get", "/anthropic/v1/vaults", handleListVaults);
+  route(app, "get", "/anthropic/v1/vaults/:id", handleGetVault, "id");
+  route(app, "delete", "/anthropic/v1/vaults/:id", handleDeleteVault, "id");
 
   // Vault credentials (Anthropic-compatible) — registered BEFORE :key routes
-  route(app, "post", "/v1/vaults/:id/credentials", handleCreateCredential, "id");
-  route(app, "get", "/v1/vaults/:id/credentials", handleListCredentials, "id");
-  app.get("/v1/vaults/:id/credentials/:credId", async (req, reply) => {
+  route(app, "post", "/anthropic/v1/vaults/:id/credentials", handleCreateCredential, "id");
+  route(app, "get", "/anthropic/v1/vaults/:id/credentials", handleListCredentials, "id");
+  app.get("/anthropic/v1/vaults/:id/credentials/:credId", async (req, reply) => {
     const { id, credId } = req.params as { id: string; credId: string };
     await sendWebResponse(reply, await handleGetCredential(toWebRequest(req), id, credId));
   });
-  app.post("/v1/vaults/:id/credentials/:credId", async (req, reply) => {
+  app.post("/anthropic/v1/vaults/:id/credentials/:credId", async (req, reply) => {
     const { id, credId } = req.params as { id: string; credId: string };
     await sendWebResponse(reply, await handleUpdateCredential(toWebRequest(req), id, credId));
   });
-  app.delete("/v1/vaults/:id/credentials/:credId", async (req, reply) => {
+  app.delete("/anthropic/v1/vaults/:id/credentials/:credId", async (req, reply) => {
     const { id, credId } = req.params as { id: string; credId: string };
     await sendWebResponse(reply, await handleDeleteCredential(toWebRequest(req), id, credId));
   });
 
   // Vault entries
-  route(app, "get", "/v1/vaults/:id/entries", handleListEntries, "id");
-  route(app, "get", "/v1/vaults/:id/entries/:key", handleGetEntry, "id", "key");
-  route(app, "put", "/v1/vaults/:id/entries/:key", handlePutEntry, "id", "key");
-  route(app, "delete", "/v1/vaults/:id/entries/:key", handleDeleteEntry, "id", "key");
+  route(app, "get", "/anthropic/v1/vaults/:id/entries", handleListEntries, "id");
+  route(app, "get", "/anthropic/v1/vaults/:id/entries/:key", handleGetEntry, "id", "key");
+  route(app, "put", "/anthropic/v1/vaults/:id/entries/:key", handlePutEntry, "id", "key");
+  route(app, "delete", "/anthropic/v1/vaults/:id/entries/:key", handleDeleteEntry, "id", "key");
 
   // ── Memory Stores ────────────────────────────────────────────────────
   route(app, "post", "/v1/memory_stores", handleCreateMemoryStore);

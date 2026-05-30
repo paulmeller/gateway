@@ -7,9 +7,9 @@
  * DELETE /v1/sessions/:id/resources/:rid      — remove resource
  */
 import { z } from "zod";
-import { routeWrap, jsonOk } from "../http";
-import { getDb } from "../db/client";
-import { getSession, updateSessionResources } from "../db/sessions";
+import { routeWrap, jsonOk } from "../../http";
+import { getDb } from "../../db/client";
+import { getSession, updateSessionResources } from "../../db/sessions";
 import {
   createResource,
   listResources,
@@ -17,11 +17,11 @@ import {
   updateResource,
   deleteResource,
   countResources,
-} from "../db/session-resources";
-import { badRequest, notFound } from "../errors";
-import { assertResourceTenant } from "../auth/scope";
-import { getProxiedTenantId } from "../db/proxy";
-import type { AuthContext } from "../types";
+} from "../../db/session-resources";
+import { badRequest, notFound } from "../../errors";
+import { assertResourceTenant } from "../../auth/scope";
+import { getProxiedTenantId } from "../../db/proxy";
+import type { AuthContext } from "../../types";
 
 const MAX_RESOURCES_PER_SESSION = 100;
 

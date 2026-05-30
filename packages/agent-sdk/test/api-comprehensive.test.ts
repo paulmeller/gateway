@@ -81,9 +81,9 @@ function req(
 
 /** Shortcut: create an agent and return its parsed body. */
 async function createTestAgent(overrides: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
-  const { handleCreateAgent } = await import("../src/handlers/agents");
+  const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
   const res = await handleCreateAgent(
-    req("/v1/agents", {
+    req("/anthropic/v1/agents", {
       body: { name: `Agent-${Date.now()}-${Math.random()}`, model: { id: "claude-sonnet-4-6" }, ...overrides },
     }),
   );
@@ -126,9 +126,9 @@ async function createTestSession(
   envId: string,
   overrides: Record<string, unknown> = {},
 ): Promise<Record<string, unknown>> {
-  const { handleCreateSession } = await import("../src/handlers/sessions");
+  const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
   const res = await handleCreateSession(
-    req("/v1/sessions", {
+    req("/anthropic/v1/sessions", {
       body: { agent: agentId, environment_id: envId, ...overrides },
     }),
   );
@@ -144,9 +144,9 @@ describe("Agents", () => {
 
   it("creates an agent with valid data -> 201", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
     const res = await handleCreateAgent(
-      req("/v1/agents", {
+      req("/anthropic/v1/agents", {
         body: { name: "My Agent", model: { id: "claude-sonnet-4-6" } },
       }),
     );
@@ -158,9 +158,9 @@ describe("Agents", () => {
 
   it("creates an agent with bare string model -> 201", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
     const res = await handleCreateAgent(
-      req("/v1/agents", {
+      req("/anthropic/v1/agents", {
         body: { name: "String Model Agent", model: "claude-sonnet-4-6" },
       }),
     );
@@ -171,9 +171,9 @@ describe("Agents", () => {
 
   it("creates an agent with empty name -> 400", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
     const res = await handleCreateAgent(
-      req("/v1/agents", {
+      req("/anthropic/v1/agents", {
         body: { name: "", model: { id: "claude-sonnet-4-6" } },
       }),
     );
@@ -182,18 +182,18 @@ describe("Agents", () => {
 
   it("creates an agent missing model -> 400", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
     const res = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "NoModel" } }),
+      req("/anthropic/v1/agents", { body: { name: "NoModel" } }),
     );
     expect(res.status).toBe(400);
   });
 
   it("creates an agent with duplicate name -> 409", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
-    await handleCreateAgent(req("/v1/agents", { body: { name: "Dupe", model: { id: "claude-sonnet-4-6" } } }));
-    const res = await handleCreateAgent(req("/v1/agents", { body: { name: "Dupe", model: { id: "claude-sonnet-4-6" } } }));
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
+    await handleCreateAgent(req("/anthropic/v1/agents", { body: { name: "Dupe", model: { id: "claude-sonnet-4-6" } } }));
+    const res = await handleCreateAgent(req("/anthropic/v1/agents", { body: { name: "Dupe", model: { id: "claude-sonnet-4-6" } } }));
     expect(res.status).toBe(409);
   });
 
@@ -201,8 +201,8 @@ describe("Agents", () => {
     await bootDb();
     await createTestAgent({ name: "A1" });
     await createTestAgent({ name: "A2" });
-    const { handleListAgents } = await import("../src/handlers/agents");
-    const res = await handleListAgents(req("/v1/agents"));
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
+    const res = await handleListAgents(req("/anthropic/v1/agents"));
     expect(res.status).toBe(200);
     const body = (await res.json()) as { data: unknown[] };
     expect(Array.isArray(body.data)).toBe(true);
@@ -214,8 +214,8 @@ describe("Agents", () => {
     await createTestAgent({ name: "L1" });
     await createTestAgent({ name: "L2" });
     await createTestAgent({ name: "L3" });
-    const { handleListAgents } = await import("../src/handlers/agents");
-    const res = await handleListAgents(req("/v1/agents?limit=2"));
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
+    const res = await handleListAgents(req("/anthropic/v1/agents?limit=2"));
     const body = (await res.json()) as { data: unknown[] };
     expect(body.data.length).toBe(2);
   });
@@ -223,8 +223,8 @@ describe("Agents", () => {
   it("gets agent by ID -> 200", async () => {
     await bootDb();
     const agent = await createTestAgent({ name: "GetMe" });
-    const { handleGetAgent } = await import("../src/handlers/agents");
-    const res = await handleGetAgent(req(`/v1/agents/${agent.id}`), agent.id as string);
+    const { handleGetAgent } = await import("../src/handlers/anthropic-compat/agents");
+    const res = await handleGetAgent(req(`/anthropic/v1/agents/${agent.id}`), agent.id as string);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.id).toBe(agent.id);
@@ -233,17 +233,17 @@ describe("Agents", () => {
 
   it("gets non-existent agent -> 404", async () => {
     await bootDb();
-    const { handleGetAgent } = await import("../src/handlers/agents");
-    const res = await handleGetAgent(req("/v1/agents/nonexistent"), "nonexistent");
+    const { handleGetAgent } = await import("../src/handlers/anthropic-compat/agents");
+    const res = await handleGetAgent(req("/anthropic/v1/agents/nonexistent"), "nonexistent");
     expect(res.status).toBe(404);
   });
 
   it("updates agent name -> 200", async () => {
     await bootDb();
     const agent = await createTestAgent({ name: "OldName" });
-    const { handleUpdateAgent } = await import("../src/handlers/agents");
+    const { handleUpdateAgent } = await import("../src/handlers/anthropic-compat/agents");
     const res = await handleUpdateAgent(
-      req(`/v1/agents/${agent.id}`, { method: "PATCH", body: { version: 1, name: "NewName" } }),
+      req(`/anthropic/v1/agents/${agent.id}`, { method: "PATCH", body: { version: 1, name: "NewName" } }),
       agent.id as string,
     );
     expect(res.status).toBe(200);
@@ -255,9 +255,9 @@ describe("Agents", () => {
     await bootDb();
     const agent = await createTestAgent({ name: "VersionTest" });
     expect(agent.version).toBe(1);
-    const { handleUpdateAgent } = await import("../src/handlers/agents");
+    const { handleUpdateAgent } = await import("../src/handlers/anthropic-compat/agents");
     const res = await handleUpdateAgent(
-      req(`/v1/agents/${agent.id}`, { method: "PATCH", body: { version: 1, model: { id: "claude-opus-4-6" } } }),
+      req(`/anthropic/v1/agents/${agent.id}`, { method: "PATCH", body: { version: 1, model: { id: "claude-opus-4-6" } } }),
       agent.id as string,
     );
     expect(res.status).toBe(200);
@@ -269,9 +269,9 @@ describe("Agents", () => {
   it("update agent rejects backend change -> 400", async () => {
     await bootDb();
     const agent = await createTestAgent({ name: "BackendTest" });
-    const { handleUpdateAgent } = await import("../src/handlers/agents");
+    const { handleUpdateAgent } = await import("../src/handlers/anthropic-compat/agents");
     const res = await handleUpdateAgent(
-      req(`/v1/agents/${agent.id}`, { method: "PATCH", body: { backend: "codex" } }),
+      req(`/anthropic/v1/agents/${agent.id}`, { method: "PATCH", body: { backend: "codex" } }),
       agent.id as string,
     );
     expect(res.status).toBe(400);
@@ -280,9 +280,9 @@ describe("Agents", () => {
   it("deletes agent -> 200", async () => {
     await bootDb();
     const agent = await createTestAgent({ name: "DeleteMe" });
-    const { handleDeleteAgent } = await import("../src/handlers/agents");
+    const { handleDeleteAgent } = await import("../src/handlers/anthropic-compat/agents");
     const res = await handleDeleteAgent(
-      req(`/v1/agents/${agent.id}`, { method: "DELETE" }),
+      req(`/anthropic/v1/agents/${agent.id}`, { method: "DELETE" }),
       agent.id as string,
     );
     expect(res.status).toBe(200);
@@ -292,9 +292,9 @@ describe("Agents", () => {
 
   it("deletes non-existent agent -> 404", async () => {
     await bootDb();
-    const { handleDeleteAgent } = await import("../src/handlers/agents");
+    const { handleDeleteAgent } = await import("../src/handlers/anthropic-compat/agents");
     const res = await handleDeleteAgent(
-      req("/v1/agents/nope", { method: "DELETE" }),
+      req("/anthropic/v1/agents/nope", { method: "DELETE" }),
       "nope",
     );
     expect(res.status).toBe(404);
@@ -302,11 +302,11 @@ describe("Agents", () => {
 
   it("auto-infers engine from model prefix when engine is omitted", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
 
     // gemini-* model → engine should be "gemini"
     const res = await handleCreateAgent(
-      req("/v1/agents", {
+      req("/anthropic/v1/agents", {
         body: { name: "GeminiAgent", model: { id: "gemini-2.5-flash" } },
       }),
     );
@@ -317,9 +317,9 @@ describe("Agents", () => {
 
   it("creates agent with tools for non-claude backend -> 400", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
     const res = await handleCreateAgent(
-      req("/v1/agents", {
+      req("/anthropic/v1/agents", {
         body: {
           name: "CodexTools",
           model: { id: "claude-sonnet-4-6" },
@@ -355,9 +355,9 @@ describe("Agents", () => {
     await bootDb();
     const a1 = await createTestAgent({ name: "ArchAlive" });
     const a2 = await createTestAgent({ name: "ArchDead" });
-    const { handleDeleteAgent, handleListAgents } = await import("../src/handlers/agents");
-    await handleDeleteAgent(req(`/v1/agents/${a2.id}`, { method: "DELETE" }), a2.id as string);
-    const res = await handleListAgents(req("/v1/agents"));
+    const { handleDeleteAgent, handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
+    await handleDeleteAgent(req(`/anthropic/v1/agents/${a2.id}`, { method: "DELETE" }), a2.id as string);
+    const res = await handleListAgents(req("/anthropic/v1/agents"));
     const body = (await res.json()) as { data: Array<{ id: string }> };
     expect(body.data.map((a) => a.id)).toContain(a1.id);
     expect(body.data.map((a) => a.id)).not.toContain(a2.id);
@@ -367,9 +367,9 @@ describe("Agents", () => {
     await bootDb();
     const a1 = await createTestAgent({ name: "InclAlive" });
     const a2 = await createTestAgent({ name: "InclDead" });
-    const { handleDeleteAgent, handleListAgents } = await import("../src/handlers/agents");
-    await handleDeleteAgent(req(`/v1/agents/${a2.id}`, { method: "DELETE" }), a2.id as string);
-    const res = await handleListAgents(req("/v1/agents?include_archived=true"));
+    const { handleDeleteAgent, handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
+    await handleDeleteAgent(req(`/anthropic/v1/agents/${a2.id}`, { method: "DELETE" }), a2.id as string);
+    const res = await handleListAgents(req("/anthropic/v1/agents?include_archived=true"));
     const body = (await res.json()) as { data: Array<{ id: string }> };
     const ids = body.data.map((a) => a.id);
     expect(ids).toContain(a1.id);
@@ -412,8 +412,8 @@ describe("Environments", () => {
   it("get environment by ID -> 200", async () => {
     await bootDb();
     const env = await createTestEnv({ name: "GetEnv" });
-    const { handleGetEnvironment } = await import("../src/handlers/environments");
-    const res = await handleGetEnvironment(req(`/v1/environments/${env.id}`), env.id as string);
+    const { handleGetEnvironment } = await import("../src/handlers/anthropic-compat/environments");
+    const res = await handleGetEnvironment(req(`/anthropic/v1/environments/${env.id}`), env.id as string);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.id).toBe(env.id);
@@ -421,8 +421,8 @@ describe("Environments", () => {
 
   it("get non-existent environment -> 404", async () => {
     await bootDb();
-    const { handleGetEnvironment } = await import("../src/handlers/environments");
-    const res = await handleGetEnvironment(req("/v1/environments/nope"), "nope");
+    const { handleGetEnvironment } = await import("../src/handlers/anthropic-compat/environments");
+    const res = await handleGetEnvironment(req("/anthropic/v1/environments/nope"), "nope");
     expect(res.status).toBe(404);
   });
 
@@ -430,8 +430,8 @@ describe("Environments", () => {
     await bootDb();
     await createTestEnv({ name: "ListE1" });
     await createTestEnv({ name: "ListE2" });
-    const { handleListEnvironments } = await import("../src/handlers/environments");
-    const res = await handleListEnvironments(req("/v1/environments"));
+    const { handleListEnvironments } = await import("../src/handlers/anthropic-compat/environments");
+    const res = await handleListEnvironments(req("/anthropic/v1/environments"));
     expect(res.status).toBe(200);
     const body = (await res.json()) as { data: unknown[] };
     expect(Array.isArray(body.data)).toBe(true);
@@ -443,8 +443,8 @@ describe("Environments", () => {
     await createTestEnv({ name: "LimE1" });
     await createTestEnv({ name: "LimE2" });
     await createTestEnv({ name: "LimE3" });
-    const { handleListEnvironments } = await import("../src/handlers/environments");
-    const res = await handleListEnvironments(req("/v1/environments?limit=2"));
+    const { handleListEnvironments } = await import("../src/handlers/anthropic-compat/environments");
+    const res = await handleListEnvironments(req("/anthropic/v1/environments?limit=2"));
     const body = (await res.json()) as { data: unknown[] };
     expect(body.data.length).toBe(2);
   });
@@ -452,9 +452,9 @@ describe("Environments", () => {
   it("delete environment -> 200", async () => {
     await bootDb();
     const env = await createTestEnv({ name: "DelEnv" });
-    const { handleDeleteEnvironment } = await import("../src/handlers/environments");
+    const { handleDeleteEnvironment } = await import("../src/handlers/anthropic-compat/environments");
     const res = await handleDeleteEnvironment(
-      req(`/v1/environments/${env.id}`, { method: "DELETE" }),
+      req(`/anthropic/v1/environments/${env.id}`, { method: "DELETE" }),
       env.id as string,
     );
     expect(res.status).toBe(200);
@@ -467,9 +467,9 @@ describe("Environments", () => {
     const agent = await createTestAgent({ name: "EnvDelAgent" });
     const env = await createTestEnv({ name: "BusyEnv" });
     await createTestSession(agent.id as string, env.id as string);
-    const { handleDeleteEnvironment } = await import("../src/handlers/environments");
+    const { handleDeleteEnvironment } = await import("../src/handlers/anthropic-compat/environments");
     const res = await handleDeleteEnvironment(
-      req(`/v1/environments/${env.id}`, { method: "DELETE" }),
+      req(`/anthropic/v1/environments/${env.id}`, { method: "DELETE" }),
       env.id as string,
     );
     expect(res.status).toBe(409);
@@ -478,9 +478,9 @@ describe("Environments", () => {
   it("archive environment -> 200", async () => {
     await bootDb();
     const env = await createTestEnv({ name: "ArchEnv" });
-    const { handleArchiveEnvironment } = await import("../src/handlers/environments");
+    const { handleArchiveEnvironment } = await import("../src/handlers/anthropic-compat/environments");
     const res = await handleArchiveEnvironment(
-      req(`/v1/environments/${env.id}/archive`, { method: "POST", body: {} }),
+      req(`/anthropic/v1/environments/${env.id}/archive`, { method: "POST", body: {} }),
       env.id as string,
     );
     expect(res.status).toBe(200);
@@ -490,9 +490,9 @@ describe("Environments", () => {
 
   it("archive non-existent environment -> 404", async () => {
     await bootDb();
-    const { handleArchiveEnvironment } = await import("../src/handlers/environments");
+    const { handleArchiveEnvironment } = await import("../src/handlers/anthropic-compat/environments");
     const res = await handleArchiveEnvironment(
-      req("/v1/environments/nope/archive", { method: "POST", body: {} }),
+      req("/anthropic/v1/environments/nope/archive", { method: "POST", body: {} }),
       "nope",
     );
     expect(res.status).toBe(404);
@@ -512,12 +512,12 @@ describe("Environments", () => {
     await bootDb();
     const e1 = await createTestEnv({ name: "ExclAlive" });
     const e2 = await createTestEnv({ name: "ExclDead" });
-    const { handleArchiveEnvironment, handleListEnvironments } = await import("../src/handlers/environments");
+    const { handleArchiveEnvironment, handleListEnvironments } = await import("../src/handlers/anthropic-compat/environments");
     await handleArchiveEnvironment(
-      req(`/v1/environments/${e2.id}/archive`, { method: "POST", body: {} }),
+      req(`/anthropic/v1/environments/${e2.id}/archive`, { method: "POST", body: {} }),
       e2.id as string,
     );
-    const res = await handleListEnvironments(req("/v1/environments"));
+    const res = await handleListEnvironments(req("/anthropic/v1/environments"));
     const body = (await res.json()) as { data: Array<{ id: string }> };
     expect(body.data.map((e) => e.id)).toContain(e1.id);
     expect(body.data.map((e) => e.id)).not.toContain(e2.id);
@@ -527,12 +527,12 @@ describe("Environments", () => {
     await bootDb();
     const e1 = await createTestEnv({ name: "InclAliveE" });
     const e2 = await createTestEnv({ name: "InclDeadE" });
-    const { handleArchiveEnvironment, handleListEnvironments } = await import("../src/handlers/environments");
+    const { handleArchiveEnvironment, handleListEnvironments } = await import("../src/handlers/anthropic-compat/environments");
     await handleArchiveEnvironment(
-      req(`/v1/environments/${e2.id}/archive`, { method: "POST", body: {} }),
+      req(`/anthropic/v1/environments/${e2.id}/archive`, { method: "POST", body: {} }),
       e2.id as string,
     );
-    const res = await handleListEnvironments(req("/v1/environments?include_archived=true"));
+    const res = await handleListEnvironments(req("/anthropic/v1/environments?include_archived=true"));
     const body = (await res.json()) as { data: Array<{ id: string }> };
     const ids = body.data.map((e) => e.id);
     expect(ids).toContain(e1.id);
@@ -541,9 +541,9 @@ describe("Environments", () => {
 
   it("delete non-existent environment -> 404", async () => {
     await bootDb();
-    const { handleDeleteEnvironment } = await import("../src/handlers/environments");
+    const { handleDeleteEnvironment } = await import("../src/handlers/anthropic-compat/environments");
     const res = await handleDeleteEnvironment(
-      req("/v1/environments/ghost", { method: "DELETE" }),
+      req("/anthropic/v1/environments/ghost", { method: "DELETE" }),
       "ghost",
     );
     expect(res.status).toBe(404);
@@ -561,9 +561,9 @@ describe("Sessions", () => {
     await bootDb();
     const agent = await createTestAgent({ name: "SessAgent" });
     const env = await createTestEnv({ name: "SessEnv" });
-    const { handleCreateSession } = await import("../src/handlers/sessions");
+    const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
     const res = await handleCreateSession(
-      req("/v1/sessions", {
+      req("/anthropic/v1/sessions", {
         body: { agent: agent.id, environment_id: env.id },
       }),
     );
@@ -575,9 +575,9 @@ describe("Sessions", () => {
   it("creates session with non-existent agent -> 404", async () => {
     await bootDb();
     const env = await createTestEnv({ name: "SessEnv2" });
-    const { handleCreateSession } = await import("../src/handlers/sessions");
+    const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
     const res = await handleCreateSession(
-      req("/v1/sessions", {
+      req("/anthropic/v1/sessions", {
         body: { agent: "fake_agent", environment_id: env.id },
       }),
     );
@@ -587,9 +587,9 @@ describe("Sessions", () => {
   it("creates session with non-existent environment -> 404", async () => {
     await bootDb();
     const agent = await createTestAgent({ name: "SessAgent3" });
-    const { handleCreateSession } = await import("../src/handlers/sessions");
+    const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
     const res = await handleCreateSession(
-      req("/v1/sessions", {
+      req("/anthropic/v1/sessions", {
         body: { agent: agent.id, environment_id: "fake_env" },
       }),
     );
@@ -602,8 +602,8 @@ describe("Sessions", () => {
     const env = await createTestEnv({ name: "ListSessEnv" });
     await createTestSession(agent.id as string, env.id as string);
     await createTestSession(agent.id as string, env.id as string);
-    const { handleListSessions } = await import("../src/handlers/sessions");
-    const res = await handleListSessions(req("/v1/sessions"));
+    const { handleListSessions } = await import("../src/handlers/anthropic-compat/sessions");
+    const res = await handleListSessions(req("/anthropic/v1/sessions"));
     expect(res.status).toBe(200);
     const body = (await res.json()) as { data: unknown[] };
     expect(Array.isArray(body.data)).toBe(true);
@@ -617,8 +617,8 @@ describe("Sessions", () => {
     const env = await createTestEnv({ name: "FilterEnv" });
     await createTestSession(a1.id as string, env.id as string);
     await createTestSession(a2.id as string, env.id as string);
-    const { handleListSessions } = await import("../src/handlers/sessions");
-    const res = await handleListSessions(req(`/v1/sessions?agent_id=${a1.id}`));
+    const { handleListSessions } = await import("../src/handlers/anthropic-compat/sessions");
+    const res = await handleListSessions(req(`/anthropic/v1/sessions?agent_id=${a1.id}`));
     const body = (await res.json()) as { data: Array<{ agent: { id: string } }> };
     expect(body.data.length).toBe(1);
     expect(body.data[0].agent.id).toBe(a1.id);
@@ -629,8 +629,8 @@ describe("Sessions", () => {
     const agent = await createTestAgent({ name: "StatusFilterAgent" });
     const env = await createTestEnv({ name: "StatusFilterEnv" });
     await createTestSession(agent.id as string, env.id as string);
-    const { handleListSessions } = await import("../src/handlers/sessions");
-    const res = await handleListSessions(req("/v1/sessions?status=idle"));
+    const { handleListSessions } = await import("../src/handlers/anthropic-compat/sessions");
+    const res = await handleListSessions(req("/anthropic/v1/sessions?status=idle"));
     const body = (await res.json()) as { data: Array<{ status: string }> };
     expect(body.data.length).toBeGreaterThanOrEqual(1);
     body.data.forEach((s) => expect(s.status).toBe("idle"));
@@ -638,8 +638,8 @@ describe("Sessions", () => {
 
   it("lists sessions with invalid status -> 400", async () => {
     await bootDb();
-    const { handleListSessions } = await import("../src/handlers/sessions");
-    const res = await handleListSessions(req("/v1/sessions?status=bogus"));
+    const { handleListSessions } = await import("../src/handlers/anthropic-compat/sessions");
+    const res = await handleListSessions(req("/anthropic/v1/sessions?status=bogus"));
     expect(res.status).toBe(400);
   });
 
@@ -648,8 +648,8 @@ describe("Sessions", () => {
     const agent = await createTestAgent({ name: "GetSessAgent" });
     const env = await createTestEnv({ name: "GetSessEnv" });
     const session = await createTestSession(agent.id as string, env.id as string);
-    const { handleGetSession } = await import("../src/handlers/sessions");
-    const res = await handleGetSession(req(`/v1/sessions/${session.id}`), session.id as string);
+    const { handleGetSession } = await import("../src/handlers/anthropic-compat/sessions");
+    const res = await handleGetSession(req(`/anthropic/v1/sessions/${session.id}`), session.id as string);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.id).toBe(session.id);
@@ -657,8 +657,8 @@ describe("Sessions", () => {
 
   it("gets non-existent session -> 404", async () => {
     await bootDb();
-    const { handleGetSession } = await import("../src/handlers/sessions");
-    const res = await handleGetSession(req("/v1/sessions/nope"), "nope");
+    const { handleGetSession } = await import("../src/handlers/anthropic-compat/sessions");
+    const res = await handleGetSession(req("/anthropic/v1/sessions/nope"), "nope");
     expect(res.status).toBe(404);
   });
 
@@ -667,9 +667,9 @@ describe("Sessions", () => {
     const agent = await createTestAgent({ name: "UpdateSessAgent" });
     const env = await createTestEnv({ name: "UpdateSessEnv" });
     const session = await createTestSession(agent.id as string, env.id as string);
-    const { handleUpdateSession } = await import("../src/handlers/sessions");
+    const { handleUpdateSession } = await import("../src/handlers/anthropic-compat/sessions");
     const res = await handleUpdateSession(
-      req(`/v1/sessions/${session.id}`, { method: "PATCH", body: { title: "My Session" } }),
+      req(`/anthropic/v1/sessions/${session.id}`, { method: "PATCH", body: { title: "My Session" } }),
       session.id as string,
     );
     expect(res.status).toBe(200);
@@ -682,9 +682,9 @@ describe("Sessions", () => {
     const agent = await createTestAgent({ name: "MetaSessAgent" });
     const env = await createTestEnv({ name: "MetaSessEnv" });
     const session = await createTestSession(agent.id as string, env.id as string);
-    const { handleUpdateSession } = await import("../src/handlers/sessions");
+    const { handleUpdateSession } = await import("../src/handlers/anthropic-compat/sessions");
     const res = await handleUpdateSession(
-      req(`/v1/sessions/${session.id}`, { method: "PATCH", body: { metadata: { foo: "bar" } } }),
+      req(`/anthropic/v1/sessions/${session.id}`, { method: "PATCH", body: { metadata: { foo: "bar" } } }),
       session.id as string,
     );
     expect(res.status).toBe(200);
@@ -694,9 +694,9 @@ describe("Sessions", () => {
 
   it("update non-existent session -> 404", async () => {
     await bootDb();
-    const { handleUpdateSession } = await import("../src/handlers/sessions");
+    const { handleUpdateSession } = await import("../src/handlers/anthropic-compat/sessions");
     const res = await handleUpdateSession(
-      req("/v1/sessions/ghost", { method: "PATCH", body: { title: "x" } }),
+      req("/anthropic/v1/sessions/ghost", { method: "PATCH", body: { title: "x" } }),
       "ghost",
     );
     expect(res.status).toBe(404);
@@ -725,8 +725,8 @@ describe("Sessions", () => {
     const agent = await createTestAgent({ name: "VaultSessAgent" });
     const env = await createTestEnv({ name: "VaultSessEnv" });
     // Create a real vault owned by this agent (server enforces ownership)
-    const { handleCreateVault } = await import("../src/handlers/vaults");
-    const vaultRes = await handleCreateVault(req("/v1/vaults", {
+    const { handleCreateVault } = await import("../src/handlers/anthropic-compat/vaults");
+    const vaultRes = await handleCreateVault(req("/anthropic/v1/vaults", {
       body: { agent_id: agent.id as string, name: "vault-for-session" },
     }));
     const vault = await vaultRes.json() as { id: string };
@@ -743,8 +743,8 @@ describe("Sessions", () => {
     await createTestSession(agent.id as string, env.id as string);
     await createTestSession(agent.id as string, env.id as string);
     await createTestSession(agent.id as string, env.id as string);
-    const { handleListSessions } = await import("../src/handlers/sessions");
-    const res = await handleListSessions(req("/v1/sessions?limit=2"));
+    const { handleListSessions } = await import("../src/handlers/anthropic-compat/sessions");
+    const res = await handleListSessions(req("/anthropic/v1/sessions?limit=2"));
     const body = (await res.json()) as { data: Array<{ id: string }>; has_more: boolean; first_id: string | null; last_id: string | null };
     expect(body.data.length).toBe(2);
     expect(body.has_more).toBe(true);
@@ -764,9 +764,9 @@ describe("Sessions", () => {
     await bootDb();
     const agent = await createTestAgent({ name: "RefAgent" });
     const env = await createTestEnv({ name: "RefEnv" });
-    const { handleCreateSession } = await import("../src/handlers/sessions");
+    const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
     const res = await handleCreateSession(
-      req("/v1/sessions", {
+      req("/anthropic/v1/sessions", {
         body: {
           agent: { id: agent.id, version: 1 },
           environment_id: env.id,
@@ -786,8 +786,8 @@ describe("Sessions", () => {
     const e2 = await createTestEnv({ name: "EnvF2" });
     await createTestSession(agent.id as string, e1.id as string);
     await createTestSession(agent.id as string, e2.id as string);
-    const { handleListSessions } = await import("../src/handlers/sessions");
-    const res = await handleListSessions(req(`/v1/sessions?environment_id=${e1.id}`));
+    const { handleListSessions } = await import("../src/handlers/anthropic-compat/sessions");
+    const res = await handleListSessions(req(`/anthropic/v1/sessions?environment_id=${e1.id}`));
     const body = (await res.json()) as { data: Array<{ environment_id: string }> };
     expect(body.data.length).toBe(1);
     expect(body.data[0].environment_id).toBe(e1.id);
@@ -806,9 +806,9 @@ describe("Events", () => {
     const agent = await createTestAgent({ name: "EvtAgent" });
     const env = await createTestEnv({ name: "EvtEnv" });
     const session = await createTestSession(agent.id as string, env.id as string);
-    const { handlePostEvents } = await import("../src/handlers/events");
+    const { handlePostEvents } = await import("../src/handlers/anthropic-compat/events");
     const res = await handlePostEvents(
-      req(`/v1/sessions/${session.id}/events`, {
+      req(`/anthropic/v1/sessions/${session.id}/events`, {
         body: { events: [{ type: "user.message", content: [{ type: "text", text: "hello" }] }] },
       }),
       session.id as string,
@@ -821,9 +821,9 @@ describe("Events", () => {
 
   it("posts to non-existent session -> 404", async () => {
     await bootDb();
-    const { handlePostEvents } = await import("../src/handlers/events");
+    const { handlePostEvents } = await import("../src/handlers/anthropic-compat/events");
     const res = await handlePostEvents(
-      req("/v1/sessions/ghost/events", {
+      req("/anthropic/v1/sessions/ghost/events", {
         body: { events: [{ type: "user.message", content: [{ type: "text", text: "hello" }] }] },
       }),
       "ghost",
@@ -836,9 +836,9 @@ describe("Events", () => {
     const agent = await createTestAgent({ name: "EmptyEvtAgent" });
     const env = await createTestEnv({ name: "EmptyEvtEnv" });
     const session = await createTestSession(agent.id as string, env.id as string);
-    const { handlePostEvents } = await import("../src/handlers/events");
+    const { handlePostEvents } = await import("../src/handlers/anthropic-compat/events");
     const res = await handlePostEvents(
-      req(`/v1/sessions/${session.id}/events`, {
+      req(`/anthropic/v1/sessions/${session.id}/events`, {
         body: { events: [] },
       }),
       session.id as string,
@@ -851,9 +851,9 @@ describe("Events", () => {
     const agent = await createTestAgent({ name: "BadEvtAgent" });
     const env = await createTestEnv({ name: "BadEvtEnv" });
     const session = await createTestSession(agent.id as string, env.id as string);
-    const { handlePostEvents } = await import("../src/handlers/events");
+    const { handlePostEvents } = await import("../src/handlers/anthropic-compat/events");
     const res = await handlePostEvents(
-      req(`/v1/sessions/${session.id}/events`, {
+      req(`/anthropic/v1/sessions/${session.id}/events`, {
         body: { events: [{ type: "bogus.event" }] },
       }),
       session.id as string,
@@ -866,14 +866,14 @@ describe("Events", () => {
     const agent = await createTestAgent({ name: "ListEvtAgent" });
     const env = await createTestEnv({ name: "ListEvtEnv" });
     const session = await createTestSession(agent.id as string, env.id as string);
-    const { handlePostEvents, handleListEvents } = await import("../src/handlers/events");
+    const { handlePostEvents, handleListEvents } = await import("../src/handlers/anthropic-compat/events");
     await handlePostEvents(
-      req(`/v1/sessions/${session.id}/events`, {
+      req(`/anthropic/v1/sessions/${session.id}/events`, {
         body: { events: [{ type: "user.message", content: [{ type: "text", text: "a" }] }] },
       }),
       session.id as string,
     );
-    const res = await handleListEvents(req(`/v1/sessions/${session.id}/events`), session.id as string);
+    const res = await handleListEvents(req(`/anthropic/v1/sessions/${session.id}/events`), session.id as string);
     expect(res.status).toBe(200);
     const body = (await res.json()) as { data: unknown[] };
     expect(Array.isArray(body.data)).toBe(true);
@@ -885,9 +885,9 @@ describe("Events", () => {
     const agent = await createTestAgent({ name: "AscEvtAgent" });
     const env = await createTestEnv({ name: "AscEvtEnv" });
     const session = await createTestSession(agent.id as string, env.id as string);
-    const { handlePostEvents, handleListEvents } = await import("../src/handlers/events");
+    const { handlePostEvents, handleListEvents } = await import("../src/handlers/anthropic-compat/events");
     await handlePostEvents(
-      req(`/v1/sessions/${session.id}/events`, {
+      req(`/anthropic/v1/sessions/${session.id}/events`, {
         body: {
           events: [
             { type: "user.message", content: [{ type: "text", text: "first" }] },
@@ -898,7 +898,7 @@ describe("Events", () => {
       session.id as string,
     );
     const res = await handleListEvents(
-      req(`/v1/sessions/${session.id}/events?order=asc`),
+      req(`/anthropic/v1/sessions/${session.id}/events?order=asc`),
       session.id as string,
     );
     const body = (await res.json()) as { data: Array<{ seq: number }> };
@@ -913,9 +913,9 @@ describe("Events", () => {
     const agent = await createTestAgent({ name: "DescEvtAgent" });
     const env = await createTestEnv({ name: "DescEvtEnv" });
     const session = await createTestSession(agent.id as string, env.id as string);
-    const { handlePostEvents, handleListEvents } = await import("../src/handlers/events");
+    const { handlePostEvents, handleListEvents } = await import("../src/handlers/anthropic-compat/events");
     await handlePostEvents(
-      req(`/v1/sessions/${session.id}/events`, {
+      req(`/anthropic/v1/sessions/${session.id}/events`, {
         body: {
           events: [
             { type: "user.message", content: [{ type: "text", text: "first" }] },
@@ -926,7 +926,7 @@ describe("Events", () => {
       session.id as string,
     );
     const res = await handleListEvents(
-      req(`/v1/sessions/${session.id}/events?order=desc`),
+      req(`/anthropic/v1/sessions/${session.id}/events?order=desc`),
       session.id as string,
     );
     const body = (await res.json()) as { data: Array<{ seq: number }> };
@@ -941,9 +941,9 @@ describe("Events", () => {
     const agent = await createTestAgent({ name: "AfterSeqAgent" });
     const env = await createTestEnv({ name: "AfterSeqEnv" });
     const session = await createTestSession(agent.id as string, env.id as string);
-    const { handlePostEvents, handleListEvents } = await import("../src/handlers/events");
+    const { handlePostEvents, handleListEvents } = await import("../src/handlers/anthropic-compat/events");
     await handlePostEvents(
-      req(`/v1/sessions/${session.id}/events`, {
+      req(`/anthropic/v1/sessions/${session.id}/events`, {
         body: {
           events: [
             { type: "user.message", content: [{ type: "text", text: "one" }] },
@@ -955,7 +955,7 @@ describe("Events", () => {
       session.id as string,
     );
     const res = await handleListEvents(
-      req(`/v1/sessions/${session.id}/events?after_seq=2`),
+      req(`/anthropic/v1/sessions/${session.id}/events?after_seq=2`),
       session.id as string,
     );
     const body = (await res.json()) as { data: Array<{ seq: number }> };
@@ -967,14 +967,14 @@ describe("Events", () => {
     const agent = await createTestAgent({ name: "SeqAgent" });
     const env = await createTestEnv({ name: "SeqEnv" });
     const session = await createTestSession(agent.id as string, env.id as string);
-    const { handlePostEvents, handleListEvents } = await import("../src/handlers/events");
+    const { handlePostEvents, handleListEvents } = await import("../src/handlers/anthropic-compat/events");
     await handlePostEvents(
-      req(`/v1/sessions/${session.id}/events`, {
+      req(`/anthropic/v1/sessions/${session.id}/events`, {
         body: { events: [{ type: "user.message", content: [{ type: "text", text: "hi" }] }] },
       }),
       session.id as string,
     );
-    const res = await handleListEvents(req(`/v1/sessions/${session.id}/events`), session.id as string);
+    const res = await handleListEvents(req(`/anthropic/v1/sessions/${session.id}/events`), session.id as string);
     const body = (await res.json()) as { data: Array<{ seq: number }> };
     expect(body.data[0].seq).toBe(1);
   });
@@ -984,25 +984,25 @@ describe("Events", () => {
     const agent = await createTestAgent({ name: "IdempAgent" });
     const env = await createTestEnv({ name: "IdempEnv" });
     const session = await createTestSession(agent.id as string, env.id as string);
-    const { handlePostEvents, handleListEvents } = await import("../src/handlers/events");
+    const { handlePostEvents, handleListEvents } = await import("../src/handlers/anthropic-compat/events");
     const eventBody = {
       events: [{ type: "user.message", content: [{ type: "text", text: "dedup" }] }],
     };
     await handlePostEvents(
-      req(`/v1/sessions/${session.id}/events`, {
+      req(`/anthropic/v1/sessions/${session.id}/events`, {
         body: eventBody,
         headers: { "idempotency-key": "same-key" },
       }),
       session.id as string,
     );
     await handlePostEvents(
-      req(`/v1/sessions/${session.id}/events`, {
+      req(`/anthropic/v1/sessions/${session.id}/events`, {
         body: eventBody,
         headers: { "idempotency-key": "same-key" },
       }),
       session.id as string,
     );
-    const res = await handleListEvents(req(`/v1/sessions/${session.id}/events`), session.id as string);
+    const res = await handleListEvents(req(`/anthropic/v1/sessions/${session.id}/events`), session.id as string);
     const body = (await res.json()) as { data: Array<{ type: string }> };
     // Only 1 user.message event should exist due to idempotency key deduplication
     const userMessages = body.data.filter((e) => e.type === "user.message");
@@ -1014,9 +1014,9 @@ describe("Events", () => {
     const agent = await createTestAgent({ name: "IntAgent" });
     const env = await createTestEnv({ name: "IntEnv" });
     const session = await createTestSession(agent.id as string, env.id as string);
-    const { handlePostEvents } = await import("../src/handlers/events");
+    const { handlePostEvents } = await import("../src/handlers/anthropic-compat/events");
     const res = await handlePostEvents(
-      req(`/v1/sessions/${session.id}/events`, {
+      req(`/anthropic/v1/sessions/${session.id}/events`, {
         body: { events: [{ type: "user.interrupt" }] },
       }),
       session.id as string,
@@ -1031,9 +1031,9 @@ describe("Events", () => {
     const agent = await createTestAgent({ name: "BatchEvtAgent" });
     const env = await createTestEnv({ name: "BatchEvtEnv" });
     const session = await createTestSession(agent.id as string, env.id as string);
-    const { handlePostEvents } = await import("../src/handlers/events");
+    const { handlePostEvents } = await import("../src/handlers/anthropic-compat/events");
     const res = await handlePostEvents(
-      req(`/v1/sessions/${session.id}/events`, {
+      req(`/anthropic/v1/sessions/${session.id}/events`, {
         body: {
           events: [
             { type: "user.message", content: [{ type: "text", text: "one" }] },
@@ -1050,8 +1050,8 @@ describe("Events", () => {
 
   it("list events for non-existent session -> 404", async () => {
     await bootDb();
-    const { handleListEvents } = await import("../src/handlers/events");
-    const res = await handleListEvents(req("/v1/sessions/nope/events"), "nope");
+    const { handleListEvents } = await import("../src/handlers/anthropic-compat/events");
+    const res = await handleListEvents(req("/anthropic/v1/sessions/nope/events"), "nope");
     expect(res.status).toBe(404);
   });
 });
@@ -1066,9 +1066,9 @@ describe("Vaults", () => {
   it("creates vault -> 201", async () => {
     await bootDb();
     const agent = await createTestAgent({ name: "VaultAgent" });
-    const { handleCreateVault } = await import("../src/handlers/vaults");
+    const { handleCreateVault } = await import("../src/handlers/anthropic-compat/vaults");
     const res = await handleCreateVault(
-      req("/v1/vaults", { body: { agent_id: agent.id, name: "secrets" } }),
+      req("/anthropic/v1/vaults", { body: { agent_id: agent.id, name: "secrets" } }),
     );
     expect(res.status).toBe(201);
     const body = await res.json();
@@ -1079,18 +1079,18 @@ describe("Vaults", () => {
   it("creates vault with empty name -> 400", async () => {
     await bootDb();
     const agent = await createTestAgent({ name: "EmptyVaultAgent" });
-    const { handleCreateVault } = await import("../src/handlers/vaults");
+    const { handleCreateVault } = await import("../src/handlers/anthropic-compat/vaults");
     const res = await handleCreateVault(
-      req("/v1/vaults", { body: { agent_id: agent.id, name: "" } }),
+      req("/anthropic/v1/vaults", { body: { agent_id: agent.id, name: "" } }),
     );
     expect(res.status).toBe(400);
   });
 
   it("creates vault with non-existent agent -> 404", async () => {
     await bootDb();
-    const { handleCreateVault } = await import("../src/handlers/vaults");
+    const { handleCreateVault } = await import("../src/handlers/anthropic-compat/vaults");
     const res = await handleCreateVault(
-      req("/v1/vaults", { body: { agent_id: "fake_agent", name: "v1" } }),
+      req("/anthropic/v1/vaults", { body: { agent_id: "fake_agent", name: "v1" } }),
     );
     expect(res.status).toBe(404);
   });
@@ -1098,10 +1098,10 @@ describe("Vaults", () => {
   it("lists vaults -> returns array", async () => {
     await bootDb();
     const agent = await createTestAgent({ name: "ListVAgent" });
-    const { handleCreateVault, handleListVaults } = await import("../src/handlers/vaults");
-    await handleCreateVault(req("/v1/vaults", { body: { agent_id: agent.id, name: "v1" } }));
-    await handleCreateVault(req("/v1/vaults", { body: { agent_id: agent.id, name: "v2" } }));
-    const res = await handleListVaults(req("/v1/vaults"));
+    const { handleCreateVault, handleListVaults } = await import("../src/handlers/anthropic-compat/vaults");
+    await handleCreateVault(req("/anthropic/v1/vaults", { body: { agent_id: agent.id, name: "v1" } }));
+    await handleCreateVault(req("/anthropic/v1/vaults", { body: { agent_id: agent.id, name: "v2" } }));
+    const res = await handleListVaults(req("/anthropic/v1/vaults"));
     expect(res.status).toBe(200);
     const body = (await res.json()) as { data: unknown[] };
     expect(body.data.length).toBe(2);
@@ -1111,10 +1111,10 @@ describe("Vaults", () => {
     await bootDb();
     const a1 = await createTestAgent({ name: "VFilterA1" });
     const a2 = await createTestAgent({ name: "VFilterA2" });
-    const { handleCreateVault, handleListVaults } = await import("../src/handlers/vaults");
-    await handleCreateVault(req("/v1/vaults", { body: { agent_id: a1.id, name: "v1" } }));
-    await handleCreateVault(req("/v1/vaults", { body: { agent_id: a2.id, name: "v2" } }));
-    const res = await handleListVaults(req(`/v1/vaults?agent_id=${a1.id}`));
+    const { handleCreateVault, handleListVaults } = await import("../src/handlers/anthropic-compat/vaults");
+    await handleCreateVault(req("/anthropic/v1/vaults", { body: { agent_id: a1.id, name: "v1" } }));
+    await handleCreateVault(req("/anthropic/v1/vaults", { body: { agent_id: a2.id, name: "v2" } }));
+    const res = await handleListVaults(req(`/anthropic/v1/vaults?agent_id=${a1.id}`));
     const body = (await res.json()) as { data: Array<{ agent_id: string }> };
     expect(body.data.length).toBe(1);
     expect(body.data[0].agent_id).toBe(a1.id);
@@ -1123,12 +1123,12 @@ describe("Vaults", () => {
   it("gets vault by ID -> 200", async () => {
     await bootDb();
     const agent = await createTestAgent({ name: "GetVaultAgent" });
-    const { handleCreateVault, handleGetVault } = await import("../src/handlers/vaults");
+    const { handleCreateVault, handleGetVault } = await import("../src/handlers/anthropic-compat/vaults");
     const createRes = await handleCreateVault(
-      req("/v1/vaults", { body: { agent_id: agent.id, name: "myvault" } }),
+      req("/anthropic/v1/vaults", { body: { agent_id: agent.id, name: "myvault" } }),
     );
     const vault = await createRes.json();
-    const res = await handleGetVault(req(`/v1/vaults/${vault.id}`), vault.id);
+    const res = await handleGetVault(req(`/anthropic/v1/vaults/${vault.id}`), vault.id);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.id).toBe(vault.id);
@@ -1136,21 +1136,21 @@ describe("Vaults", () => {
 
   it("gets non-existent vault -> 404", async () => {
     await bootDb();
-    const { handleGetVault } = await import("../src/handlers/vaults");
-    const res = await handleGetVault(req("/v1/vaults/ghost"), "ghost");
+    const { handleGetVault } = await import("../src/handlers/anthropic-compat/vaults");
+    const res = await handleGetVault(req("/anthropic/v1/vaults/ghost"), "ghost");
     expect(res.status).toBe(404);
   });
 
   it("deletes vault -> 200", async () => {
     await bootDb();
     const agent = await createTestAgent({ name: "DelVaultAgent" });
-    const { handleCreateVault, handleDeleteVault } = await import("../src/handlers/vaults");
+    const { handleCreateVault, handleDeleteVault } = await import("../src/handlers/anthropic-compat/vaults");
     const createRes = await handleCreateVault(
-      req("/v1/vaults", { body: { agent_id: agent.id, name: "todelete" } }),
+      req("/anthropic/v1/vaults", { body: { agent_id: agent.id, name: "todelete" } }),
     );
     const vault = await createRes.json();
     const res = await handleDeleteVault(
-      req(`/v1/vaults/${vault.id}`, { method: "DELETE" }),
+      req(`/anthropic/v1/vaults/${vault.id}`, { method: "DELETE" }),
       vault.id,
     );
     expect(res.status).toBe(200);
@@ -1160,9 +1160,9 @@ describe("Vaults", () => {
 
   it("deletes non-existent vault -> 404", async () => {
     await bootDb();
-    const { handleDeleteVault } = await import("../src/handlers/vaults");
+    const { handleDeleteVault } = await import("../src/handlers/anthropic-compat/vaults");
     const res = await handleDeleteVault(
-      req("/v1/vaults/ghost", { method: "DELETE" }),
+      req("/anthropic/v1/vaults/ghost", { method: "DELETE" }),
       "ghost",
     );
     expect(res.status).toBe(404);
@@ -1171,13 +1171,13 @@ describe("Vaults", () => {
   it("puts entry -> 200", async () => {
     await bootDb();
     const agent = await createTestAgent({ name: "EntryPutAgent" });
-    const { handleCreateVault, handlePutEntry } = await import("../src/handlers/vaults");
+    const { handleCreateVault, handlePutEntry } = await import("../src/handlers/anthropic-compat/vaults");
     const createRes = await handleCreateVault(
-      req("/v1/vaults", { body: { agent_id: agent.id, name: "entries" } }),
+      req("/anthropic/v1/vaults", { body: { agent_id: agent.id, name: "entries" } }),
     );
     const vault = await createRes.json();
     const res = await handlePutEntry(
-      req(`/v1/vaults/${vault.id}/entries/mykey`, { method: "PUT", body: { value: "myval" } }),
+      req(`/anthropic/v1/vaults/${vault.id}/entries/mykey`, { method: "PUT", body: { value: "myval" } }),
       vault.id,
       "mykey",
     );
@@ -1190,17 +1190,17 @@ describe("Vaults", () => {
   it("gets entry -> 200", async () => {
     await bootDb();
     const agent = await createTestAgent({ name: "EntryGetAgent" });
-    const { handleCreateVault, handlePutEntry, handleGetEntry } = await import("../src/handlers/vaults");
+    const { handleCreateVault, handlePutEntry, handleGetEntry } = await import("../src/handlers/anthropic-compat/vaults");
     const createRes = await handleCreateVault(
-      req("/v1/vaults", { body: { agent_id: agent.id, name: "getentry" } }),
+      req("/anthropic/v1/vaults", { body: { agent_id: agent.id, name: "getentry" } }),
     );
     const vault = await createRes.json();
     await handlePutEntry(
-      req(`/v1/vaults/${vault.id}/entries/k1`, { method: "PUT", body: { value: "v1" } }),
+      req(`/anthropic/v1/vaults/${vault.id}/entries/k1`, { method: "PUT", body: { value: "v1" } }),
       vault.id,
       "k1",
     );
-    const res = await handleGetEntry(req(`/v1/vaults/${vault.id}/entries/k1`), vault.id, "k1");
+    const res = await handleGetEntry(req(`/anthropic/v1/vaults/${vault.id}/entries/k1`), vault.id, "k1");
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.key).toBe("k1");
@@ -1211,30 +1211,30 @@ describe("Vaults", () => {
   it("gets non-existent entry -> 404", async () => {
     await bootDb();
     const agent = await createTestAgent({ name: "NoEntryAgent" });
-    const { handleCreateVault, handleGetEntry } = await import("../src/handlers/vaults");
+    const { handleCreateVault, handleGetEntry } = await import("../src/handlers/anthropic-compat/vaults");
     const createRes = await handleCreateVault(
-      req("/v1/vaults", { body: { agent_id: agent.id, name: "noentry" } }),
+      req("/anthropic/v1/vaults", { body: { agent_id: agent.id, name: "noentry" } }),
     );
     const vault = await createRes.json();
-    const res = await handleGetEntry(req(`/v1/vaults/${vault.id}/entries/nope`), vault.id, "nope");
+    const res = await handleGetEntry(req(`/anthropic/v1/vaults/${vault.id}/entries/nope`), vault.id, "nope");
     expect(res.status).toBe(404);
   });
 
   it("deletes entry -> 200", async () => {
     await bootDb();
     const agent = await createTestAgent({ name: "DelEntryAgent" });
-    const { handleCreateVault, handlePutEntry, handleDeleteEntry } = await import("../src/handlers/vaults");
+    const { handleCreateVault, handlePutEntry, handleDeleteEntry } = await import("../src/handlers/anthropic-compat/vaults");
     const createRes = await handleCreateVault(
-      req("/v1/vaults", { body: { agent_id: agent.id, name: "delentry" } }),
+      req("/anthropic/v1/vaults", { body: { agent_id: agent.id, name: "delentry" } }),
     );
     const vault = await createRes.json();
     await handlePutEntry(
-      req(`/v1/vaults/${vault.id}/entries/k1`, { method: "PUT", body: { value: "v1" } }),
+      req(`/anthropic/v1/vaults/${vault.id}/entries/k1`, { method: "PUT", body: { value: "v1" } }),
       vault.id,
       "k1",
     );
     const res = await handleDeleteEntry(
-      req(`/v1/vaults/${vault.id}/entries/k1`, { method: "DELETE" }),
+      req(`/anthropic/v1/vaults/${vault.id}/entries/k1`, { method: "DELETE" }),
       vault.id,
       "k1",
     );
@@ -1246,13 +1246,13 @@ describe("Vaults", () => {
   it("deletes non-existent entry -> 404", async () => {
     await bootDb();
     const agent = await createTestAgent({ name: "DelNoEntryAgent" });
-    const { handleCreateVault, handleDeleteEntry } = await import("../src/handlers/vaults");
+    const { handleCreateVault, handleDeleteEntry } = await import("../src/handlers/anthropic-compat/vaults");
     const createRes = await handleCreateVault(
-      req("/v1/vaults", { body: { agent_id: agent.id, name: "nodelentry" } }),
+      req("/anthropic/v1/vaults", { body: { agent_id: agent.id, name: "nodelentry" } }),
     );
     const vault = await createRes.json();
     const res = await handleDeleteEntry(
-      req(`/v1/vaults/${vault.id}/entries/nope`, { method: "DELETE" }),
+      req(`/anthropic/v1/vaults/${vault.id}/entries/nope`, { method: "DELETE" }),
       vault.id,
       "nope",
     );
@@ -1262,22 +1262,22 @@ describe("Vaults", () => {
   it("lists entries -> returns array", async () => {
     await bootDb();
     const agent = await createTestAgent({ name: "ListEntriesAgent" });
-    const { handleCreateVault, handlePutEntry, handleListEntries } = await import("../src/handlers/vaults");
+    const { handleCreateVault, handlePutEntry, handleListEntries } = await import("../src/handlers/anthropic-compat/vaults");
     const createRes = await handleCreateVault(
-      req("/v1/vaults", { body: { agent_id: agent.id, name: "listentries" } }),
+      req("/anthropic/v1/vaults", { body: { agent_id: agent.id, name: "listentries" } }),
     );
     const vault = await createRes.json();
     await handlePutEntry(
-      req(`/v1/vaults/${vault.id}/entries/k1`, { method: "PUT", body: { value: "v1" } }),
+      req(`/anthropic/v1/vaults/${vault.id}/entries/k1`, { method: "PUT", body: { value: "v1" } }),
       vault.id,
       "k1",
     );
     await handlePutEntry(
-      req(`/v1/vaults/${vault.id}/entries/k2`, { method: "PUT", body: { value: "v2" } }),
+      req(`/anthropic/v1/vaults/${vault.id}/entries/k2`, { method: "PUT", body: { value: "v2" } }),
       vault.id,
       "k2",
     );
-    const res = await handleListEntries(req(`/v1/vaults/${vault.id}/entries`), vault.id);
+    const res = await handleListEntries(req(`/anthropic/v1/vaults/${vault.id}/entries`), vault.id);
     expect(res.status).toBe(200);
     const body = (await res.json()) as { data: unknown[] };
     expect(body.data.length).toBe(2);
@@ -1286,22 +1286,22 @@ describe("Vaults", () => {
   it("updates entry value (overwrite)", async () => {
     await bootDb();
     const agent = await createTestAgent({ name: "OverwriteAgent" });
-    const { handleCreateVault, handlePutEntry, handleGetEntry } = await import("../src/handlers/vaults");
+    const { handleCreateVault, handlePutEntry, handleGetEntry } = await import("../src/handlers/anthropic-compat/vaults");
     const createRes = await handleCreateVault(
-      req("/v1/vaults", { body: { agent_id: agent.id, name: "overwrite" } }),
+      req("/anthropic/v1/vaults", { body: { agent_id: agent.id, name: "overwrite" } }),
     );
     const vault = await createRes.json();
     await handlePutEntry(
-      req(`/v1/vaults/${vault.id}/entries/k`, { method: "PUT", body: { value: "old" } }),
+      req(`/anthropic/v1/vaults/${vault.id}/entries/k`, { method: "PUT", body: { value: "old" } }),
       vault.id,
       "k",
     );
     await handlePutEntry(
-      req(`/v1/vaults/${vault.id}/entries/k`, { method: "PUT", body: { value: "new" } }),
+      req(`/anthropic/v1/vaults/${vault.id}/entries/k`, { method: "PUT", body: { value: "new" } }),
       vault.id,
       "k",
     );
-    const res = await handleGetEntry(req(`/v1/vaults/${vault.id}/entries/k`), vault.id, "k");
+    const res = await handleGetEntry(req(`/anthropic/v1/vaults/${vault.id}/entries/k`), vault.id, "k");
     const body = await res.json();
     expect(body.value).toBe("******"); // masked in API response
   });
@@ -1309,9 +1309,9 @@ describe("Vaults", () => {
   it("vault has correct fields", async () => {
     await bootDb();
     const agent = await createTestAgent({ name: "VaultFieldsAgent" });
-    const { handleCreateVault } = await import("../src/handlers/vaults");
+    const { handleCreateVault } = await import("../src/handlers/anthropic-compat/vaults");
     const res = await handleCreateVault(
-      req("/v1/vaults", { body: { agent_id: agent.id, name: "fields" } }),
+      req("/anthropic/v1/vaults", { body: { agent_id: agent.id, name: "fields" } }),
     );
     const body = await res.json();
     expect(body).toHaveProperty("id");
@@ -1716,8 +1716,8 @@ describe("Batch", () => {
       req("/v1/batch", {
         body: {
           operations: [
-            { method: "POST", path: "/v1/environments", body: { name: "BatchEnv1", config: { type: "cloud" } } },
-            { method: "POST", path: "/v1/environments", body: { name: "BatchEnv2", config: { type: "cloud" } } },
+            { method: "POST", path: "/anthropic/v1/environments", body: { name: "BatchEnv1", config: { type: "cloud" } } },
+            { method: "POST", path: "/anthropic/v1/environments", body: { name: "BatchEnv2", config: { type: "cloud" } } },
           ],
         },
       }),
@@ -1743,7 +1743,7 @@ describe("Batch", () => {
     const { handleBatch } = await import("../src/handlers/batch");
     const ops = Array.from({ length: 51 }, (_, i) => ({
       method: "POST",
-      path: "/v1/agents",
+      path: "/anthropic/v1/agents",
       body: { name: `BatchOverflow${i}`, model: { id: "claude-sonnet-4-6" } },
     }));
     const res = await handleBatch(
@@ -1772,8 +1772,8 @@ describe("Batch", () => {
       req("/v1/batch", {
         body: {
           operations: [
-            { method: "DELETE", path: `/v1/agents/${realAgent.id}` },
-            { method: "DELETE", path: "/v1/agents/nonexistent" },
+            { method: "DELETE", path: `/anthropic/v1/agents/${realAgent.id}` },
+            { method: "DELETE", path: "/anthropic/v1/agents/nonexistent" },
           ],
         },
       }),
@@ -1791,8 +1791,8 @@ describe("Batch", () => {
       req("/v1/batch", {
         body: {
           operations: [
-            { method: "POST", path: "/v1/environments", body: { name: "BatchEnvA", config: { type: "cloud" } } },
-            { method: "POST", path: "/v1/environments", body: { name: "BatchEnvB", config: { type: "cloud" } } },
+            { method: "POST", path: "/anthropic/v1/environments", body: { name: "BatchEnvA", config: { type: "cloud" } } },
+            { method: "POST", path: "/anthropic/v1/environments", body: { name: "BatchEnvB", config: { type: "cloud" } } },
           ],
         },
       }),
@@ -1810,7 +1810,7 @@ describe("Batch", () => {
       req("/v1/batch", {
         body: {
           operations: [
-            { method: "PATCH", path: "/v1/agents/something", body: { name: "x" } },
+            { method: "PATCH", path: "/anthropic/v1/agents/something", body: { name: "x" } },
           ],
         },
       }),
@@ -1904,32 +1904,32 @@ describe("Auth", () => {
 
   it("request without API key -> 401", async () => {
     await bootDb();
-    const { handleListAgents } = await import("../src/handlers/agents");
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
     const res = await handleListAgents(
-      new Request("http://localhost/v1/agents", { method: "GET" }),
+      new Request("http://localhost/anthropic/v1/agents", { method: "GET" }),
     );
     expect(res.status).toBe(401);
   });
 
   it("request with invalid API key -> 401", async () => {
     await bootDb();
-    const { handleListAgents } = await import("../src/handlers/agents");
-    const res = await handleListAgents(req("/v1/agents", { apiKey: "bad-key-wrong" }));
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
+    const res = await handleListAgents(req("/anthropic/v1/agents", { apiKey: "bad-key-wrong" }));
     expect(res.status).toBe(401);
   });
 
   it("request with valid API key -> 200", async () => {
     await bootDb();
-    const { handleListAgents } = await import("../src/handlers/agents");
-    const res = await handleListAgents(req("/v1/agents", { apiKey: "test-api-key-12345" }));
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
+    const res = await handleListAgents(req("/anthropic/v1/agents", { apiKey: "test-api-key-12345" }));
     expect(res.status).toBe(200);
   });
 
   it("API key in x-api-key header works", async () => {
     await bootDb();
-    const { handleListAgents } = await import("../src/handlers/agents");
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
     const res = await handleListAgents(
-      new Request("http://localhost/v1/agents", {
+      new Request("http://localhost/anthropic/v1/agents", {
         method: "GET",
         headers: { "x-api-key": "test-api-key-12345" },
       }),
@@ -1939,9 +1939,9 @@ describe("Auth", () => {
 
   it("API key in Authorization Bearer header works", async () => {
     await bootDb();
-    const { handleListAgents } = await import("../src/handlers/agents");
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
     const res = await handleListAgents(
-      new Request("http://localhost/v1/agents", {
+      new Request("http://localhost/anthropic/v1/agents", {
         method: "GET",
         headers: { authorization: "Bearer test-api-key-12345" },
       }),
@@ -1951,9 +1951,9 @@ describe("Auth", () => {
 
   it("401 response has correct error envelope", async () => {
     await bootDb();
-    const { handleListAgents } = await import("../src/handlers/agents");
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
     const res = await handleListAgents(
-      new Request("http://localhost/v1/agents", { method: "GET" }),
+      new Request("http://localhost/anthropic/v1/agents", { method: "GET" }),
     );
     expect(res.status).toBe(401);
     const body = (await res.json()) as { type: string; error: { type: string; message: string } };
@@ -1971,9 +1971,9 @@ describe("Error Handling", () => {
 
   it("invalid JSON body -> 400 or 500", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
     const res = await handleCreateAgent(
-      new Request("http://localhost/v1/agents", {
+      new Request("http://localhost/anthropic/v1/agents", {
         method: "POST",
         headers: { "content-type": "application/json", "x-api-key": "test-api-key-12345" },
         body: "{not valid json",
@@ -1985,8 +1985,8 @@ describe("Error Handling", () => {
 
   it("error responses have correct envelope shape", async () => {
     await bootDb();
-    const { handleGetAgent } = await import("../src/handlers/agents");
-    const res = await handleGetAgent(req("/v1/agents/nope"), "nope");
+    const { handleGetAgent } = await import("../src/handlers/anthropic-compat/agents");
+    const res = await handleGetAgent(req("/anthropic/v1/agents/nope"), "nope");
     expect(res.status).toBe(404);
     const body = (await res.json()) as { type: string; error: { type: string; message: string } };
     expect(body.type).toBe("error");
@@ -1996,17 +1996,17 @@ describe("Error Handling", () => {
 
   it("not found has correct error type", async () => {
     await bootDb();
-    const { handleGetAgent } = await import("../src/handlers/agents");
-    const res = await handleGetAgent(req("/v1/agents/missing"), "missing");
+    const { handleGetAgent } = await import("../src/handlers/anthropic-compat/agents");
+    const res = await handleGetAgent(req("/anthropic/v1/agents/missing"), "missing");
     const body = (await res.json()) as { error: { type: string } };
     expect(body.error.type).toBe("not_found_error");
   });
 
   it("bad request has correct error type", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
     const res = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "", model: "" } }),
+      req("/anthropic/v1/agents", { body: { name: "", model: "" } }),
     );
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error: { type: string } };
@@ -2015,10 +2015,10 @@ describe("Error Handling", () => {
 
   it("conflict has correct error type and status", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
-    await handleCreateAgent(req("/v1/agents", { body: { name: "Conflict", model: { id: "claude-sonnet-4-6" } } }));
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
+    await handleCreateAgent(req("/anthropic/v1/agents", { body: { name: "Conflict", model: { id: "claude-sonnet-4-6" } } }));
     const res = await handleCreateAgent(
-      req("/v1/agents", { body: { name: "Conflict", model: { id: "claude-sonnet-4-6" } } }),
+      req("/anthropic/v1/agents", { body: { name: "Conflict", model: { id: "claude-sonnet-4-6" } } }),
     );
     expect(res.status).toBe(409);
     const body = (await res.json()) as { error: { type: string } };
@@ -2057,9 +2057,9 @@ describe("Threads", () => {
     const agent = await createTestAgent({ name: "ThreadAgent" });
     const env = await createTestEnv({ name: "ThreadEnv" });
     const session = await createTestSession(agent.id as string, env.id as string);
-    const { handleListThreads } = await import("../src/handlers/threads");
+    const { handleListThreads } = await import("../src/handlers/anthropic-compat/threads");
     const res = await handleListThreads(
-      req(`/v1/sessions/${session.id}/threads`),
+      req(`/anthropic/v1/sessions/${session.id}/threads`),
       session.id as string,
     );
     expect(res.status).toBe(200);
@@ -2070,8 +2070,8 @@ describe("Threads", () => {
 
   it("lists threads for non-existent session -> 404", async () => {
     await bootDb();
-    const { handleListThreads } = await import("../src/handlers/threads");
-    const res = await handleListThreads(req("/v1/sessions/ghost/threads"), "ghost");
+    const { handleListThreads } = await import("../src/handlers/anthropic-compat/threads");
+    const res = await handleListThreads(req("/anthropic/v1/sessions/ghost/threads"), "ghost");
     expect(res.status).toBe(404);
   });
 
@@ -2089,9 +2089,9 @@ describe("Threads", () => {
       agentVersion: agent.version as number,
     });
 
-    const { handleListThreads } = await import("../src/handlers/threads");
+    const { handleListThreads } = await import("../src/handlers/anthropic-compat/threads");
     const res = await handleListThreads(
-      req(`/v1/sessions/${parent.id}/threads`),
+      req(`/anthropic/v1/sessions/${parent.id}/threads`),
       parent.id as string,
     );
     const body = (await res.json()) as { data: Array<{ id: string; session_id: string; type: string }> };
@@ -2112,8 +2112,8 @@ describe("Pagination & Ordering", () => {
     await bootDb();
     await createTestAgent({ name: "P1" });
     await createTestAgent({ name: "P2" });
-    const { handleListAgents } = await import("../src/handlers/agents");
-    const res = await handleListAgents(req("/v1/agents?limit=1"));
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
+    const res = await handleListAgents(req("/anthropic/v1/agents?limit=1"));
     const body = (await res.json()) as { data: Array<{ id: string }>; has_more: boolean; first_id: string | null; last_id: string | null };
     expect(body.data.length).toBe(1);
     expect(body.has_more).toBe(true);
@@ -2123,8 +2123,8 @@ describe("Pagination & Ordering", () => {
     await bootDb();
     await createTestAgent({ name: "Order1" });
     await createTestAgent({ name: "Order2" });
-    const { handleListAgents } = await import("../src/handlers/agents");
-    const res = await handleListAgents(req("/v1/agents?order=asc"));
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
+    const res = await handleListAgents(req("/anthropic/v1/agents?order=asc"));
     const body = (await res.json()) as { data: Array<{ id: string }> };
     expect(body.data.length).toBe(2);
     // ASC means first ID < second ID
@@ -2135,8 +2135,8 @@ describe("Pagination & Ordering", () => {
     await bootDb();
     await createTestEnv({ name: "EP1" });
     await createTestEnv({ name: "EP2" });
-    const { handleListEnvironments } = await import("../src/handlers/environments");
-    const res = await handleListEnvironments(req("/v1/environments?limit=1"));
+    const { handleListEnvironments } = await import("../src/handlers/anthropic-compat/environments");
+    const res = await handleListEnvironments(req("/anthropic/v1/environments?limit=1"));
     const body = (await res.json()) as { data: unknown[]; has_more: boolean; first_id: string | null; last_id: string | null };
     expect(body.data.length).toBe(1);
     expect(body.has_more).toBe(true);
@@ -2148,8 +2148,8 @@ describe("Pagination & Ordering", () => {
     const env = await createTestEnv({ name: "OrdSessEnv" });
     await createTestSession(agent.id as string, env.id as string);
     await createTestSession(agent.id as string, env.id as string);
-    const { handleListSessions } = await import("../src/handlers/sessions");
-    const res = await handleListSessions(req("/v1/sessions?order=asc"));
+    const { handleListSessions } = await import("../src/handlers/anthropic-compat/sessions");
+    const res = await handleListSessions(req("/anthropic/v1/sessions?order=asc"));
     const body = (await res.json()) as { data: Array<{ id: string }> };
     expect(body.data.length).toBe(2);
     expect(body.data[0].id < body.data[1].id).toBe(true);
@@ -2160,9 +2160,9 @@ describe("Pagination & Ordering", () => {
     const agent = await createTestAgent({ name: "EvtPageAgent" });
     const env = await createTestEnv({ name: "EvtPageEnv" });
     const session = await createTestSession(agent.id as string, env.id as string);
-    const { handlePostEvents, handleListEvents } = await import("../src/handlers/events");
+    const { handlePostEvents, handleListEvents } = await import("../src/handlers/anthropic-compat/events");
     await handlePostEvents(
-      req(`/v1/sessions/${session.id}/events`, {
+      req(`/anthropic/v1/sessions/${session.id}/events`, {
         body: {
           events: [
             { type: "user.message", content: [{ type: "text", text: "a" }] },
@@ -2173,7 +2173,7 @@ describe("Pagination & Ordering", () => {
       session.id as string,
     );
     const res = await handleListEvents(
-      req(`/v1/sessions/${session.id}/events?limit=1`),
+      req(`/anthropic/v1/sessions/${session.id}/events?limit=1`),
       session.id as string,
     );
     const body = (await res.json()) as { data: Array<{ id: string }>; has_more: boolean; first_id: string | null; last_id: string | null };
@@ -2191,9 +2191,9 @@ describe("Edge Cases", () => {
 
   it("creating an agent with null body -> 400", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
     const res = await handleCreateAgent(
-      new Request("http://localhost/v1/agents", {
+      new Request("http://localhost/anthropic/v1/agents", {
         method: "POST",
         headers: { "content-type": "application/json", "x-api-key": "test-api-key-12345" },
       }),
@@ -2203,17 +2203,17 @@ describe("Edge Cases", () => {
 
   it("creating session with missing body fields -> 400", async () => {
     await bootDb();
-    const { handleCreateSession } = await import("../src/handlers/sessions");
+    const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
     const res = await handleCreateSession(
-      req("/v1/sessions", { body: {} }),
+      req("/anthropic/v1/sessions", { body: {} }),
     );
     expect(res.status).toBe(400);
   });
 
   it("listing vaults with no data returns empty array", async () => {
     await bootDb();
-    const { handleListVaults } = await import("../src/handlers/vaults");
-    const res = await handleListVaults(req("/v1/vaults"));
+    const { handleListVaults } = await import("../src/handlers/anthropic-compat/vaults");
+    const res = await handleListVaults(req("/anthropic/v1/vaults"));
     const body = (await res.json()) as { data: unknown[] };
     expect(body.data).toEqual([]);
   });
@@ -2228,9 +2228,9 @@ describe("Edge Cases", () => {
 
   it("creating standalone vault without agent_id -> 201", async () => {
     await bootDb();
-    const { handleCreateVault } = await import("../src/handlers/vaults");
+    const { handleCreateVault } = await import("../src/handlers/anthropic-compat/vaults");
     const res = await handleCreateVault(
-      req("/v1/vaults", { body: { name: "standalone" } }),
+      req("/anthropic/v1/vaults", { body: { name: "standalone" } }),
     );
     expect(res.status).toBe(201);
     const body = await res.json();
@@ -2242,13 +2242,13 @@ describe("Edge Cases", () => {
   it("put entry with missing value -> 400", async () => {
     await bootDb();
     const agent = await createTestAgent({ name: "PutNoValAgent" });
-    const { handleCreateVault, handlePutEntry } = await import("../src/handlers/vaults");
+    const { handleCreateVault, handlePutEntry } = await import("../src/handlers/anthropic-compat/vaults");
     const createRes = await handleCreateVault(
-      req("/v1/vaults", { body: { agent_id: agent.id, name: "noentry" } }),
+      req("/anthropic/v1/vaults", { body: { agent_id: agent.id, name: "noentry" } }),
     );
     const vault = await createRes.json();
     const res = await handlePutEntry(
-      req(`/v1/vaults/${vault.id}/entries/k`, { method: "PUT", body: { notvalue: "x" } }),
+      req(`/anthropic/v1/vaults/${vault.id}/entries/k`, { method: "PUT", body: { notvalue: "x" } }),
       vault.id,
       "k",
     );
@@ -2257,23 +2257,23 @@ describe("Edge Cases", () => {
 
   it("list entries on non-existent vault -> 404", async () => {
     await bootDb();
-    const { handleListEntries } = await import("../src/handlers/vaults");
-    const res = await handleListEntries(req("/v1/vaults/ghost/entries"), "ghost");
+    const { handleListEntries } = await import("../src/handlers/anthropic-compat/vaults");
+    const res = await handleListEntries(req("/anthropic/v1/vaults/ghost/entries"), "ghost");
     expect(res.status).toBe(404);
   });
 
   it("get entry on non-existent vault -> 404", async () => {
     await bootDb();
-    const { handleGetEntry } = await import("../src/handlers/vaults");
-    const res = await handleGetEntry(req("/v1/vaults/ghost/entries/k"), "ghost", "k");
+    const { handleGetEntry } = await import("../src/handlers/anthropic-compat/vaults");
+    const res = await handleGetEntry(req("/anthropic/v1/vaults/ghost/entries/k"), "ghost", "k");
     expect(res.status).toBe(404);
   });
 
   it("put entry on non-existent vault -> 404", async () => {
     await bootDb();
-    const { handlePutEntry } = await import("../src/handlers/vaults");
+    const { handlePutEntry } = await import("../src/handlers/anthropic-compat/vaults");
     const res = await handlePutEntry(
-      req("/v1/vaults/ghost/entries/k", { method: "PUT", body: { value: "v" } }),
+      req("/anthropic/v1/vaults/ghost/entries/k", { method: "PUT", body: { value: "v" } }),
       "ghost",
       "k",
     );
@@ -2282,9 +2282,9 @@ describe("Edge Cases", () => {
 
   it("delete entry on non-existent vault -> 404", async () => {
     await bootDb();
-    const { handleDeleteEntry } = await import("../src/handlers/vaults");
+    const { handleDeleteEntry } = await import("../src/handlers/anthropic-compat/vaults");
     const res = await handleDeleteEntry(
-      req("/v1/vaults/ghost/entries/k", { method: "DELETE" }),
+      req("/anthropic/v1/vaults/ghost/entries/k", { method: "DELETE" }),
       "ghost",
       "k",
     );
@@ -2480,11 +2480,11 @@ describe("Agent Skills CRUD", () => {
 
   it("create agent with skills", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
     const skills = [
       { name: "test-skill", source: "test/repo@test-skill", content: "# Test Skill\nContent here.", installed_at: new Date().toISOString() },
     ];
-    const res = await handleCreateAgent(req("/v1/agents", {
+    const res = await handleCreateAgent(req("/anthropic/v1/agents", {
       body: { name: "Agent-Skills-Test", model: { id: "claude-sonnet-4-6" }, skills },
     }));
     expect(res.status).toBe(201);
@@ -2498,17 +2498,17 @@ describe("Agent Skills CRUD", () => {
 
   it("get agent returns skills", async () => {
     await bootDb();
-    const { handleCreateAgent, handleGetAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent, handleGetAgent } = await import("../src/handlers/anthropic-compat/agents");
     const skills = [
       { name: "s1", source: "a/b@s1", content: "content1", installed_at: new Date().toISOString() },
       { name: "s2", source: "a/b@s2", content: "content2", installed_at: new Date().toISOString() },
     ];
-    const createRes = await handleCreateAgent(req("/v1/agents", {
+    const createRes = await handleCreateAgent(req("/anthropic/v1/agents", {
       body: { name: "Agent-Get-Skills", model: { id: "claude-sonnet-4-6" }, skills },
     }));
     const agent = await createRes.json() as Record<string, unknown>;
 
-    const getRes = await handleGetAgent(req(`/v1/agents/${agent.id}`), agent.id as string);
+    const getRes = await handleGetAgent(req(`/anthropic/v1/agents/${agent.id}`), agent.id as string);
     expect(getRes.status).toBe(200);
     const fetched = await getRes.json() as Record<string, unknown>;
     expect((fetched.skills as any[]).length).toBe(2);
@@ -2516,8 +2516,8 @@ describe("Agent Skills CRUD", () => {
 
   it("update agent adds skills", async () => {
     await bootDb();
-    const { handleCreateAgent, handleUpdateAgent, handleGetAgent } = await import("../src/handlers/agents");
-    const createRes = await handleCreateAgent(req("/v1/agents", {
+    const { handleCreateAgent, handleUpdateAgent, handleGetAgent } = await import("../src/handlers/anthropic-compat/agents");
+    const createRes = await handleCreateAgent(req("/anthropic/v1/agents", {
       body: { name: "Agent-Add-Skills", model: { id: "claude-sonnet-4-6" } },
     }));
     const agent = await createRes.json() as Record<string, unknown>;
@@ -2527,13 +2527,13 @@ describe("Agent Skills CRUD", () => {
       { name: "added-skill", source: "x/y@added-skill", content: "# Added", installed_at: new Date().toISOString() },
     ];
     const updateRes = await handleUpdateAgent(
-      req(`/v1/agents/${agent.id}`, { body: { version: 1, skills: newSkills } }),
+      req(`/anthropic/v1/agents/${agent.id}`, { body: { version: 1, skills: newSkills } }),
       agent.id as string,
     );
     expect(updateRes.status).toBe(200);
 
     // Verify
-    const getRes = await handleGetAgent(req(`/v1/agents/${agent.id}`), agent.id as string);
+    const getRes = await handleGetAgent(req(`/anthropic/v1/agents/${agent.id}`), agent.id as string);
     const fetched = await getRes.json() as Record<string, unknown>;
     expect((fetched.skills as any[]).length).toBe(1);
     expect((fetched.skills as any[])[0].name).toBe("added-skill");
@@ -2541,23 +2541,23 @@ describe("Agent Skills CRUD", () => {
 
   it("update agent removes skills", async () => {
     await bootDb();
-    const { handleCreateAgent, handleUpdateAgent, handleGetAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent, handleUpdateAgent, handleGetAgent } = await import("../src/handlers/anthropic-compat/agents");
     const skills = [
       { name: "keep", source: "a/b@keep", content: "keep", installed_at: new Date().toISOString() },
       { name: "remove", source: "a/b@remove", content: "remove", installed_at: new Date().toISOString() },
     ];
-    const createRes = await handleCreateAgent(req("/v1/agents", {
+    const createRes = await handleCreateAgent(req("/anthropic/v1/agents", {
       body: { name: "Agent-Remove-Skills", model: { id: "claude-sonnet-4-6" }, skills },
     }));
     const agent = await createRes.json() as Record<string, unknown>;
 
     // Remove one skill
     await handleUpdateAgent(
-      req(`/v1/agents/${agent.id}`, { body: { version: 1, skills: [skills[0]] } }),
+      req(`/anthropic/v1/agents/${agent.id}`, { body: { version: 1, skills: [skills[0]] } }),
       agent.id as string,
     );
 
-    const getRes = await handleGetAgent(req(`/v1/agents/${agent.id}`), agent.id as string);
+    const getRes = await handleGetAgent(req(`/anthropic/v1/agents/${agent.id}`), agent.id as string);
     const fetched = await getRes.json() as Record<string, unknown>;
     expect((fetched.skills as any[]).length).toBe(1);
     expect((fetched.skills as any[])[0].name).toBe("keep");
@@ -2565,12 +2565,12 @@ describe("Agent Skills CRUD", () => {
 
   it("skills size limit enforced", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
     const bigContent = "x".repeat(300_000); // > 256KB limit
     const skills = [
       { name: "big", source: "a/b@big", content: bigContent, installed_at: new Date().toISOString() },
     ];
-    const res = await handleCreateAgent(req("/v1/agents", {
+    const res = await handleCreateAgent(req("/anthropic/v1/agents", {
       body: { name: "Agent-Big-Skill", model: { id: "claude-sonnet-4-6" }, skills },
     }));
     // Should reject or accept based on implementation — either 400 or 201
@@ -2584,8 +2584,8 @@ describe("Environment Creation — Cloud Provider Skip", () => {
 
   it("cloud provider skips availability check", async () => {
     await bootDb();
-    const { handleCreateEnvironment } = await import("../src/handlers/environments");
-    const res = await handleCreateEnvironment(req("/v1/environments", {
+    const { handleCreateEnvironment } = await import("../src/handlers/anthropic-compat/environments");
+    const res = await handleCreateEnvironment(req("/anthropic/v1/environments", {
       body: { name: `cloud-env-${Date.now()}`, config: { type: "self_hosted", provider: "e2b", packages: {} } },
     }));
     // Should succeed even without E2B_API_KEY — check is skipped for cloud providers
@@ -2594,14 +2594,14 @@ describe("Environment Creation — Cloud Provider Skip", () => {
 
   it("duplicate environment name rejected", async () => {
     await bootDb();
-    const { handleCreateEnvironment } = await import("../src/handlers/environments");
+    const { handleCreateEnvironment } = await import("../src/handlers/anthropic-compat/environments");
     const name = `dup-env-${Date.now()}`;
-    const res1 = await handleCreateEnvironment(req("/v1/environments", {
+    const res1 = await handleCreateEnvironment(req("/anthropic/v1/environments", {
       body: { name, config: { type: "self_hosted", provider: "e2b", packages: {} } },
     }));
     expect(res1.status).toBe(201);
 
-    const res2 = await handleCreateEnvironment(req("/v1/environments", {
+    const res2 = await handleCreateEnvironment(req("/anthropic/v1/environments", {
       body: { name, config: { type: "self_hosted", provider: "e2b", packages: {} } },
     }));
     expect(res2.status).toBe(409);
@@ -2630,10 +2630,10 @@ describe("OpenAPI Spec", () => {
     const res = await handleGetOpenApiSpec(req("/v1/openapi.json"));
     const body = await res.json() as { paths: Record<string, unknown> };
     const paths = Object.keys(body.paths);
-    expect(paths).toContain("/v1/agents");
-    expect(paths).toContain("/v1/environments");
-    expect(paths).toContain("/v1/sessions");
-    expect(paths).toContain("/v1/vaults");
+    expect(paths).toContain("/anthropic/v1/agents");
+    expect(paths).toContain("/anthropic/v1/environments");
+    expect(paths).toContain("/anthropic/v1/sessions");
+    expect(paths).toContain("/anthropic/v1/vaults");
   });
 });
 
@@ -2646,15 +2646,15 @@ describe("Session Stream", () => {
     await bootDb();
     const agent = await createTestAgent();
     const env = await createTestEnv();
-    const { handleCreateSession } = await import("../src/handlers/sessions");
-    const sessRes = await handleCreateSession(req("/v1/sessions", {
+    const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
+    const sessRes = await handleCreateSession(req("/anthropic/v1/sessions", {
       body: { agent: agent.id, environment_id: env.id },
     }));
     const session = await sessRes.json() as Record<string, unknown>;
 
-    const { handleSessionStream } = await import("../src/handlers/stream");
+    const { handleSessionStream } = await import("../src/handlers/anthropic-compat/stream");
     const controller = new AbortController();
-    const streamReq = new Request(`http://localhost/v1/sessions/${session.id}/stream`, {
+    const streamReq = new Request(`http://localhost/anthropic/v1/sessions/${session.id}/stream`, {
       headers: { "x-api-key": "test-api-key-12345" },
       signal: controller.signal,
     });
@@ -2666,9 +2666,9 @@ describe("Session Stream", () => {
 
   it("returns 404 for missing session", async () => {
     await bootDb();
-    const { handleSessionStream } = await import("../src/handlers/stream");
+    const { handleSessionStream } = await import("../src/handlers/anthropic-compat/stream");
     const res = await handleSessionStream(
-      req("/v1/sessions/sess_nonexistent/stream"),
+      req("/anthropic/v1/sessions/sess_nonexistent/stream"),
       "sess_nonexistent",
     );
     expect(res.status).toBe(404);
@@ -2676,9 +2676,9 @@ describe("Session Stream", () => {
 
   it("returns 401 without auth", async () => {
     await bootDb();
-    const { handleSessionStream } = await import("../src/handlers/stream");
+    const { handleSessionStream } = await import("../src/handlers/anthropic-compat/stream");
     const res = await handleSessionStream(
-      req("/v1/sessions/sess_x/stream", { apiKey: "" }),
+      req("/anthropic/v1/sessions/sess_x/stream", { apiKey: "" }),
       "sess_x",
     );
     expect(res.status).toBe(401);
@@ -2692,13 +2692,13 @@ describe("Environments — Additional Coverage", () => {
 
   it("list environments with limit and order", async () => {
     await bootDb();
-    const { handleCreateEnvironment, handleListEnvironments } = await import("../src/handlers/environments");
+    const { handleCreateEnvironment, handleListEnvironments } = await import("../src/handlers/anthropic-compat/environments");
     for (let i = 0; i < 3; i++) {
-      await handleCreateEnvironment(req("/v1/environments", {
+      await handleCreateEnvironment(req("/anthropic/v1/environments", {
         body: { name: `env-${i}-${Date.now()}`, config: { type: "self_hosted", provider: "e2b", packages: {} } },
       }));
     }
-    const res = await handleListEnvironments(req("/v1/environments?limit=2&order=desc"));
+    const res = await handleListEnvironments(req("/anthropic/v1/environments?limit=2&order=desc"));
     expect(res.status).toBe(200);
     const body = await res.json() as { data: any[] };
     expect(body.data.length).toBeLessThanOrEqual(2);
@@ -2706,12 +2706,12 @@ describe("Environments — Additional Coverage", () => {
 
   it("get environment by id", async () => {
     await bootDb();
-    const { handleCreateEnvironment, handleGetEnvironment } = await import("../src/handlers/environments");
-    const createRes = await handleCreateEnvironment(req("/v1/environments", {
+    const { handleCreateEnvironment, handleGetEnvironment } = await import("../src/handlers/anthropic-compat/environments");
+    const createRes = await handleCreateEnvironment(req("/anthropic/v1/environments", {
       body: { name: `env-get-${Date.now()}`, config: { type: "self_hosted", provider: "e2b", packages: {} } },
     }));
     const env = await createRes.json() as Record<string, unknown>;
-    const getRes = await handleGetEnvironment(req(`/v1/environments/${env.id}`), env.id as string);
+    const getRes = await handleGetEnvironment(req(`/anthropic/v1/environments/${env.id}`), env.id as string);
     expect(getRes.status).toBe(200);
     const fetched = await getRes.json() as Record<string, unknown>;
     expect(fetched.id).toBe(env.id);
@@ -2720,36 +2720,36 @@ describe("Environments — Additional Coverage", () => {
 
   it("get nonexistent environment returns 404", async () => {
     await bootDb();
-    const { handleGetEnvironment } = await import("../src/handlers/environments");
-    const res = await handleGetEnvironment(req("/v1/environments/env_nonexistent"), "env_nonexistent");
+    const { handleGetEnvironment } = await import("../src/handlers/anthropic-compat/environments");
+    const res = await handleGetEnvironment(req("/anthropic/v1/environments/env_nonexistent"), "env_nonexistent");
     expect(res.status).toBe(404);
   });
 
   it("delete environment", async () => {
     await bootDb();
-    const { handleCreateEnvironment, handleDeleteEnvironment, handleGetEnvironment } = await import("../src/handlers/environments");
-    const createRes = await handleCreateEnvironment(req("/v1/environments", {
+    const { handleCreateEnvironment, handleDeleteEnvironment, handleGetEnvironment } = await import("../src/handlers/anthropic-compat/environments");
+    const createRes = await handleCreateEnvironment(req("/anthropic/v1/environments", {
       body: { name: `env-del-${Date.now()}`, config: { type: "self_hosted", provider: "e2b", packages: {} } },
     }));
     const env = await createRes.json() as Record<string, unknown>;
 
-    const delRes = await handleDeleteEnvironment(req(`/v1/environments/${env.id}`, { method: "DELETE" }), env.id as string);
+    const delRes = await handleDeleteEnvironment(req(`/anthropic/v1/environments/${env.id}`, { method: "DELETE" }), env.id as string);
     expect(delRes.status).toBe(200);
 
-    const getRes = await handleGetEnvironment(req(`/v1/environments/${env.id}`), env.id as string);
+    const getRes = await handleGetEnvironment(req(`/anthropic/v1/environments/${env.id}`), env.id as string);
     expect(getRes.status).toBe(404);
   });
 
   it("archive environment", async () => {
     await bootDb();
-    const { handleCreateEnvironment, handleArchiveEnvironment } = await import("../src/handlers/environments");
-    const createRes = await handleCreateEnvironment(req("/v1/environments", {
+    const { handleCreateEnvironment, handleArchiveEnvironment } = await import("../src/handlers/anthropic-compat/environments");
+    const createRes = await handleCreateEnvironment(req("/anthropic/v1/environments", {
       body: { name: `env-arch-${Date.now()}`, config: { type: "self_hosted", provider: "e2b", packages: {} } },
     }));
     const env = await createRes.json() as Record<string, unknown>;
 
     const archRes = await handleArchiveEnvironment(
-      req(`/v1/environments/${env.id}/archive`, { method: "POST" }),
+      req(`/anthropic/v1/environments/${env.id}/archive`, { method: "POST" }),
       env.id as string,
     );
     expect(archRes.status).toBe(200);
@@ -2759,8 +2759,8 @@ describe("Environments — Additional Coverage", () => {
 
   it("invalid config returns 400", async () => {
     await bootDb();
-    const { handleCreateEnvironment } = await import("../src/handlers/environments");
-    const res = await handleCreateEnvironment(req("/v1/environments", {
+    const { handleCreateEnvironment } = await import("../src/handlers/anthropic-compat/environments");
+    const res = await handleCreateEnvironment(req("/anthropic/v1/environments", {
       body: { name: "bad", config: { type: "invalid" } },
     }));
     expect(res.status).toBe(400);
@@ -2776,13 +2776,13 @@ describe("Sessions — Additional Coverage", () => {
     await bootDb();
     const agent = await createTestAgent();
     const env = await createTestEnv();
-    const { handleCreateSession, handleGetSession } = await import("../src/handlers/sessions");
-    const createRes = await handleCreateSession(req("/v1/sessions", {
+    const { handleCreateSession, handleGetSession } = await import("../src/handlers/anthropic-compat/sessions");
+    const createRes = await handleCreateSession(req("/anthropic/v1/sessions", {
       body: { agent: agent.id, environment_id: env.id },
     }));
     const session = await createRes.json() as Record<string, unknown>;
 
-    const getRes = await handleGetSession(req(`/v1/sessions/${session.id}`), session.id as string);
+    const getRes = await handleGetSession(req(`/anthropic/v1/sessions/${session.id}`), session.id as string);
     expect(getRes.status).toBe(200);
     const fetched = await getRes.json() as Record<string, unknown>;
     expect(fetched.id).toBe(session.id);
@@ -2795,8 +2795,8 @@ describe("Sessions — Additional Coverage", () => {
 
   it("get nonexistent session returns 404", async () => {
     await bootDb();
-    const { handleGetSession } = await import("../src/handlers/sessions");
-    const res = await handleGetSession(req("/v1/sessions/sess_nonexistent"), "sess_nonexistent");
+    const { handleGetSession } = await import("../src/handlers/anthropic-compat/sessions");
+    const res = await handleGetSession(req("/anthropic/v1/sessions/sess_nonexistent"), "sess_nonexistent");
     expect(res.status).toBe(404);
   });
 
@@ -2804,13 +2804,13 @@ describe("Sessions — Additional Coverage", () => {
     await bootDb();
     const agent = await createTestAgent();
     const env = await createTestEnv();
-    const { handleCreateSession, handleDeleteSession, handleGetSession } = await import("../src/handlers/sessions");
-    const createRes = await handleCreateSession(req("/v1/sessions", {
+    const { handleCreateSession, handleDeleteSession, handleGetSession } = await import("../src/handlers/anthropic-compat/sessions");
+    const createRes = await handleCreateSession(req("/anthropic/v1/sessions", {
       body: { agent: agent.id, environment_id: env.id },
     }));
     const session = await createRes.json() as Record<string, unknown>;
 
-    const delRes = await handleDeleteSession(req(`/v1/sessions/${session.id}`, { method: "DELETE" }), session.id as string);
+    const delRes = await handleDeleteSession(req(`/anthropic/v1/sessions/${session.id}`, { method: "DELETE" }), session.id as string);
     expect(delRes.status).toBe(200);
     const delBody = await delRes.json() as Record<string, unknown>;
     expect(delBody.id).toBe(session.id);
@@ -2820,14 +2820,14 @@ describe("Sessions — Additional Coverage", () => {
     await bootDb();
     const agent = await createTestAgent();
     const env = await createTestEnv();
-    const { handleCreateSession, handleArchiveSession } = await import("../src/handlers/sessions");
-    const createRes = await handleCreateSession(req("/v1/sessions", {
+    const { handleCreateSession, handleArchiveSession } = await import("../src/handlers/anthropic-compat/sessions");
+    const createRes = await handleCreateSession(req("/anthropic/v1/sessions", {
       body: { agent: agent.id, environment_id: env.id },
     }));
     const session = await createRes.json() as Record<string, unknown>;
 
     const archRes = await handleArchiveSession(
-      req(`/v1/sessions/${session.id}/archive`, { method: "POST" }),
+      req(`/anthropic/v1/sessions/${session.id}/archive`, { method: "POST" }),
       session.id as string,
     );
     expect(archRes.status).toBe(200);
@@ -2839,14 +2839,14 @@ describe("Sessions — Additional Coverage", () => {
     await bootDb();
     const agent = await createTestAgent();
     const env = await createTestEnv();
-    const { handleCreateSession, handleUpdateSession } = await import("../src/handlers/sessions");
-    const createRes = await handleCreateSession(req("/v1/sessions", {
+    const { handleCreateSession, handleUpdateSession } = await import("../src/handlers/anthropic-compat/sessions");
+    const createRes = await handleCreateSession(req("/anthropic/v1/sessions", {
       body: { agent: agent.id, environment_id: env.id },
     }));
     const session = await createRes.json() as Record<string, unknown>;
 
     const updateRes = await handleUpdateSession(
-      req(`/v1/sessions/${session.id}`, { body: { title: "Test Title", metadata: { key: "value" } } }),
+      req(`/anthropic/v1/sessions/${session.id}`, { body: { title: "Test Title", metadata: { key: "value" } } }),
       session.id as string,
     );
     expect(updateRes.status).toBe(200);
@@ -2858,12 +2858,12 @@ describe("Sessions — Additional Coverage", () => {
     await bootDb();
     const agent = await createTestAgent();
     const env = await createTestEnv();
-    const { handleCreateSession, handleListSessions } = await import("../src/handlers/sessions");
-    await handleCreateSession(req("/v1/sessions", {
+    const { handleCreateSession, handleListSessions } = await import("../src/handlers/anthropic-compat/sessions");
+    await handleCreateSession(req("/anthropic/v1/sessions", {
       body: { agent: agent.id, environment_id: env.id },
     }));
 
-    const res = await handleListSessions(req(`/v1/sessions?agent_id=${agent.id}&limit=5`));
+    const res = await handleListSessions(req(`/anthropic/v1/sessions?agent_id=${agent.id}&limit=5`));
     expect(res.status).toBe(200);
     const body = await res.json() as { data: any[] };
     expect(body.data.length).toBeGreaterThanOrEqual(1);
@@ -2873,8 +2873,8 @@ describe("Sessions — Additional Coverage", () => {
   it("create session with invalid agent returns 404", async () => {
     await bootDb();
     const env = await createTestEnv();
-    const { handleCreateSession } = await import("../src/handlers/sessions");
-    const res = await handleCreateSession(req("/v1/sessions", {
+    const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
+    const res = await handleCreateSession(req("/anthropic/v1/sessions", {
       body: { agent: "agent_nonexistent", environment_id: env.id },
     }));
     expect(res.status).toBe(404);
@@ -2890,15 +2890,15 @@ describe("Events — Additional Coverage", () => {
     await bootDb();
     const agent = await createTestAgent();
     const env = await createTestEnv();
-    const { handleCreateSession } = await import("../src/handlers/sessions");
-    const sessRes = await handleCreateSession(req("/v1/sessions", {
+    const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
+    const sessRes = await handleCreateSession(req("/anthropic/v1/sessions", {
       body: { agent: agent.id, environment_id: env.id },
     }));
     const session = await sessRes.json() as Record<string, unknown>;
 
-    const { handlePostEvents, handleListEvents } = await import("../src/handlers/events");
+    const { handlePostEvents, handleListEvents } = await import("../src/handlers/anthropic-compat/events");
     await handlePostEvents(
-      req(`/v1/sessions/${session.id}/events`, {
+      req(`/anthropic/v1/sessions/${session.id}/events`, {
         body: {
           events: [
             { type: "user.message", content: [{ type: "text", text: "hello" }] },
@@ -2909,7 +2909,7 @@ describe("Events — Additional Coverage", () => {
       session.id as string,
     );
 
-    const listRes = await handleListEvents(req(`/v1/sessions/${session.id}/events?limit=10`), session.id as string);
+    const listRes = await handleListEvents(req(`/anthropic/v1/sessions/${session.id}/events?limit=10`), session.id as string);
     expect(listRes.status).toBe(200);
     const body = await listRes.json() as { data: any[] };
     // Should have at least the 2 user messages
@@ -2921,21 +2921,21 @@ describe("Events — Additional Coverage", () => {
     await bootDb();
     const agent = await createTestAgent();
     const env = await createTestEnv();
-    const { handleCreateSession } = await import("../src/handlers/sessions");
-    const sessRes = await handleCreateSession(req("/v1/sessions", {
+    const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
+    const sessRes = await handleCreateSession(req("/anthropic/v1/sessions", {
       body: { agent: agent.id, environment_id: env.id },
     }));
     const session = await sessRes.json() as Record<string, unknown>;
 
-    const { handlePostEvents, handleListEvents } = await import("../src/handlers/events");
+    const { handlePostEvents, handleListEvents } = await import("../src/handlers/anthropic-compat/events");
     await handlePostEvents(
-      req(`/v1/sessions/${session.id}/events`, {
+      req(`/anthropic/v1/sessions/${session.id}/events`, {
         body: { events: [{ type: "user.message", content: [{ type: "text", text: "msg1" }] }] },
       }),
       session.id as string,
     );
 
-    const res = await handleListEvents(req(`/v1/sessions/${session.id}/events?order=asc`), session.id as string);
+    const res = await handleListEvents(req(`/anthropic/v1/sessions/${session.id}/events?order=asc`), session.id as string);
     expect(res.status).toBe(200);
     const body = await res.json() as { data: any[] };
     if (body.data.length >= 2) {
@@ -2945,8 +2945,8 @@ describe("Events — Additional Coverage", () => {
 
   it("events for nonexistent session returns 404", async () => {
     await bootDb();
-    const { handleListEvents } = await import("../src/handlers/events");
-    const res = await handleListEvents(req("/v1/sessions/sess_nonexistent/events"), "sess_nonexistent");
+    const { handleListEvents } = await import("../src/handlers/anthropic-compat/events");
+    const res = await handleListEvents(req("/anthropic/v1/sessions/sess_nonexistent/events"), "sess_nonexistent");
     expect(res.status).toBe(404);
   });
 });
@@ -2958,23 +2958,23 @@ describe("Agents — Additional Coverage", () => {
 
   it("create agent with system prompt", async () => {
     await bootDb();
-    const { handleCreateAgent, handleGetAgent } = await import("../src/handlers/agents");
-    const res = await handleCreateAgent(req("/v1/agents", {
+    const { handleCreateAgent, handleGetAgent } = await import("../src/handlers/anthropic-compat/agents");
+    const res = await handleCreateAgent(req("/anthropic/v1/agents", {
       body: { name: "SystemAgent", model: { id: "claude-sonnet-4-6" }, system: "You are a helpful assistant." },
     }));
     expect(res.status).toBe(201);
     const agent = await res.json() as Record<string, unknown>;
     expect(agent.system).toBe("You are a helpful assistant.");
 
-    const getRes = await handleGetAgent(req(`/v1/agents/${agent.id}`), agent.id as string);
+    const getRes = await handleGetAgent(req(`/anthropic/v1/agents/${agent.id}`), agent.id as string);
     const fetched = await getRes.json() as Record<string, unknown>;
     expect(fetched.system).toBe("You are a helpful assistant.");
   });
 
   it("create agent with confirmation mode", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
-    const res = await handleCreateAgent(req("/v1/agents", {
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
+    const res = await handleCreateAgent(req("/anthropic/v1/agents", {
       body: { name: "ConfirmAgent", model: { id: "claude-sonnet-4-6" }, confirmation_mode: true },
     }));
     expect(res.status).toBe(201);
@@ -2985,9 +2985,9 @@ describe("Agents — Additional Coverage", () => {
   it("update agent name and model", async () => {
     await bootDb();
     const agent = await createTestAgent();
-    const { handleUpdateAgent } = await import("../src/handlers/agents");
+    const { handleUpdateAgent } = await import("../src/handlers/anthropic-compat/agents");
     const res = await handleUpdateAgent(
-      req(`/v1/agents/${agent.id}`, { body: { version: 1, name: "NewName", model: { id: "claude-opus-4-6" } } }),
+      req(`/anthropic/v1/agents/${agent.id}`, { body: { version: 1, name: "NewName", model: { id: "claude-opus-4-6" } } }),
       agent.id as string,
     );
     expect(res.status).toBe(200);
@@ -3000,16 +3000,16 @@ describe("Agents — Additional Coverage", () => {
   it("update creates new version", async () => {
     await bootDb();
     const agent = await createTestAgent();
-    const { handleUpdateAgent, handleGetAgent } = await import("../src/handlers/agents");
+    const { handleUpdateAgent, handleGetAgent } = await import("../src/handlers/anthropic-compat/agents");
     await handleUpdateAgent(
-      req(`/v1/agents/${agent.id}`, { body: { version: 1, name: "V2" } }),
+      req(`/anthropic/v1/agents/${agent.id}`, { body: { version: 1, name: "V2" } }),
       agent.id as string,
     );
     await handleUpdateAgent(
-      req(`/v1/agents/${agent.id}`, { body: { version: 2, name: "V3" } }),
+      req(`/anthropic/v1/agents/${agent.id}`, { body: { version: 2, name: "V3" } }),
       agent.id as string,
     );
-    const res = await handleGetAgent(req(`/v1/agents/${agent.id}`), agent.id as string);
+    const res = await handleGetAgent(req(`/anthropic/v1/agents/${agent.id}`), agent.id as string);
     const fetched = await res.json() as Record<string, unknown>;
     expect(fetched.version).toBe(3);
     expect(fetched.name).toBe("V3");
@@ -3018,13 +3018,13 @@ describe("Agents — Additional Coverage", () => {
   it("get specific version", async () => {
     await bootDb();
     const agent = await createTestAgent({ name: "VersionTest" });
-    const { handleUpdateAgent, handleGetAgent } = await import("../src/handlers/agents");
+    const { handleUpdateAgent, handleGetAgent } = await import("../src/handlers/anthropic-compat/agents");
     await handleUpdateAgent(
-      req(`/v1/agents/${agent.id}`, { body: { version: 1, name: "Updated" } }),
+      req(`/anthropic/v1/agents/${agent.id}`, { body: { version: 1, name: "Updated" } }),
       agent.id as string,
     );
     // Get latest — should be version 2
-    const latestRes = await handleGetAgent(req(`/v1/agents/${agent.id}`), agent.id as string);
+    const latestRes = await handleGetAgent(req(`/anthropic/v1/agents/${agent.id}`), agent.id as string);
     const latest = await latestRes.json() as Record<string, unknown>;
     expect(latest.version).toBe(2);
     expect(latest.name).toBe("Updated");
@@ -3032,8 +3032,8 @@ describe("Agents — Additional Coverage", () => {
 
   it("create agent with empty name returns 400", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
-    const res = await handleCreateAgent(req("/v1/agents", {
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
+    const res = await handleCreateAgent(req("/anthropic/v1/agents", {
       body: { name: "", model: { id: "claude-sonnet-4-6" } },
     }));
     expect(res.status).toBe(400);
@@ -3043,8 +3043,8 @@ describe("Agents — Additional Coverage", () => {
     await bootDb();
     await createTestAgent({ name: "A-first" });
     await createTestAgent({ name: "B-second" });
-    const { handleListAgents } = await import("../src/handlers/agents");
-    const res = await handleListAgents(req("/v1/agents?order=asc&limit=10"));
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
+    const res = await handleListAgents(req("/anthropic/v1/agents?order=asc&limit=10"));
     expect(res.status).toBe(200);
     const body = await res.json() as { data: any[] };
     expect(body.data.length).toBeGreaterThanOrEqual(2);
@@ -3129,20 +3129,20 @@ describe("Vault Entries — Additional Coverage", () => {
   it("set and get vault entry", async () => {
     await bootDb();
     const agent = await createTestAgent();
-    const { handleCreateVault, handlePutEntry, handleGetEntry } = await import("../src/handlers/vaults");
-    const vaultRes = await handleCreateVault(req("/v1/vaults", {
+    const { handleCreateVault, handlePutEntry, handleGetEntry } = await import("../src/handlers/anthropic-compat/vaults");
+    const vaultRes = await handleCreateVault(req("/anthropic/v1/vaults", {
       body: { name: "test-vault", agent_id: agent.id },
     }));
     const vault = await vaultRes.json() as Record<string, unknown>;
 
     await handlePutEntry(
-      req(`/v1/vaults/${vault.id}/entries/MY_KEY`, { method: "PUT", body: { value: "secret123" } }),
+      req(`/anthropic/v1/vaults/${vault.id}/entries/MY_KEY`, { method: "PUT", body: { value: "secret123" } }),
       vault.id as string,
       "MY_KEY",
     );
 
     const getRes = await handleGetEntry(
-      req(`/v1/vaults/${vault.id}/entries/MY_KEY`),
+      req(`/anthropic/v1/vaults/${vault.id}/entries/MY_KEY`),
       vault.id as string,
       "MY_KEY",
     );
@@ -3156,27 +3156,27 @@ describe("Vault Entries — Additional Coverage", () => {
   it("delete vault entry", async () => {
     await bootDb();
     const agent = await createTestAgent();
-    const { handleCreateVault, handlePutEntry, handleDeleteEntry, handleGetEntry } = await import("../src/handlers/vaults");
-    const vaultRes = await handleCreateVault(req("/v1/vaults", {
+    const { handleCreateVault, handlePutEntry, handleDeleteEntry, handleGetEntry } = await import("../src/handlers/anthropic-compat/vaults");
+    const vaultRes = await handleCreateVault(req("/anthropic/v1/vaults", {
       body: { name: "del-vault", agent_id: agent.id },
     }));
     const vault = await vaultRes.json() as Record<string, unknown>;
 
     await handlePutEntry(
-      req(`/v1/vaults/${vault.id}/entries/DEL_KEY`, { method: "PUT", body: { value: "todelete" } }),
+      req(`/anthropic/v1/vaults/${vault.id}/entries/DEL_KEY`, { method: "PUT", body: { value: "todelete" } }),
       vault.id as string,
       "DEL_KEY",
     );
 
     const delRes = await handleDeleteEntry(
-      req(`/v1/vaults/${vault.id}/entries/DEL_KEY`, { method: "DELETE" }),
+      req(`/anthropic/v1/vaults/${vault.id}/entries/DEL_KEY`, { method: "DELETE" }),
       vault.id as string,
       "DEL_KEY",
     );
     expect(delRes.status).toBe(200);
 
     const getRes = await handleGetEntry(
-      req(`/v1/vaults/${vault.id}/entries/DEL_KEY`),
+      req(`/anthropic/v1/vaults/${vault.id}/entries/DEL_KEY`),
       vault.id as string,
       "DEL_KEY",
     );
@@ -3186,16 +3186,16 @@ describe("Vault Entries — Additional Coverage", () => {
   it("list vault entries", async () => {
     await bootDb();
     const agent = await createTestAgent();
-    const { handleCreateVault, handlePutEntry, handleListEntries } = await import("../src/handlers/vaults");
-    const vaultRes = await handleCreateVault(req("/v1/vaults", {
+    const { handleCreateVault, handlePutEntry, handleListEntries } = await import("../src/handlers/anthropic-compat/vaults");
+    const vaultRes = await handleCreateVault(req("/anthropic/v1/vaults", {
       body: { name: "list-vault", agent_id: agent.id },
     }));
     const vault = await vaultRes.json() as Record<string, unknown>;
 
-    await handlePutEntry(req(`/v1/vaults/${vault.id}/entries/K1`, { method: "PUT", body: { value: "v1" } }), vault.id as string, "K1");
-    await handlePutEntry(req(`/v1/vaults/${vault.id}/entries/K2`, { method: "PUT", body: { value: "v2" } }), vault.id as string, "K2");
+    await handlePutEntry(req(`/anthropic/v1/vaults/${vault.id}/entries/K1`, { method: "PUT", body: { value: "v1" } }), vault.id as string, "K1");
+    await handlePutEntry(req(`/anthropic/v1/vaults/${vault.id}/entries/K2`, { method: "PUT", body: { value: "v2" } }), vault.id as string, "K2");
 
-    const listRes = await handleListEntries(req(`/v1/vaults/${vault.id}/entries`), vault.id as string);
+    const listRes = await handleListEntries(req(`/anthropic/v1/vaults/${vault.id}/entries`), vault.id as string);
     expect(listRes.status).toBe(200);
     const body = await listRes.json() as { data: any[] };
     expect(body.data.length).toBe(2);
@@ -3210,14 +3210,14 @@ describe("Vault Duplicate Names", () => {
   it("rejects duplicate vault name on same agent", async () => {
     await bootDb();
     const agent = await createTestAgent();
-    const { handleCreateVault } = await import("../src/handlers/vaults");
+    const { handleCreateVault } = await import("../src/handlers/anthropic-compat/vaults");
 
-    const res1 = await handleCreateVault(req("/v1/vaults", {
+    const res1 = await handleCreateVault(req("/anthropic/v1/vaults", {
       body: { name: "default", agent_id: agent.id },
     }));
     expect(res1.status).toBe(201);
 
-    const res2 = await handleCreateVault(req("/v1/vaults", {
+    const res2 = await handleCreateVault(req("/anthropic/v1/vaults", {
       body: { name: "default", agent_id: agent.id },
     }));
     expect(res2.status).toBe(409);
@@ -3229,14 +3229,14 @@ describe("Vault Duplicate Names", () => {
     await bootDb();
     const agent1 = await createTestAgent({ name: "Agent1" });
     const agent2 = await createTestAgent({ name: "Agent2" });
-    const { handleCreateVault } = await import("../src/handlers/vaults");
+    const { handleCreateVault } = await import("../src/handlers/anthropic-compat/vaults");
 
-    const res1 = await handleCreateVault(req("/v1/vaults", {
+    const res1 = await handleCreateVault(req("/anthropic/v1/vaults", {
       body: { name: "default", agent_id: agent1.id },
     }));
     expect(res1.status).toBe(201);
 
-    const res2 = await handleCreateVault(req("/v1/vaults", {
+    const res2 = await handleCreateVault(req("/anthropic/v1/vaults", {
       body: { name: "default", agent_id: agent2.id },
     }));
     expect(res2.status).toBe(201);
@@ -3252,10 +3252,10 @@ describe("Session Auto-Title", () => {
     await bootDb();
     const agent = await createTestAgent();
     const env = await createTestEnv();
-    const { handleCreateSession, handleGetSession } = await import("../src/handlers/sessions");
-    const { handlePostEvents } = await import("../src/handlers/events");
+    const { handleCreateSession, handleGetSession } = await import("../src/handlers/anthropic-compat/sessions");
+    const { handlePostEvents } = await import("../src/handlers/anthropic-compat/events");
 
-    const sessRes = await handleCreateSession(req("/v1/sessions", {
+    const sessRes = await handleCreateSession(req("/anthropic/v1/sessions", {
       body: { agent: agent.id, environment_id: env.id },
     }));
     const session = await sessRes.json() as Record<string, unknown>;
@@ -3265,14 +3265,14 @@ describe("Session Auto-Title", () => {
     // the handler directly (not the driver), title won't update here.
     // Instead verify the event is stored correctly.
     await handlePostEvents(
-      req(`/v1/sessions/${session.id}/events`, {
+      req(`/anthropic/v1/sessions/${session.id}/events`, {
         body: { events: [{ type: "user.message", content: [{ type: "text", text: "What is the meaning of life?" }] }] },
       }),
       session.id as string,
     );
 
     // Verify event was stored
-    const getRes = await handleGetSession(req(`/v1/sessions/${session.id}`), session.id as string);
+    const getRes = await handleGetSession(req(`/anthropic/v1/sessions/${session.id}`), session.id as string);
     expect(getRes.status).toBe(200);
   });
 });
@@ -3284,13 +3284,13 @@ describe("Agent Duplicate Names", () => {
 
   it("rejects duplicate agent name", async () => {
     await bootDb();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
-    const res1 = await handleCreateAgent(req("/v1/agents", {
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
+    const res1 = await handleCreateAgent(req("/anthropic/v1/agents", {
       body: { name: "Coder", model: { id: "claude-sonnet-4-6" } },
     }));
     expect(res1.status).toBe(201);
 
-    const res2 = await handleCreateAgent(req("/v1/agents", {
+    const res2 = await handleCreateAgent(req("/anthropic/v1/agents", {
       body: { name: "Coder", model: { id: "claude-sonnet-4-6" } },
     }));
     expect(res2.status).toBe(409);
@@ -3306,15 +3306,15 @@ describe("Environment Duplicate Names", () => {
 
   it("rejects duplicate environment name", async () => {
     await bootDb();
-    const { handleCreateEnvironment } = await import("../src/handlers/environments");
+    const { handleCreateEnvironment } = await import("../src/handlers/anthropic-compat/environments");
     const name = `env-dup-${Date.now()}`;
 
-    const res1 = await handleCreateEnvironment(req("/v1/environments", {
+    const res1 = await handleCreateEnvironment(req("/anthropic/v1/environments", {
       body: { name, config: { type: "self_hosted", provider: "e2b", packages: {} } },
     }));
     expect(res1.status).toBe(201);
 
-    const res2 = await handleCreateEnvironment(req("/v1/environments", {
+    const res2 = await handleCreateEnvironment(req("/anthropic/v1/environments", {
       body: { name, config: { type: "self_hosted", provider: "e2b", packages: {} } },
     }));
     expect(res2.status).toBe(409);

@@ -3,10 +3,10 @@
  *
  * Passthrough lets a client point an Anthropic SDK at the gateway with
  * their existing `sk-ant-api*` key. The gateway forwards to Anthropic
- * using that key, with no gateway-side state created. This is a
- * "drop-in replacement" path — same URLs as Anthropic's Managed Agents
- * API — so the routing decision happens here rather than at a separate
- * URL prefix.
+ * using that key, with no gateway-side state created. Anthropic-shaped
+ * routes live under the `/anthropic/v1/*` prefix (mirroring the path
+ * convention used for `/google/v1beta/*`), and the allowlist below is
+ * the authoritative source for which routes are forwarded.
  *
  * Two invariants keep this safe:
  *
@@ -27,7 +27,7 @@
  *
  * `sk-ant-oat*` (OAuth tokens) intentionally do NOT match — the
  * existing anthropic-provider sync flow rejects them (see
- * `handlers/sessions.ts`), so we keep the same posture in passthrough.
+ * `handlers/anthropic-compat/sessions.ts`), so we keep the same posture in passthrough.
  */
 
 /**
@@ -46,40 +46,42 @@ export function isAnthropicApiKey(key: string): boolean {
 }
 
 /**
- * Routes that mirror Anthropic's Managed Agents API and may be forwarded
- * via passthrough. A request whose normalized path matches any of these
- * patterns will be proxied to `https://api.anthropic.com<path>` using
- * the caller's `sk-ant-api*` key.
+ * Routes under `/anthropic/v1/*` that mirror Anthropic's Managed Agents
+ * API and may be forwarded via passthrough. A request whose normalized
+ * path matches any of these patterns will be proxied to
+ * `https://api.anthropic.com/v1<rest>` using the caller's `sk-ant-api*`
+ * key (the `/anthropic` prefix is stripped before forwarding).
  *
  * Gateway-only paths (anything not on this list) reject passthrough
  * with 401, regardless of feature flag. Don't add a route here unless
- * Anthropic exposes the equivalent endpoint at the same path.
+ * Anthropic exposes the equivalent endpoint at the same path under
+ * their `/v1/*` namespace.
  */
 const PASSTHROUGH_ROUTE_PATTERNS: RegExp[] = [
   // Agents
-  /^\/v1\/agents$/,
-  /^\/v1\/agents\/[^/]+$/,
+  /^\/anthropic\/v1\/agents$/,
+  /^\/anthropic\/v1\/agents\/[^/]+$/,
   // Sessions + sub-resources
-  /^\/v1\/sessions$/,
-  /^\/v1\/sessions\/[^/]+$/,
-  /^\/v1\/sessions\/[^/]+\/archive$/,
-  /^\/v1\/sessions\/[^/]+\/events$/,
-  /^\/v1\/sessions\/[^/]+\/events\/stream$/,
+  /^\/anthropic\/v1\/sessions$/,
+  /^\/anthropic\/v1\/sessions\/[^/]+$/,
+  /^\/anthropic\/v1\/sessions\/[^/]+\/archive$/,
+  /^\/anthropic\/v1\/sessions\/[^/]+\/events$/,
+  /^\/anthropic\/v1\/sessions\/[^/]+\/events\/stream$/,
   // Vaults + entries + credentials
-  /^\/v1\/vaults$/,
-  /^\/v1\/vaults\/[^/]+$/,
-  /^\/v1\/vaults\/[^/]+\/entries$/,
-  /^\/v1\/vaults\/[^/]+\/entries\/[^/]+$/,
-  /^\/v1\/vaults\/[^/]+\/credentials$/,
-  /^\/v1\/vaults\/[^/]+\/credentials\/[^/]+$/,
+  /^\/anthropic\/v1\/vaults$/,
+  /^\/anthropic\/v1\/vaults\/[^/]+$/,
+  /^\/anthropic\/v1\/vaults\/[^/]+\/entries$/,
+  /^\/anthropic\/v1\/vaults\/[^/]+\/entries\/[^/]+$/,
+  /^\/anthropic\/v1\/vaults\/[^/]+\/credentials$/,
+  /^\/anthropic\/v1\/vaults\/[^/]+\/credentials\/[^/]+$/,
   // Environments
-  /^\/v1\/environments$/,
-  /^\/v1\/environments\/[^/]+$/,
-  /^\/v1\/environments\/[^/]+\/archive$/,
+  /^\/anthropic\/v1\/environments$/,
+  /^\/anthropic\/v1\/environments\/[^/]+$/,
+  /^\/anthropic\/v1\/environments\/[^/]+\/archive$/,
   // Files
-  /^\/v1\/files$/,
-  /^\/v1\/files\/[^/]+$/,
-  /^\/v1\/files\/[^/]+\/content$/,
+  /^\/anthropic\/v1\/files$/,
+  /^\/anthropic\/v1\/files\/[^/]+$/,
+  /^\/anthropic\/v1\/files\/[^/]+\/content$/,
 ];
 
 export function isPassthroughAllowedPath(pathname: string): boolean {

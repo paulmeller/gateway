@@ -10,7 +10,7 @@
  *   - mcp_oauth: OAuth 2.0 for MCP servers with optional refresh config
  */
 import { z } from "zod";
-import { routeWrap, jsonOk, paginatedOk } from "../http";
+import { routeWrap, jsonOk, paginatedOk } from "../../http";
 import { loadVaultForCaller } from "./vaults";
 import {
   createCredential,
@@ -20,9 +20,9 @@ import {
   updateCredential,
   deleteCredential,
   archiveCredential,
-} from "../db/credentials";
-import type { OAuthRefreshConfig } from "../db/credentials";
-import { badRequest, notFound, conflict } from "../errors";
+} from "../../db/credentials";
+import type { OAuthRefreshConfig } from "../../db/credentials";
+import { badRequest, notFound, conflict } from "../../errors";
 
 // ---------------------------------------------------------------------------
 // Schemas

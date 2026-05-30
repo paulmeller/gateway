@@ -97,13 +97,13 @@ describe("File response shape", () => {
 
   it("upload returns correct shape (type, mime_type, size_bytes, downloadable)", async () => {
     const { key, sessionId } = await seedSession();
-    const { handleUploadFile } = await import("../src/handlers/files");
+    const { handleUploadFile } = await import("../src/handlers/anthropic-compat/files");
 
     const formData = new FormData();
     formData.append("file", new File(["hello world"], "test.txt", { type: "text/plain" }));
 
     const res = await handleUploadFile(
-      new Request(`http://localhost/v1/files?scope_id=${sessionId}&scope_type=session`, {
+      new Request(`http://localhost/anthropic/v1/files?scope_id=${sessionId}&scope_type=session`, {
         method: "POST",
         headers: { "x-api-key": key },
         body: formData,
@@ -148,10 +148,10 @@ describe("File list pagination", () => {
 
   it("returns pagination envelope (data, has_more, first_id, last_id)", async () => {
     const { key, sessionId } = await seedSession();
-    const { handleListFiles } = await import("../src/handlers/files");
+    const { handleListFiles } = await import("../src/handlers/anthropic-compat/files");
 
     const res = await handleListFiles(
-      new Request(`http://localhost/v1/files?scope_id=${sessionId}`, {
+      new Request(`http://localhost/anthropic/v1/files?scope_id=${sessionId}`, {
         headers: { "x-api-key": key },
       }),
     );
@@ -242,12 +242,12 @@ describe("File get/download/delete", () => {
   it("get returns correct shape", async () => {
     const { key, sessionId } = await seedSession();
     const { createFile } = await import("../src/db/files");
-    const { handleGetFile } = await import("../src/handlers/files");
+    const { handleGetFile } = await import("../src/handlers/anthropic-compat/files");
 
     const file = createFile({ filename: "get.txt", size: 5, content_type: "text/plain", storage_path: "p1", scope: { type: "session", id: sessionId } });
 
     const res = await handleGetFile(
-      new Request(`http://localhost/v1/files/${file.id}`, {
+      new Request(`http://localhost/anthropic/v1/files/${file.id}`, {
         headers: { "x-api-key": key },
       }),
       file.id,
@@ -263,13 +263,13 @@ describe("File get/download/delete", () => {
 
   it("download returns content", async () => {
     const { key, sessionId } = await seedSession();
-    const { handleUploadFile, handleGetFileContent } = await import("../src/handlers/files");
+    const { handleUploadFile, handleGetFileContent } = await import("../src/handlers/anthropic-compat/files");
 
     const formData = new FormData();
     formData.append("file", new File(["file content here"], "dl.txt", { type: "text/plain" }));
 
     const uploadRes = await handleUploadFile(
-      new Request(`http://localhost/v1/files?scope_id=${sessionId}&scope_type=session`, {
+      new Request(`http://localhost/anthropic/v1/files?scope_id=${sessionId}&scope_type=session`, {
         method: "POST",
         headers: { "x-api-key": key },
         body: formData,
@@ -278,7 +278,7 @@ describe("File get/download/delete", () => {
     const uploaded = await uploadRes.json() as { id: string };
 
     const dlRes = await handleGetFileContent(
-      new Request(`http://localhost/v1/files/${uploaded.id}/content`, {
+      new Request(`http://localhost/anthropic/v1/files/${uploaded.id}/content`, {
         headers: { "x-api-key": key },
       }),
       uploaded.id,
@@ -291,13 +291,13 @@ describe("File get/download/delete", () => {
 
   it("delete returns { id, type: file_deleted }", async () => {
     const { key, sessionId } = await seedSession();
-    const { handleUploadFile, handleDeleteFile } = await import("../src/handlers/files");
+    const { handleUploadFile, handleDeleteFile } = await import("../src/handlers/anthropic-compat/files");
 
     const formData = new FormData();
     formData.append("file", new File(["x"], "del.txt", { type: "text/plain" }));
 
     const uploadRes = await handleUploadFile(
-      new Request(`http://localhost/v1/files?scope_id=${sessionId}&scope_type=session`, {
+      new Request(`http://localhost/anthropic/v1/files?scope_id=${sessionId}&scope_type=session`, {
         method: "POST",
         headers: { "x-api-key": key },
         body: formData,
@@ -306,7 +306,7 @@ describe("File get/download/delete", () => {
     const uploaded = await uploadRes.json() as { id: string };
 
     const delRes = await handleDeleteFile(
-      new Request(`http://localhost/v1/files/${uploaded.id}`, {
+      new Request(`http://localhost/anthropic/v1/files/${uploaded.id}`, {
         method: "DELETE",
         headers: { "x-api-key": key },
       }),
@@ -327,10 +327,10 @@ describe("Session resources (table-backed)", () => {
 
   it("create returns sesrsc_* ID with correct shape", async () => {
     const { key, sessionId } = await seedSession();
-    const { handleAddResource } = await import("../src/handlers/resources");
+    const { handleAddResource } = await import("../src/handlers/anthropic-compat/resources");
 
     const res = await handleAddResource(
-      new Request(`http://localhost/v1/sessions/${sessionId}/resources`, {
+      new Request(`http://localhost/anthropic/v1/sessions/${sessionId}/resources`, {
         method: "POST",
         headers: { "x-api-key": key, "content-type": "application/json" },
         body: JSON.stringify({ type: "file", file_id: "file_test123" }),
@@ -350,11 +350,11 @@ describe("Session resources (table-backed)", () => {
 
   it("list returns resources from table", async () => {
     const { key, sessionId } = await seedSession();
-    const { handleAddResource, handleListResources } = await import("../src/handlers/resources");
+    const { handleAddResource, handleListResources } = await import("../src/handlers/anthropic-compat/resources");
 
     // Add two resources
     await handleAddResource(
-      new Request(`http://localhost/v1/sessions/${sessionId}/resources`, {
+      new Request(`http://localhost/anthropic/v1/sessions/${sessionId}/resources`, {
         method: "POST",
         headers: { "x-api-key": key, "content-type": "application/json" },
         body: JSON.stringify({ type: "file", file_id: "file_1" }),
@@ -362,7 +362,7 @@ describe("Session resources (table-backed)", () => {
       sessionId,
     );
     await handleAddResource(
-      new Request(`http://localhost/v1/sessions/${sessionId}/resources`, {
+      new Request(`http://localhost/anthropic/v1/sessions/${sessionId}/resources`, {
         method: "POST",
         headers: { "x-api-key": key, "content-type": "application/json" },
         body: JSON.stringify({ type: "github_repository", repository_url: "https://github.com/test/repo", branch: "main" }),
@@ -371,7 +371,7 @@ describe("Session resources (table-backed)", () => {
     );
 
     const listRes = await handleListResources(
-      new Request(`http://localhost/v1/sessions/${sessionId}/resources`, {
+      new Request(`http://localhost/anthropic/v1/sessions/${sessionId}/resources`, {
         headers: { "x-api-key": key },
       }),
       sessionId,
@@ -386,10 +386,10 @@ describe("Session resources (table-backed)", () => {
 
   it("get by ID works", async () => {
     const { key, sessionId } = await seedSession();
-    const { handleAddResource, handleGetResource } = await import("../src/handlers/resources");
+    const { handleAddResource, handleGetResource } = await import("../src/handlers/anthropic-compat/resources");
 
     const addRes = await handleAddResource(
-      new Request(`http://localhost/v1/sessions/${sessionId}/resources`, {
+      new Request(`http://localhost/anthropic/v1/sessions/${sessionId}/resources`, {
         method: "POST",
         headers: { "x-api-key": key, "content-type": "application/json" },
         body: JSON.stringify({ type: "file", file_id: "file_get" }),
@@ -399,7 +399,7 @@ describe("Session resources (table-backed)", () => {
     const added = await addRes.json() as { id: string };
 
     const getRes = await handleGetResource(
-      new Request(`http://localhost/v1/sessions/${sessionId}/resources/${added.id}`, {
+      new Request(`http://localhost/anthropic/v1/sessions/${sessionId}/resources/${added.id}`, {
         headers: { "x-api-key": key },
       }),
       sessionId,
@@ -414,10 +414,10 @@ describe("Session resources (table-backed)", () => {
 
   it("delete by ID works", async () => {
     const { key, sessionId } = await seedSession();
-    const { handleAddResource, handleDeleteResource } = await import("../src/handlers/resources");
+    const { handleAddResource, handleDeleteResource } = await import("../src/handlers/anthropic-compat/resources");
 
     const addRes = await handleAddResource(
-      new Request(`http://localhost/v1/sessions/${sessionId}/resources`, {
+      new Request(`http://localhost/anthropic/v1/sessions/${sessionId}/resources`, {
         method: "POST",
         headers: { "x-api-key": key, "content-type": "application/json" },
         body: JSON.stringify({ type: "file", file_id: "file_del" }),
@@ -427,7 +427,7 @@ describe("Session resources (table-backed)", () => {
     const added = await addRes.json() as { id: string };
 
     const delRes = await handleDeleteResource(
-      new Request(`http://localhost/v1/sessions/${sessionId}/resources/${added.id}`, {
+      new Request(`http://localhost/anthropic/v1/sessions/${sessionId}/resources/${added.id}`, {
         method: "DELETE",
         headers: { "x-api-key": key },
       }),
@@ -460,9 +460,9 @@ describe("Session resources (table-backed)", () => {
       rawKey: "ck_test_filesapi_admin2",
     });
 
-    const { handleAddResource } = await import("../src/handlers/resources");
+    const { handleAddResource } = await import("../src/handlers/anthropic-compat/resources");
     const res = await handleAddResource(
-      new Request(`http://localhost/v1/sessions/${sessionId}/resources`, {
+      new Request(`http://localhost/anthropic/v1/sessions/${sessionId}/resources`, {
         method: "POST",
         headers: { "x-api-key": key, "content-type": "application/json" },
         body: JSON.stringify({ type: "file", file_id: "file_overflow" }),
@@ -477,10 +477,10 @@ describe("Session resources (table-backed)", () => {
 
   it("session response includes resources from table", async () => {
     const { key, sessionId } = await seedSession();
-    const { handleAddResource } = await import("../src/handlers/resources");
+    const { handleAddResource } = await import("../src/handlers/anthropic-compat/resources");
 
     await handleAddResource(
-      new Request(`http://localhost/v1/sessions/${sessionId}/resources`, {
+      new Request(`http://localhost/anthropic/v1/sessions/${sessionId}/resources`, {
         method: "POST",
         headers: { "x-api-key": key, "content-type": "application/json" },
         body: JSON.stringify({ type: "file", file_id: "file_in_session" }),
@@ -488,9 +488,9 @@ describe("Session resources (table-backed)", () => {
       sessionId,
     );
 
-    const { handleGetSession } = await import("../src/handlers/sessions");
+    const { handleGetSession } = await import("../src/handlers/anthropic-compat/sessions");
     const sessRes = await handleGetSession(
-      new Request(`http://localhost/v1/sessions/${sessionId}`, {
+      new Request(`http://localhost/anthropic/v1/sessions/${sessionId}`, {
         headers: { "x-api-key": key },
       }),
       sessionId,
@@ -505,10 +505,10 @@ describe("Session resources (table-backed)", () => {
 
   it("github_repository resource has checkout field", async () => {
     const { key, sessionId } = await seedSession();
-    const { handleAddResource, handleGetResource } = await import("../src/handlers/resources");
+    const { handleAddResource, handleGetResource } = await import("../src/handlers/anthropic-compat/resources");
 
     const addRes = await handleAddResource(
-      new Request(`http://localhost/v1/sessions/${sessionId}/resources`, {
+      new Request(`http://localhost/anthropic/v1/sessions/${sessionId}/resources`, {
         method: "POST",
         headers: { "x-api-key": key, "content-type": "application/json" },
         body: JSON.stringify({ type: "github_repository", repository_url: "https://github.com/test/repo", branch: "main" }),
@@ -518,7 +518,7 @@ describe("Session resources (table-backed)", () => {
     const added = await addRes.json() as { id: string };
 
     const getRes = await handleGetResource(
-      new Request(`http://localhost/v1/sessions/${sessionId}/resources/${added.id}`, {
+      new Request(`http://localhost/anthropic/v1/sessions/${sessionId}/resources/${added.id}`, {
         headers: { "x-api-key": key },
       }),
       sessionId,
@@ -567,11 +567,11 @@ describe("Resources passed at session creation", () => {
     });
 
     // Upload a file first
-    const { handleUploadFile } = await import("../src/handlers/files");
+    const { handleUploadFile } = await import("../src/handlers/anthropic-compat/files");
     const formData = new FormData();
     formData.append("file", new File(["test data"], "data.csv", { type: "text/csv" }));
     const uploadRes = await handleUploadFile(
-      new Request("http://localhost/v1/files", {
+      new Request("http://localhost/anthropic/v1/files", {
         method: "POST",
         headers: { "x-api-key": key },
         body: formData,
@@ -580,9 +580,9 @@ describe("Resources passed at session creation", () => {
     const uploaded = await uploadRes.json() as { id: string };
 
     // Create session with resources in body
-    const { handleCreateSession } = await import("../src/handlers/sessions");
+    const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
     const sessRes = await handleCreateSession(
-      new Request("http://localhost/v1/sessions", {
+      new Request("http://localhost/anthropic/v1/sessions", {
         method: "POST",
         headers: { "x-api-key": key, "content-type": "application/json" },
         body: JSON.stringify({
@@ -632,9 +632,9 @@ describe("Resources passed at session creation", () => {
       rawKey: "ck_test_sr_admin",
     });
 
-    const { handleCreateSession } = await import("../src/handlers/sessions");
+    const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
     const sessRes = await handleCreateSession(
-      new Request("http://localhost/v1/sessions", {
+      new Request("http://localhost/anthropic/v1/sessions", {
         method: "POST",
         headers: { "x-api-key": key, "content-type": "application/json" },
         body: JSON.stringify({
@@ -651,9 +651,9 @@ describe("Resources passed at session creation", () => {
     const session = await sessRes.json() as { id: string };
 
     // Retrieve session and check resources
-    const { handleGetSession } = await import("../src/handlers/sessions");
+    const { handleGetSession } = await import("../src/handlers/anthropic-compat/sessions");
     const getRes = await handleGetSession(
-      new Request(`http://localhost/v1/sessions/${session.id}`, {
+      new Request(`http://localhost/anthropic/v1/sessions/${session.id}`, {
         headers: { "x-api-key": key },
       }),
       session.id,

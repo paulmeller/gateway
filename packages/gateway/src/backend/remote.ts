@@ -45,7 +45,7 @@ export class RemoteBackend implements Backend {
   agents = {
     create: (input: any) => {
       const { model, ...rest } = input;
-      return this.request("POST", "/v1/agents", { ...rest, model: { id: model } });
+      return this.request("POST", "/anthropic/v1/agents", { ...rest, model: { id: model } });
     },
     list: (opts?: any): Promise<Paginated<any>> => {
       const params = new URLSearchParams();
@@ -69,7 +69,7 @@ export class RemoteBackend implements Backend {
   };
 
   environments = {
-    create: (input: any) => this.request("POST", "/v1/environments", input),
+    create: (input: any) => this.request("POST", "/anthropic/v1/environments", input),
     list: (opts?: any): Promise<Paginated<any>> => {
       const params = new URLSearchParams();
       if (opts?.limit) params.set("limit", String(opts.limit));
@@ -83,7 +83,7 @@ export class RemoteBackend implements Backend {
   };
 
   sessions = {
-    create: (input: any) => this.request("POST", "/v1/sessions", input),
+    create: (input: any) => this.request("POST", "/anthropic/v1/sessions", input),
     list: (opts?: any): Promise<Paginated<any>> => {
       const params = new URLSearchParams();
       if (opts?.limit) params.set("limit", String(opts.limit));
@@ -213,7 +213,7 @@ export class RemoteBackend implements Backend {
   }
 
   vaults = {
-    create: (input: any) => this.request("POST", "/v1/vaults", input),
+    create: (input: any) => this.request("POST", "/anthropic/v1/vaults", input),
     list: (opts?: any) => {
       const params = new URLSearchParams();
       if (opts?.agent_id) params.set("agent_id", opts.agent_id);

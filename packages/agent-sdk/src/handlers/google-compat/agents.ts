@@ -107,7 +107,7 @@ export function handleCreateGoogleAgent(request: Request): Promise<Response> {
     const agentName = data.id || `google-agent-${Date.now()}`;
 
     // Create internal agent
-    const { handleCreateAgent } = await import("../agents");
+    const { handleCreateAgent } = await import("../anthropic-compat/agents");
     const createBody: Record<string, unknown> = {
       name: agentName,
       model: { id: model },
@@ -145,7 +145,7 @@ export function handleCreateGoogleAgent(request: Request): Promise<Response> {
 
 export function handleListGoogleAgents(request: Request): Promise<Response> {
   return routeWrap(request, async () => {
-    const { handleListAgents } = await import("../agents");
+    const { handleListAgents } = await import("../anthropic-compat/agents");
     const listReq = new Request(request.url.replace(/\/google\/v1beta\/agents.*/, `/v1/agents?limit=1000`), {
       headers: request.headers,
     });
@@ -163,7 +163,7 @@ export function handleListGoogleAgents(request: Request): Promise<Response> {
 
 export function handleGetGoogleAgent(request: Request, id: string): Promise<Response> {
   return routeWrap(request, async () => {
-    const { handleListAgents } = await import("../agents");
+    const { handleListAgents } = await import("../anthropic-compat/agents");
     // Look up by name (Google uses name as ID)
     const listReq = new Request(request.url.replace(/\/google\/v1beta\/agents.*/, `/v1/agents?limit=1000`), {
       headers: request.headers,
@@ -184,7 +184,7 @@ export function handleGetGoogleAgent(request: Request, id: string): Promise<Resp
 
 export function handleDeleteGoogleAgent(request: Request, id: string): Promise<Response> {
   return routeWrap(request, async () => {
-    const { handleListAgents, handleDeleteAgent } = await import("../agents");
+    const { handleListAgents, handleDeleteAgent } = await import("../anthropic-compat/agents");
     // Look up by name to get internal ID
     const listReq = new Request(request.url.replace(/\/google\/v1beta\/agents.*/, `/v1/agents?limit=1000`), {
       headers: request.headers,

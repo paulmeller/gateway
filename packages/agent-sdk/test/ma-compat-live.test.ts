@@ -33,7 +33,7 @@ function api(path: string, opts: { method?: string; body?: unknown } = {}) {
 async function pollUntilIdle(sessionId: string, timeoutMs = 120000): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    const res = await api(`/v1/sessions/${sessionId}`);
+    const res = await api(`/anthropic/v1/sessions/${sessionId}`);
     const session = (await res.json()) as { status: string };
     if (session.status === "idle" || session.status === "terminated") return;
     await new Promise((r) => setTimeout(r, 5000));
@@ -49,7 +49,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
     "agent lifecycle: create → session → send message → poll idle → events → cleanup",
     async () => {
       // Create agent
-      const createAgentRes = await api("/v1/agents", {
+      const createAgentRes = await api("/anthropic/v1/agents", {
         body: { name: `live-smoke-agent-${Date.now()}`, engine: "claude", model: { id: "claude-sonnet-4-6" } },
       });
       expect(createAgentRes.status).toBe(201);
@@ -62,7 +62,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
         if (process.env.LIVE_TEST_ENV_ID) sessionBody.environment_id = process.env.LIVE_TEST_ENV_ID;
         if (process.env.LIVE_TEST_VAULT_ID) sessionBody.vault_id = process.env.LIVE_TEST_VAULT_ID;
 
-        const createSessRes = await api("/v1/sessions", { body: sessionBody });
+        const createSessRes = await api("/anthropic/v1/sessions", { body: sessionBody });
         expect(createSessRes.status).toBe(201);
         const session = (await createSessRes.json()) as { id: string; status: string };
         expect(session.id).toMatch(/^sesn_/);
@@ -72,7 +72,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
 
         try {
           // Send user.message
-          const sendRes = await api(`/v1/sessions/${sessionId}/events`, {
+          const sendRes = await api(`/anthropic/v1/sessions/${sessionId}/events`, {
             body: {
               events: [
                 {
@@ -88,7 +88,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
           await pollUntilIdle(sessionId, 120000);
 
           // Verify events exist
-          const eventsRes = await api(`/v1/sessions/${sessionId}/events`);
+          const eventsRes = await api(`/anthropic/v1/sessions/${sessionId}/events`);
           expect(eventsRes.status).toBe(200);
           const events = (await eventsRes.json()) as {
             data: Array<{ type: string }>;
@@ -100,11 +100,11 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
           expect(types).toContain("session.status_idle");
         } finally {
           // Cleanup session
-          await api(`/v1/sessions/${sessionId}`, { method: "DELETE" });
+          await api(`/anthropic/v1/sessions/${sessionId}`, { method: "DELETE" });
         }
       } finally {
         // Cleanup agent
-        await api(`/v1/agents/${agent.id}`, { method: "DELETE" });
+        await api(`/anthropic/v1/agents/${agent.id}`, { method: "DELETE" });
       }
     },
     120_000,
@@ -117,7 +117,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
     "custom tool round-trip: agent calls tool → send tool result → session reaches idle",
     async () => {
       // Create agent with a custom tool
-      const createAgentRes = await api("/v1/agents", {
+      const createAgentRes = await api("/anthropic/v1/agents", {
         body: {
           name: `live-custom-tool-${Date.now()}`,
           engine: "claude",
@@ -147,14 +147,14 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
         if (process.env.LIVE_TEST_ENV_ID) sessionBody.environment_id = process.env.LIVE_TEST_ENV_ID;
         if (process.env.LIVE_TEST_VAULT_ID) sessionBody.vault_id = process.env.LIVE_TEST_VAULT_ID;
 
-        const createSessRes = await api("/v1/sessions", { body: sessionBody });
+        const createSessRes = await api("/anthropic/v1/sessions", { body: sessionBody });
         expect(createSessRes.status).toBe(201);
         const session = (await createSessRes.json()) as { id: string; status: string };
         const sessionId = session.id;
 
         try {
           // Send message asking agent to call the custom tool
-          const sendRes = await api(`/v1/sessions/${sessionId}/events`, {
+          const sendRes = await api(`/anthropic/v1/sessions/${sessionId}/events`, {
             body: {
               events: [
                 {
@@ -177,7 +177,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
           let toolUseName: string | undefined;
 
           while (Date.now() - start < 120000) {
-            const eventsRes = await api(`/v1/sessions/${sessionId}/events`);
+            const eventsRes = await api(`/anthropic/v1/sessions/${sessionId}/events`);
             const events = (await eventsRes.json()) as {
               data: Array<{ type: string; id: string; payload: Record<string, unknown> }>;
             };
@@ -188,7 +188,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
               break;
             }
             // Also break early if session went idle (agent skipped the tool call)
-            const sessRes = await api(`/v1/sessions/${sessionId}`);
+            const sessRes = await api(`/anthropic/v1/sessions/${sessionId}`);
             const sess = (await sessRes.json()) as { status: string };
             if (sess.status === "idle" || sess.status === "terminated") break;
             await new Promise((r) => setTimeout(r, 5000));
@@ -196,7 +196,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
 
           // If the agent called the custom tool, send the result and wait for idle
           if (toolUseEventId) {
-            const toolResultRes = await api(`/v1/sessions/${sessionId}/events`, {
+            const toolResultRes = await api(`/anthropic/v1/sessions/${sessionId}/events`, {
               body: {
                 events: [
                   {
@@ -213,7 +213,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
             await pollUntilIdle(sessionId, 120000);
 
             // Verify agent.message appears after the tool result
-            const finalEventsRes = await api(`/v1/sessions/${sessionId}/events`);
+            const finalEventsRes = await api(`/anthropic/v1/sessions/${sessionId}/events`);
             const finalEvents = (await finalEventsRes.json()) as {
               data: Array<{ type: string; id: string }>;
             };
@@ -235,10 +235,10 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
             console.log(`Custom tool called: ${toolUseName} (event: ${toolUseEventId})`);
           }
         } finally {
-          await api(`/v1/sessions/${sessionId}`, { method: "DELETE" });
+          await api(`/anthropic/v1/sessions/${sessionId}`, { method: "DELETE" });
         }
       } finally {
-        await api(`/v1/agents/${agent.id}`, { method: "DELETE" });
+        await api(`/anthropic/v1/agents/${agent.id}`, { method: "DELETE" });
       }
     },
     300_000,
@@ -254,7 +254,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
     try {
       // Create 3 agents
       for (let i = 0; i < 3; i++) {
-        const res = await api("/v1/agents", {
+        const res = await api("/anthropic/v1/agents", {
           body: { name: `live-pag-agent-${suffix}-${i}`, engine: "claude", model: { id: "claude-sonnet-4-6" } },
         });
         expect(res.status).toBe(201);
@@ -263,7 +263,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
       }
 
       // List with limit=2
-      const page1Res = await api("/v1/agents?limit=2");
+      const page1Res = await api("/anthropic/v1/agents?limit=2");
       expect(page1Res.status).toBe(200);
       const page1 = (await page1Res.json()) as {
         data: Array<{ id: string }>;
@@ -274,7 +274,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
       expect(page1.next_page).toBeTypeOf("string");
 
       // Paginate using next_page cursor
-      const page2Res = await api(`/v1/agents?limit=2&page=${page1.next_page}`);
+      const page2Res = await api(`/anthropic/v1/agents?limit=2&page=${page1.next_page}`);
       expect(page2Res.status).toBe(200);
       const page2 = (await page2Res.json()) as {
         data: Array<{ id: string }>;
@@ -292,7 +292,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
     } finally {
       // Cleanup
       for (const id of agentIds) {
-        await api(`/v1/agents/${id}`, { method: "DELETE" });
+        await api(`/anthropic/v1/agents/${id}`, { method: "DELETE" });
       }
     }
   });
@@ -302,7 +302,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
   // ---------------------------------------------------------------------------
   it("vault + credentials: create static_bearer + mcp_oauth — token not in GET response", async () => {
     // Create an agent to own the vault
-    const createAgentRes = await api("/v1/agents", {
+    const createAgentRes = await api("/anthropic/v1/agents", {
       body: { name: `live-vault-agent-${Date.now()}`, engine: "claude", model: { id: "claude-sonnet-4-6" } },
     });
     expect(createAgentRes.status).toBe(201);
@@ -310,7 +310,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
 
     try {
       // Create vault
-      const createVaultRes = await api("/v1/vaults", {
+      const createVaultRes = await api("/anthropic/v1/vaults", {
         body: { agent_id: agent.id, name: `live-vault-${Date.now()}` },
       });
       expect(createVaultRes.status).toBe(201);
@@ -321,7 +321,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
 
       try {
         // Create static_bearer credential
-        const bearerRes = await api(`/v1/vaults/${vault.id}/credentials`, {
+        const bearerRes = await api(`/anthropic/v1/vaults/${vault.id}/credentials`, {
           body: {
             display_name: "live-static-bearer",
             auth: {
@@ -343,7 +343,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
         credIds.push(bearer.id);
 
         // GET credential — token must still be absent
-        const getBearerRes = await api(`/v1/vaults/${vault.id}/credentials/${bearer.id}`);
+        const getBearerRes = await api(`/anthropic/v1/vaults/${vault.id}/credentials/${bearer.id}`);
         expect(getBearerRes.status).toBe(200);
         const fetchedBearer = (await getBearerRes.json()) as {
           id: string;
@@ -353,7 +353,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
         expect(fetchedBearer.auth.token).toBeUndefined();
 
         // Create mcp_oauth credential
-        const oauthRes = await api(`/v1/vaults/${vault.id}/credentials`, {
+        const oauthRes = await api(`/anthropic/v1/vaults/${vault.id}/credentials`, {
           body: {
             display_name: "live-mcp-oauth",
             auth: {
@@ -384,7 +384,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
         credIds.push(oauth.id);
 
         // GET mcp_oauth credential — secrets must still be absent
-        const getOauthRes = await api(`/v1/vaults/${vault.id}/credentials/${oauth.id}`);
+        const getOauthRes = await api(`/anthropic/v1/vaults/${vault.id}/credentials/${oauth.id}`);
         expect(getOauthRes.status).toBe(200);
         const fetchedOauth = (await getOauthRes.json()) as {
           id: string;
@@ -398,15 +398,15 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
       } finally {
         // Cleanup credentials
         for (const credId of credIds) {
-          await api(`/v1/vaults/${vault.id}/credentials/${credId}`, { method: "DELETE" }).catch(
+          await api(`/anthropic/v1/vaults/${vault.id}/credentials/${credId}`, { method: "DELETE" }).catch(
             () => {},
           );
         }
         // Cleanup vault
-        await api(`/v1/vaults/${vault.id}`, { method: "DELETE" }).catch(() => {});
+        await api(`/anthropic/v1/vaults/${vault.id}`, { method: "DELETE" }).catch(() => {});
       }
     } finally {
-      await api(`/v1/agents/${agent.id}`, { method: "DELETE" });
+      await api(`/anthropic/v1/agents/${agent.id}`, { method: "DELETE" });
     }
   });
 
@@ -415,7 +415,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
   // ---------------------------------------------------------------------------
   it("error handling: 404 on nonexistent agent, 400 on empty body", async () => {
     // 404 for nonexistent agent
-    const notFoundRes = await api("/v1/agents/agent_nonexistent");
+    const notFoundRes = await api("/anthropic/v1/agents/agent_nonexistent");
     expect(notFoundRes.status).toBe(404);
     const notFoundBody = (await notFoundRes.json()) as {
       type: string;
@@ -427,7 +427,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
     expect(typeof notFoundBody.error.message).toBe("string");
 
     // 400 for empty/invalid body when creating agent
-    const badBodyRes = await api("/v1/agents", { body: {} });
+    const badBodyRes = await api("/anthropic/v1/agents", { body: {} });
     expect(badBodyRes.status).toBe(400);
     const badBodyBody = (await badBodyRes.json()) as {
       type: string;
@@ -443,7 +443,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
   // ---------------------------------------------------------------------------
   it("events pagination: create session, post 3 events, list with limit=2, verify next_page", async () => {
     // Create agent + session for events pagination test
-    const createAgentRes = await api("/v1/agents", {
+    const createAgentRes = await api("/anthropic/v1/agents", {
       body: { name: `live-evt-pag-${Date.now()}`, engine: "claude", model: { id: "claude-sonnet-4-6" } },
     });
     expect(createAgentRes.status).toBe(201);
@@ -454,7 +454,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
       if (process.env.LIVE_TEST_ENV_ID) sessionBody.environment_id = process.env.LIVE_TEST_ENV_ID;
       if (process.env.LIVE_TEST_VAULT_ID) sessionBody.vault_id = process.env.LIVE_TEST_VAULT_ID;
 
-      const createSessRes = await api("/v1/sessions", { body: sessionBody });
+      const createSessRes = await api("/anthropic/v1/sessions", { body: sessionBody });
       expect(createSessRes.status).toBe(201);
       const session = (await createSessRes.json()) as { id: string };
       const sessionId = session.id;
@@ -462,7 +462,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
       try {
         // Post 3 user.message events
         for (let i = 0; i < 3; i++) {
-          const postRes = await api(`/v1/sessions/${sessionId}/events`, {
+          const postRes = await api(`/anthropic/v1/sessions/${sessionId}/events`, {
             body: {
               events: [
                 {
@@ -476,7 +476,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
         }
 
         // List events with limit=2
-        const eventsRes = await api(`/v1/sessions/${sessionId}/events?limit=2`);
+        const eventsRes = await api(`/anthropic/v1/sessions/${sessionId}/events?limit=2`);
         expect(eventsRes.status).toBe(200);
         const events = (await eventsRes.json()) as {
           data: Array<{ id: string; type: string }>;
@@ -489,7 +489,7 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
 
         // Paginate to second page using next_page cursor
         const page2Res = await api(
-          `/v1/sessions/${sessionId}/events?limit=2&page=${events.next_page}`,
+          `/anthropic/v1/sessions/${sessionId}/events?limit=2&page=${events.next_page}`,
         );
         expect(page2Res.status).toBe(200);
         const page2 = (await page2Res.json()) as {
@@ -505,10 +505,10 @@ describe.skipIf(skip)("MA Compatibility: Live Smoke Tests", () => {
           expect(page1Ids.has(evt.id)).toBe(false);
         }
       } finally {
-        await api(`/v1/sessions/${sessionId}`, { method: "DELETE" });
+        await api(`/anthropic/v1/sessions/${sessionId}`, { method: "DELETE" });
       }
     } finally {
-      await api(`/v1/agents/${agent.id}`, { method: "DELETE" });
+      await api(`/anthropic/v1/agents/${agent.id}`, { method: "DELETE" });
     }
   });
 });

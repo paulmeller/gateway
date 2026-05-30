@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { routeWrap, jsonOk, paginatedOk, decodeCursor } from "../http";
-import { getDb } from "../db/client";
+import { routeWrap, jsonOk, paginatedOk, decodeCursor } from "../../http";
+import { getDb } from "../../db/client";
 import {
   createSession,
   getSession,
@@ -9,23 +9,23 @@ import {
   updateSessionStatus,
   archiveSession,
   setOutcomeCriteria,
-} from "../db/sessions";
-import { getAgent } from "../db/agents";
-import { getEnvironment } from "../db/environments";
-import { getActor, dropActor } from "../sessions/actor";
-import { appendEvent, dropEmitter } from "../sessions/bus";
-import { interruptSession } from "../sessions/interrupt";
-import { releaseSession } from "../containers/lifecycle";
-import { kickoffEnvironmentSetup } from "../containers/setup";
-import { isProxied, markProxied, unmarkProxied, getProxiedTenantId } from "../db/proxy";
-import { forwardToAnthropic } from "../proxy/forward";
-import { syncAndCreateSession } from "../sync/anthropic";
-import { upsertSync, resolveRemoteSessionId } from "../db/sync";
-import { badRequest, notFound } from "../errors";
-import { nowMs } from "../util/clock";
-import { assertResourceTenant, tenantFilter } from "../auth/scope";
-import { getMemoryStore } from "../db/memory";
-import type { AuthContext, SessionStatus } from "../types";
+} from "../../db/sessions";
+import { getAgent } from "../../db/agents";
+import { getEnvironment } from "../../db/environments";
+import { getActor, dropActor } from "../../sessions/actor";
+import { appendEvent, dropEmitter } from "../../sessions/bus";
+import { interruptSession } from "../../sessions/interrupt";
+import { releaseSession } from "../../containers/lifecycle";
+import { kickoffEnvironmentSetup } from "../../containers/setup";
+import { isProxied, markProxied, unmarkProxied, getProxiedTenantId } from "../../db/proxy";
+import { forwardToAnthropic } from "../../proxy/forward";
+import { syncAndCreateSession } from "../../sync/anthropic";
+import { upsertSync, resolveRemoteSessionId } from "../../db/sync";
+import { badRequest, notFound } from "../../errors";
+import { nowMs } from "../../util/clock";
+import { assertResourceTenant, tenantFilter } from "../../auth/scope";
+import { getMemoryStore } from "../../db/memory";
+import type { AuthContext, SessionStatus } from "../../types";
 
 function getAgentTenantId(id: string): string | null | undefined {
   const row = getDb()
@@ -169,7 +169,7 @@ function shouldFallback(err: unknown): boolean {
   // Classify anything else via the existing retry taxonomy.
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { classifyError } = require("../sessions/errors") as typeof import("../sessions/errors");
+    const { classifyError } = require("../sessions/errors") as typeof import("../../sessions/errors");
     return classifyError(msg).retryable;
   } catch {
     return false;
@@ -210,7 +210,7 @@ export function handleCreateSession(request: Request): Promise<Response> {
       // a tenant user must match to be allowed to create a session
       // against it. Reject early so we don't leak the existence of
       // agents in other tenants via the proxy.
-      const { getProxiedTenantId } = await import("../db/proxy");
+      const { getProxiedTenantId } = await import("../../db/proxy");
       const agentTenant = getProxiedTenantId(initialAgentId);
       assertResourceTenant(auth, agentTenant ?? null, `agent not found: ${initialAgentId}`);
       const proxyRes = await forwardToAnthropic(request, "/v1/sessions", { body: rawBody });
@@ -228,7 +228,7 @@ export function handleCreateSession(request: Request): Promise<Response> {
       typeof data.agent === "string" ? undefined : data.agent.version;
 
     // Import helpers once up-front.
-    const { checkResourceScope } = await import("../auth/scope");
+    const { checkResourceScope } = await import("../../auth/scope");
 
     /**
      * Attempt to create a session for (agentId, envId, agentVersion?).
@@ -305,7 +305,7 @@ export function handleCreateSession(request: Request): Promise<Response> {
 
       // User profile validation: ensure it exists and belongs to the caller's tenant.
       if (data.user_profile_id) {
-        const { getUserProfile } = await import("../db/user-profiles");
+        const { getUserProfile } = await import("../../db/user-profiles");
         const profile = getUserProfile(data.user_profile_id);
         if (!profile) throw badRequest(`user profile not found: ${data.user_profile_id}`);
         if (profile.tenant_id && profile.tenant_id !== agentTenantId) {
@@ -332,13 +332,13 @@ export function handleCreateSession(request: Request): Promise<Response> {
       // ── Anthropic provider / cloud type: sync local config → Anthropic, then proxy ──
       if (env.config?.type === "cloud" || env.config?.provider === "anthropic") {
         // Unified resolver: vault → pool → config cascade (v0.4 PR4).
-        const { resolveAnthropicKey } = await import("../providers/upstream-keys");
+        const { resolveAnthropicKey } = await import("../../providers/upstream-keys");
         const resolved = resolveAnthropicKey({ vaultIds: data.vault_ids ?? undefined });
         if (!resolved) {
           // Check if an OAuth token was found but silently rejected —
           // inspect vault entries, config cascade, and CLAUDE_CODE_OAUTH_TOKEN.
-          const { getConfig } = await import("../config");
-          const { listEntries } = await import("../db/vaults");
+          const { getConfig } = await import("../../config");
+          const { listEntries } = await import("../../db/vaults");
           const cfg = getConfig();
           let hasOAuth = cfg.anthropicApiKey?.startsWith("sk-ant-oat") || !!cfg.claudeToken;
           if (!hasOAuth && data.vault_ids?.length) {
@@ -379,7 +379,7 @@ export function handleCreateSession(request: Request): Promise<Response> {
 
         // Insert into session_resources table before sync
         if (data.resources?.length) {
-          const { createResource } = await import("../db/session-resources");
+          const { createResource } = await import("../../db/session-resources");
           for (const r of data.resources) {
             let repoUrl = r.type === "github_repository" ? (r.repository_url ?? r.url) : r.uri;
             if (r.type === "github_repository" && r.authorization_token && repoUrl) {
@@ -469,7 +469,7 @@ export function handleCreateSession(request: Request): Promise<Response> {
 
       // Insert into session_resources table so provisioning picks them up
       if (data.resources?.length) {
-        const { createResource } = await import("../db/session-resources");
+        const { createResource } = await import("../../db/session-resources");
         for (const r of data.resources) {
           if (r.type === "memory_store") {
             createResource(session.id, {

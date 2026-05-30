@@ -99,11 +99,11 @@ describe("memory store agent scoping", () => {
 
   it("create with valid agent_id succeeds and stores agent_id", async () => {
     const { globalKey } = await bootTenants();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
     const { handleCreateMemoryStore } = await import("../src/handlers/memory");
 
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", globalKey, {
+      req("/anthropic/v1/agents", globalKey, {
         body: { name: "mem-agent", model: { id: "claude-sonnet-4-6" } },
       }),
     );
@@ -121,12 +121,12 @@ describe("memory store agent scoping", () => {
 
   it("cross-tenant memory store access returns 404", async () => {
     const { globalKey, acmeKey } = await bootTenants();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
     const { handleCreateMemoryStore, handleGetMemoryStore } = await import("../src/handlers/memory");
 
     // Global admin creates agent + store in default tenant
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", globalKey, {
+      req("/anthropic/v1/agents", globalKey, {
         body: { name: "def-agent", model: { id: "claude-sonnet-4-6" }, tenant_id: "tenant_default" },
       }),
     );
@@ -148,12 +148,12 @@ describe("memory store agent scoping", () => {
 
   it("list filters by tenant", async () => {
     const { globalKey, acmeKey } = await bootTenants();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
     const { handleCreateMemoryStore, handleListMemoryStores } = await import("../src/handlers/memory");
 
     // Create agent + store in each tenant
     const defAgent = await (await handleCreateAgent(
-      req("/v1/agents", globalKey, {
+      req("/anthropic/v1/agents", globalKey, {
         body: { name: "def-a", model: { id: "claude-sonnet-4-6" }, tenant_id: "tenant_default" },
       }),
     )).json() as { id: string };
@@ -164,7 +164,7 @@ describe("memory store agent scoping", () => {
     );
 
     const acmeAgent = await (await handleCreateAgent(
-      req("/v1/agents", acmeKey, {
+      req("/anthropic/v1/agents", acmeKey, {
         body: { name: "acme-a", model: { id: "claude-sonnet-4-6" } },
       }),
     )).json() as { id: string };
@@ -190,11 +190,11 @@ describe("memory store agent scoping", () => {
 
   it("memories CRUD respects store tenant (cross-tenant → 404)", async () => {
     const { globalKey, acmeKey } = await bootTenants();
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
     const { handleCreateMemoryStore, handleCreateMemory } = await import("../src/handlers/memory");
 
     const agent = await (await handleCreateAgent(
-      req("/v1/agents", globalKey, {
+      req("/anthropic/v1/agents", globalKey, {
         body: { name: "mem-a", model: { id: "claude-sonnet-4-6" }, tenant_id: "tenant_default" },
       }),
     )).json() as { id: string };

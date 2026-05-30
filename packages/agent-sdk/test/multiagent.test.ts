@@ -79,9 +79,9 @@ function req(
 }
 
 async function createTestAgent(overrides: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
-  const { handleCreateAgent } = await import("../src/handlers/agents");
+  const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
   const res = await handleCreateAgent(
-    req("/v1/agents", {
+    req("/anthropic/v1/agents", {
       body: { name: `Agent-${Date.now()}-${Math.random()}`, model: { id: "claude-sonnet-4-6" }, ...overrides },
     }),
   );
@@ -185,9 +185,9 @@ describe("Multi-Agent: multiagent config on agents", () => {
   it("rejects multiagent with more than 20 agents", async () => {
     await bootDb();
     const agents = Array.from({ length: 21 }, (_, i) => ({ type: "agent", id: `agent_${i}` }));
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
     const res = await handleCreateAgent(
-      req("/v1/agents", {
+      req("/anthropic/v1/agents", {
         body: {
           name: `Agent-${Date.now()}`,
           model: { id: "claude-sonnet-4-6" },
@@ -207,9 +207,9 @@ describe("Multi-Agent: multiagent config on agents", () => {
       },
     });
 
-    const { handleUpdateAgent } = await import("../src/handlers/agents");
+    const { handleUpdateAgent } = await import("../src/handlers/anthropic-compat/agents");
     const res = await handleUpdateAgent(
-      req(`/v1/agents/${agent.id}`, {
+      req(`/anthropic/v1/agents/${agent.id}`, {
         body: {
           version: agent.version,
           name: "Updated Agent",
@@ -233,9 +233,9 @@ describe("Multi-Agent: multiagent config on agents", () => {
       },
     });
 
-    const { handleUpdateAgent } = await import("../src/handlers/agents");
+    const { handleUpdateAgent } = await import("../src/handlers/anthropic-compat/agents");
     const res = await handleUpdateAgent(
-      req(`/v1/agents/${agent.id}`, {
+      req(`/anthropic/v1/agents/${agent.id}`, {
         body: {
           version: agent.version,
           multiagent: {
@@ -264,9 +264,9 @@ describe("Multi-Agent: multiagent config on agents", () => {
       },
     });
 
-    const { handleUpdateAgent } = await import("../src/handlers/agents");
+    const { handleUpdateAgent } = await import("../src/handlers/anthropic-compat/agents");
     const res = await handleUpdateAgent(
-      req(`/v1/agents/${agent.id}`, {
+      req(`/anthropic/v1/agents/${agent.id}`, {
         body: {
           version: agent.version,
           multiagent: null,
@@ -469,9 +469,9 @@ describe("Multi-Agent: thread handlers", () => {
     createThread({ sessionId: session.id as string, agentId: agent.id as string, agentVersion: agent.version as number });
     createThread({ sessionId: session.id as string, agentId: agent.id as string, agentVersion: agent.version as number });
 
-    const { handleListThreads } = await import("../src/handlers/threads");
+    const { handleListThreads } = await import("../src/handlers/anthropic-compat/threads");
     const res = await handleListThreads(
-      req(`/v1/sessions/${session.id}/threads`),
+      req(`/anthropic/v1/sessions/${session.id}/threads`),
       session.id as string,
     );
     expect(res.status).toBe(200);
@@ -489,9 +489,9 @@ describe("Multi-Agent: thread handlers", () => {
     const { createThread } = await import("../src/db/threads");
     const thread = createThread({ sessionId: session.id as string, agentId: agent.id as string, agentVersion: agent.version as number });
 
-    const { handleGetThread } = await import("../src/handlers/threads");
+    const { handleGetThread } = await import("../src/handlers/anthropic-compat/threads");
     const res = await handleGetThread(
-      req(`/v1/sessions/${session.id}/threads/${thread.id}`),
+      req(`/anthropic/v1/sessions/${session.id}/threads/${thread.id}`),
       session.id as string,
       thread.id,
     );
@@ -507,9 +507,9 @@ describe("Multi-Agent: thread handlers", () => {
     const env = await createTestEnv();
     const session = await createTestSession(agent.id as string, env.id as string);
 
-    const { handleGetThread } = await import("../src/handlers/threads");
+    const { handleGetThread } = await import("../src/handlers/anthropic-compat/threads");
     const res = await handleGetThread(
-      req(`/v1/sessions/${session.id}/threads/sth_nonexistent`),
+      req(`/anthropic/v1/sessions/${session.id}/threads/sth_nonexistent`),
       session.id as string,
       "sth_nonexistent",
     );
@@ -525,9 +525,9 @@ describe("Multi-Agent: thread handlers", () => {
     const { createThread } = await import("../src/db/threads");
     const thread = createThread({ sessionId: session.id as string, agentId: agent.id as string, agentVersion: agent.version as number });
 
-    const { handleArchiveThread } = await import("../src/handlers/threads");
+    const { handleArchiveThread } = await import("../src/handlers/anthropic-compat/threads");
     const res = await handleArchiveThread(
-      req(`/v1/sessions/${session.id}/threads/${thread.id}/archive`, { method: "POST" }),
+      req(`/anthropic/v1/sessions/${session.id}/threads/${thread.id}/archive`, { method: "POST" }),
       session.id as string,
       thread.id,
     );
@@ -547,9 +547,9 @@ describe("Multi-Agent: thread handlers", () => {
     const thread = createThread({ sessionId: session.id as string, agentId: agent.id as string, agentVersion: agent.version as number });
     updateThreadStatus(thread.id, "running");
 
-    const { handleArchiveThread } = await import("../src/handlers/threads");
+    const { handleArchiveThread } = await import("../src/handlers/anthropic-compat/threads");
     const res = await handleArchiveThread(
-      req(`/v1/sessions/${session.id}/threads/${thread.id}/archive`, { method: "POST" }),
+      req(`/anthropic/v1/sessions/${session.id}/threads/${thread.id}/archive`, { method: "POST" }),
       session.id as string,
       thread.id,
     );
@@ -558,9 +558,9 @@ describe("Multi-Agent: thread handlers", () => {
 
   it("handleListThreads returns 404 for nonexistent session", async () => {
     await bootDb();
-    const { handleListThreads } = await import("../src/handlers/threads");
+    const { handleListThreads } = await import("../src/handlers/anthropic-compat/threads");
     const res = await handleListThreads(
-      req("/v1/sessions/sesn_nonexistent/threads"),
+      req("/anthropic/v1/sessions/sesn_nonexistent/threads"),
       "sesn_nonexistent",
     );
     expect(res.status).toBe(404);

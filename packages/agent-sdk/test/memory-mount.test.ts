@@ -75,9 +75,9 @@ function req(
 }
 
 async function createTestAgent(overrides: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
-  const { handleCreateAgent } = await import("../src/handlers/agents");
+  const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
   const res = await handleCreateAgent(
-    req("/v1/agents", {
+    req("/anthropic/v1/agents", {
       body: { name: `Agent-${Date.now()}-${Math.random()}`, model: { id: "claude-sonnet-4-6" }, ...overrides },
     }),
   );
@@ -373,7 +373,7 @@ describe("memory mount + versions", () => {
     it("accepts memory_store in resources on session create", async () => {
       await bootDb();
       const { createMemoryStore, createOrUpsertMemory } = await import("../src/db/memory");
-      const { handleCreateSession } = await import("../src/handlers/sessions");
+      const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
       const agent = await createTestAgent();
       const env = await createTestEnv();
 
@@ -381,7 +381,7 @@ describe("memory mount + versions", () => {
       createOrUpsertMemory(store.id, "readme.md", "# Hello");
 
       const res = await handleCreateSession(
-        req("/v1/sessions", {
+        req("/anthropic/v1/sessions", {
           body: {
             agent: agent.id,
             environment_id: env.id,
@@ -407,7 +407,7 @@ describe("memory mount + versions", () => {
     it("rejects more than 8 memory_store resources", async () => {
       await bootDb();
       const { createMemoryStore } = await import("../src/db/memory");
-      const { handleCreateSession } = await import("../src/handlers/sessions");
+      const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
       const agent = await createTestAgent();
       const env = await createTestEnv();
 
@@ -417,7 +417,7 @@ describe("memory mount + versions", () => {
       }
 
       const res = await handleCreateSession(
-        req("/v1/sessions", {
+        req("/anthropic/v1/sessions", {
           body: {
             agent: agent.id,
             environment_id: env.id,
@@ -435,12 +435,12 @@ describe("memory mount + versions", () => {
 
     it("rejects non-existent memory store", async () => {
       await bootDb();
-      const { handleCreateSession } = await import("../src/handlers/sessions");
+      const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
       const agent = await createTestAgent();
       const env = await createTestEnv();
 
       const res = await handleCreateSession(
-        req("/v1/sessions", {
+        req("/anthropic/v1/sessions", {
           body: {
             agent: agent.id,
             environment_id: env.id,
@@ -456,7 +456,7 @@ describe("memory mount + versions", () => {
     it("rejects archived memory store", async () => {
       await bootDb();
       const { createMemoryStore, archiveMemoryStore } = await import("../src/db/memory");
-      const { handleCreateSession } = await import("../src/handlers/sessions");
+      const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
       const agent = await createTestAgent();
       const env = await createTestEnv();
 
@@ -464,7 +464,7 @@ describe("memory mount + versions", () => {
       archiveMemoryStore(store.id);
 
       const res = await handleCreateSession(
-        req("/v1/sessions", {
+        req("/anthropic/v1/sessions", {
           body: {
             agent: agent.id,
             environment_id: env.id,
@@ -482,14 +482,14 @@ describe("memory mount + versions", () => {
     it("defaults access to read_write", async () => {
       await bootDb();
       const { createMemoryStore } = await import("../src/db/memory");
-      const { handleCreateSession } = await import("../src/handlers/sessions");
+      const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
       const agent = await createTestAgent();
       const env = await createTestEnv();
 
       const store = createMemoryStore({ name: "my-store", agent_id: agent.id as string });
 
       const res = await handleCreateSession(
-        req("/v1/sessions", {
+        req("/anthropic/v1/sessions", {
           body: {
             agent: agent.id,
             environment_id: env.id,

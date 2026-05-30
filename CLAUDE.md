@@ -80,9 +80,19 @@ The turn driver (`packages/agent-sdk/src/sessions/driver.ts`) orchestrates every
 
 All handlers use `routeWrap()` from `http.ts` which handles init-on-first-request, auth, and error envelopes. Hono, Fastify, Next.js adapters, and the CLI's LocalBackend all call these same handler functions.
 
+### API namespace
+
+Vendor-compat surfaces live under their own URL prefix:
+
+- `/anthropic/v1/*` — Anthropic Managed Agents API shape (agents, sessions, vaults, environments, files, threads, resources, user_profiles, oauth). Handlers in `packages/agent-sdk/src/handlers/anthropic-compat/`.
+- `/google/v1beta/*` — Google Interactions API shape. Handlers in `packages/agent-sdk/src/handlers/google-compat/`.
+- `/v1/*` — Gateway-native API (settings, api-keys, metrics, audit, tenants, upstream-keys, license, traces, providers, models, batch, skills, whoami, memory_stores, work). Handlers at the top level of `packages/agent-sdk/src/handlers/`.
+
+The `/v1/environments/:id/work/*` work-queue routes are gateway-native and stay under `/v1/*` even though they share a path parameter with `/anthropic/v1/environments/:id`.
+
 ### Anthropic API key passthrough
 
-Gated by `anthropic_passthrough_enabled` (env or settings, default off). When on, `sk-ant-api*` keys in `x-api-key` are routed by *shape* in `auth/middleware.ts` — never compared to the local `api_keys` table — and intercepted in `routeWrap` (and `prepareSessionStream` for SSE) before any handler runs. Pure proxy: zero DB writes. Gateway-only routes (api-keys, settings, metrics, tenants, upstream-keys, audit, ...) reject `sk-ant-api*` via the allowlist in `auth/passthrough.ts`. Random strings 401 locally.
+Gated by `anthropic_passthrough_enabled` (env or settings, default off). When on, `sk-ant-api*` keys in `x-api-key` are routed by *shape* in `auth/middleware.ts` — never compared to the local `api_keys` table — and intercepted in `routeWrap` (and `prepareSessionStream` for SSE) before any handler runs. Pure proxy: zero DB writes. Only `/anthropic/v1/*` routes on the allowlist in `auth/passthrough.ts` are forwarded upstream (the `/anthropic` prefix is stripped before the call to `api.anthropic.com`); gateway-native `/v1/*` routes reject passthrough. Random strings 401 locally.
 
 ### DB
 

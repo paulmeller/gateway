@@ -17,7 +17,7 @@
  *
  * `sk-ant-oat*` (OAuth tokens) do NOT enter the passthrough path — they
  * fall through to the gateway lookup and 401 (matching the existing
- * anthropic-provider posture in `handlers/sessions.ts`).
+ * anthropic-provider posture in `handlers/anthropic-compat/sessions.ts`).
  *
  * Callers should prefer `authenticateAndIntercept()` over `authenticate()`
  * directly — the former structurally guarantees the passthrough fast-path

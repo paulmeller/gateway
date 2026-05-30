@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { routeWrap, jsonOk, paginatedOk, decodeCursor } from "../http";
-import { getDb } from "../db/client";
+import { routeWrap, jsonOk, paginatedOk, decodeCursor } from "../../http";
+import { getDb } from "../../db/client";
 import {
   createEnvironment,
   getEnvironment,
@@ -9,14 +9,14 @@ import {
   deleteEnvironment,
   hasSessionsAttached,
   updateEnvironment,
-} from "../db/environments";
-import { kickoffEnvironmentSetup } from "../containers/setup";
-import { resolveContainerProvider as resolveProvider } from "../providers/registry";
-import { isProxied, markProxied, unmarkProxied, getProxiedTenantId } from "../db/proxy";
-import { forwardToAnthropic } from "../proxy/forward";
-import { badRequest, conflict, notFound } from "../errors";
-import { assertResourceTenant, resolveCreateTenant, tenantFilter } from "../auth/scope";
-import type { AuthContext } from "../types";
+} from "../../db/environments";
+import { kickoffEnvironmentSetup } from "../../containers/setup";
+import { resolveContainerProvider as resolveProvider } from "../../providers/registry";
+import { isProxied, markProxied, unmarkProxied, getProxiedTenantId } from "../../db/proxy";
+import { forwardToAnthropic } from "../../proxy/forward";
+import { badRequest, conflict, notFound } from "../../errors";
+import { assertResourceTenant, resolveCreateTenant, tenantFilter } from "../../auth/scope";
+import type { AuthContext } from "../../types";
 
 function getEnvironmentTenantId(id: string): string | null | undefined {
   const row = getDb()

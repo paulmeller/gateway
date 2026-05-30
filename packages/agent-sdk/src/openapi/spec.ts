@@ -170,7 +170,7 @@ const ErrorResponses = {
 
 registry.registerPath({
   method: "post",
-  path: "/v1/agents",
+  path: "/anthropic/v1/agents",
   tags: ["Agents"],
   summary: "Create an agent",
   security: [{ ApiKey: [] }],
@@ -191,7 +191,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/agents",
+  path: "/anthropic/v1/agents",
   tags: ["Agents"],
   summary: "List agents",
   security: [{ ApiKey: [] }],
@@ -214,7 +214,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/agents/{id}",
+  path: "/anthropic/v1/agents/{id}",
   tags: ["Agents"],
   summary: "Retrieve an agent (optionally a specific version)",
   security: [{ ApiKey: [] }],
@@ -233,7 +233,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: "/v1/agents/{id}",
+  path: "/anthropic/v1/agents/{id}",
   tags: ["Agents"],
   summary: "Update an agent (creates a new version)",
   security: [{ ApiKey: [] }],
@@ -255,7 +255,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "delete",
-  path: "/v1/agents/{id}",
+  path: "/anthropic/v1/agents/{id}",
   tags: ["Agents"],
   summary: "Archive an agent",
   security: [{ ApiKey: [] }],
@@ -271,7 +271,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: "/v1/agents/{id}/archive",
+  path: "/anthropic/v1/agents/{id}/archive",
   tags: ["Agents"],
   summary: "Archive an agent (returns the archived agent)",
   description:
@@ -289,7 +289,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/agents/{id}/versions",
+  path: "/anthropic/v1/agents/{id}/versions",
   tags: ["Agents"],
   summary: "List agent versions",
   description:
@@ -317,7 +317,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: "/v1/environments",
+  path: "/anthropic/v1/environments",
   tags: ["Environments"],
   summary: "Create an environment",
   description:
@@ -340,7 +340,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/environments",
+  path: "/anthropic/v1/environments",
   tags: ["Environments"],
   summary: "List environments",
   security: [{ ApiKey: [] }],
@@ -363,7 +363,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/environments/{id}",
+  path: "/anthropic/v1/environments/{id}",
   tags: ["Environments"],
   summary: "Retrieve an environment",
   security: [{ ApiKey: [] }],
@@ -379,7 +379,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: "/v1/environments/{id}",
+  path: "/anthropic/v1/environments/{id}",
   tags: ["Environments"],
   summary: "Update an environment",
   security: [{ ApiKey: [] }],
@@ -401,7 +401,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "delete",
-  path: "/v1/environments/{id}",
+  path: "/anthropic/v1/environments/{id}",
   tags: ["Environments"],
   summary: "Delete an environment",
   description:
@@ -419,7 +419,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: "/v1/environments/{id}/archive",
+  path: "/anthropic/v1/environments/{id}/archive",
   tags: ["Environments"],
   summary: "Archive an environment",
   description:
@@ -441,7 +441,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: "/v1/sessions",
+  path: "/anthropic/v1/sessions",
   tags: ["Sessions"],
   summary: "Create a session",
   description:
@@ -464,7 +464,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/sessions",
+  path: "/anthropic/v1/sessions",
   tags: ["Sessions"],
   summary: "List sessions",
   security: [{ ApiKey: [] }],
@@ -496,7 +496,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/sessions/{id}",
+  path: "/anthropic/v1/sessions/{id}",
   tags: ["Sessions"],
   summary: "Retrieve a session",
   security: [{ ApiKey: [] }],
@@ -512,7 +512,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: "/v1/sessions/{id}",
+  path: "/anthropic/v1/sessions/{id}",
   tags: ["Sessions"],
   summary: "Update session title / metadata",
   security: [{ ApiKey: [] }],
@@ -534,7 +534,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "delete",
-  path: "/v1/sessions/{id}",
+  path: "/anthropic/v1/sessions/{id}",
   tags: ["Sessions"],
   summary: "Delete (terminate) a session",
   description:
@@ -552,7 +552,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: "/v1/sessions/{id}/archive",
+  path: "/anthropic/v1/sessions/{id}/archive",
   tags: ["Sessions"],
   summary: "Archive a session",
   security: [{ ApiKey: [] }],
@@ -572,7 +572,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: "/v1/sessions/{id}/events",
+  path: "/anthropic/v1/sessions/{id}/events",
   tags: ["Events"],
   summary: "Append user events to a session",
   description:
@@ -602,7 +602,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/sessions/{id}/events",
+  path: "/anthropic/v1/sessions/{id}/events",
   tags: ["Events"],
   summary: "List a session's event history",
   security: [{ ApiKey: [] }],
@@ -625,7 +625,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/sessions/{id}/events/stream",
+  path: "/anthropic/v1/sessions/{id}/events/stream",
   tags: ["Events"],
   summary: "Stream a session's events via Server-Sent Events",
   description:
@@ -667,7 +667,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/sessions/{id}/threads",
+  path: "/anthropic/v1/sessions/{id}/threads",
   tags: ["Sessions"],
   summary: "List child thread sessions",
   description:
@@ -695,7 +695,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: "/v1/sessions/{id}/resources",
+  path: "/anthropic/v1/sessions/{id}/resources",
   tags: ["Resources"],
   summary: "Add a resource to a session",
   description:
@@ -719,7 +719,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/sessions/{id}/resources",
+  path: "/anthropic/v1/sessions/{id}/resources",
   tags: ["Resources"],
   summary: "List session resources",
   security: [{ ApiKey: [] }],
@@ -735,7 +735,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/sessions/{id}/resources/{rid}",
+  path: "/anthropic/v1/sessions/{id}/resources/{rid}",
   tags: ["Resources"],
   summary: "Get a single session resource",
   security: [{ ApiKey: [] }],
@@ -751,7 +751,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "delete",
-  path: "/v1/sessions/{id}/resources/{rid}",
+  path: "/anthropic/v1/sessions/{id}/resources/{rid}",
   tags: ["Resources"],
   summary: "Remove a resource from a session",
   security: [{ ApiKey: [] }],
@@ -771,7 +771,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: "/v1/files",
+  path: "/anthropic/v1/files",
   tags: ["Files"],
   summary: "Upload a file",
   description:
@@ -795,7 +795,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/files",
+  path: "/anthropic/v1/files",
   tags: ["Files"],
   summary: "List files",
   security: [{ ApiKey: [] }],
@@ -818,7 +818,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/files/{id}",
+  path: "/anthropic/v1/files/{id}",
   tags: ["Files"],
   summary: "Get file metadata",
   security: [{ ApiKey: [] }],
@@ -834,7 +834,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/files/{id}/content",
+  path: "/anthropic/v1/files/{id}/content",
   tags: ["Files"],
   summary: "Download file content",
   security: [{ ApiKey: [] }],
@@ -854,7 +854,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "delete",
-  path: "/v1/files/{id}",
+  path: "/anthropic/v1/files/{id}",
   tags: ["Files"],
   summary: "Delete a file",
   security: [{ ApiKey: [] }],
@@ -874,7 +874,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: "/v1/vaults",
+  path: "/anthropic/v1/vaults",
   tags: ["Vaults"],
   summary: "Create a vault",
   security: [{ ApiKey: [] }],
@@ -895,7 +895,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/vaults",
+  path: "/anthropic/v1/vaults",
   tags: ["Vaults"],
   summary: "List vaults",
   security: [{ ApiKey: [] }],
@@ -915,7 +915,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/vaults/{id}",
+  path: "/anthropic/v1/vaults/{id}",
   tags: ["Vaults"],
   summary: "Retrieve a vault",
   security: [{ ApiKey: [] }],
@@ -931,7 +931,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: "/v1/vaults/{id}",
+  path: "/anthropic/v1/vaults/{id}",
   tags: ["Vaults"],
   summary: "Update a vault",
   description: "Updates vault display_name and/or metadata.",
@@ -954,7 +954,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "delete",
-  path: "/v1/vaults/{id}",
+  path: "/anthropic/v1/vaults/{id}",
   tags: ["Vaults"],
   summary: "Delete a vault and all its entries",
   security: [{ ApiKey: [] }],
@@ -970,7 +970,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: "/v1/vaults/{id}/archive",
+  path: "/anthropic/v1/vaults/{id}/archive",
   tags: ["Vaults"],
   summary: "Archive a vault",
   description: "Archives the vault and returns the full vault object with `archived_at` set.",
@@ -991,7 +991,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: "/v1/vaults/{id}/credentials",
+  path: "/anthropic/v1/vaults/{id}/credentials",
   tags: ["Credentials"],
   summary: "Create a vault credential",
   description:
@@ -1018,7 +1018,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/vaults/{id}/credentials",
+  path: "/anthropic/v1/vaults/{id}/credentials",
   tags: ["Credentials"],
   summary: "List vault credentials",
   security: [{ ApiKey: [] }],
@@ -1034,7 +1034,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/vaults/{id}/credentials/{credId}",
+  path: "/anthropic/v1/vaults/{id}/credentials/{credId}",
   tags: ["Credentials"],
   summary: "Get a vault credential",
   security: [{ ApiKey: [] }],
@@ -1050,7 +1050,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: "/v1/vaults/{id}/credentials/{credId}",
+  path: "/anthropic/v1/vaults/{id}/credentials/{credId}",
   tags: ["Credentials"],
   summary: "Update a vault credential",
   security: [{ ApiKey: [] }],
@@ -1072,7 +1072,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "delete",
-  path: "/v1/vaults/{id}/credentials/{credId}",
+  path: "/anthropic/v1/vaults/{id}/credentials/{credId}",
   tags: ["Credentials"],
   summary: "Delete a vault credential",
   security: [{ ApiKey: [] }],
@@ -1092,7 +1092,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/vaults/{id}/entries",
+  path: "/anthropic/v1/vaults/{id}/entries",
   tags: ["Vaults"],
   summary: "List vault entries",
   security: [{ ApiKey: [] }],
@@ -1108,7 +1108,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/vaults/{id}/entries/{key}",
+  path: "/anthropic/v1/vaults/{id}/entries/{key}",
   tags: ["Vaults"],
   summary: "Get a vault entry",
   security: [{ ApiKey: [] }],
@@ -1124,7 +1124,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "put",
-  path: "/v1/vaults/{id}/entries/{key}",
+  path: "/anthropic/v1/vaults/{id}/entries/{key}",
   tags: ["Vaults"],
   summary: "Set a vault entry",
   security: [{ ApiKey: [] }],
@@ -1146,7 +1146,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "delete",
-  path: "/v1/vaults/{id}/entries/{key}",
+  path: "/anthropic/v1/vaults/{id}/entries/{key}",
   tags: ["Vaults"],
   summary: "Delete a vault entry",
   security: [{ ApiKey: [] }],
@@ -2095,7 +2095,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: "/v1/user_profiles",
+  path: "/anthropic/v1/user_profiles",
   tags: ["User Profiles"],
   summary: "Create user profile",
   security: [{ ApiKey: [] }],
@@ -2116,7 +2116,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/user_profiles",
+  path: "/anthropic/v1/user_profiles",
   tags: ["User Profiles"],
   summary: "List user profiles",
   security: [{ ApiKey: [] }],
@@ -2131,7 +2131,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/user_profiles/{id}",
+  path: "/anthropic/v1/user_profiles/{id}",
   tags: ["User Profiles"],
   summary: "Get user profile",
   security: [{ ApiKey: [] }],
@@ -2147,7 +2147,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: "/v1/user_profiles/{id}",
+  path: "/anthropic/v1/user_profiles/{id}",
   tags: ["User Profiles"],
   summary: "Update user profile",
   security: [{ ApiKey: [] }],
@@ -2169,7 +2169,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: "/v1/user_profiles/{id}/enrollment_url",
+  path: "/anthropic/v1/user_profiles/{id}/enrollment_url",
   tags: ["User Profiles"],
   summary: "Generate OAuth enrollment URL",
   security: [{ ApiKey: [] }],

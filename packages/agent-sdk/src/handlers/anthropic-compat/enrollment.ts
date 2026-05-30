@@ -14,12 +14,12 @@
  */
 import { z } from "zod";
 import { randomBytes } from "node:crypto";
-import { routeWrap, jsonOk } from "../http";
-import { badRequest, notFound } from "../errors";
-import { tenantFilter } from "../auth/scope";
-import { getUserProfile, updateUserProfile } from "../db/user-profiles";
-import type { TrustGrant } from "../db/user-profiles";
-import { createCredential, updateCredential, getCredential } from "../db/credentials";
+import { routeWrap, jsonOk } from "../../http";
+import { badRequest, notFound } from "../../errors";
+import { tenantFilter } from "../../auth/scope";
+import { getUserProfile, updateUserProfile } from "../../db/user-profiles";
+import type { TrustGrant } from "../../db/user-profiles";
+import { createCredential, updateCredential, getCredential } from "../../db/credentials";
 
 // ---------------------------------------------------------------------------
 // In-memory pending enrollment state (ephemeral — lost on restart)
@@ -150,7 +150,7 @@ export function handleEnrollmentUrl(
  */
 export async function handleOAuthCallback(request: Request): Promise<Response> {
   // Import ensureInitialized to guarantee DB is ready (routeWrap normally does this)
-  const { ensureInitialized } = await import("../init");
+  const { ensureInitialized } = await import("../../init");
   await ensureInitialized();
 
   try {

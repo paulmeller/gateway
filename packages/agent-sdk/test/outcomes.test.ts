@@ -74,9 +74,9 @@ function req(
 }
 
 async function createTestAgent(overrides: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
-  const { handleCreateAgent } = await import("../src/handlers/agents");
+  const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
   const res = await handleCreateAgent(
-    req("/v1/agents", {
+    req("/anthropic/v1/agents", {
       body: { name: `Agent-${Date.now()}-${Math.random()}`, model: { id: "claude-sonnet-4-6" }, ...overrides },
     }),
   );
@@ -106,9 +106,9 @@ async function createTestSession(
   envId: string,
   overrides: Record<string, unknown> = {},
 ): Promise<Record<string, unknown>> {
-  const { handleCreateSession } = await import("../src/handlers/sessions");
+  const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
   const res = await handleCreateSession(
-    req("/v1/sessions", {
+    req("/anthropic/v1/sessions", {
       body: { agent: agentId, environment_id: envId, ...overrides },
     }),
   );
@@ -130,9 +130,9 @@ describe("Outcomes", () => {
       const session = await createTestSession(agent.id as string, env.id as string);
       const sessionId = session.id as string;
 
-      const { handlePostEvents } = await import("../src/handlers/events");
+      const { handlePostEvents } = await import("../src/handlers/anthropic-compat/events");
       const res = await handlePostEvents(
-        req(`/v1/sessions/${sessionId}/events`, {
+        req(`/anthropic/v1/sessions/${sessionId}/events`, {
           body: {
             events: [{
               type: "user.define_outcome",
@@ -178,9 +178,9 @@ describe("Outcomes", () => {
       const session = await createTestSession(agent.id as string, env.id as string);
       const sessionId = session.id as string;
 
-      const { handlePostEvents } = await import("../src/handlers/events");
+      const { handlePostEvents } = await import("../src/handlers/anthropic-compat/events");
       const res = await handlePostEvents(
-        req(`/v1/sessions/${sessionId}/events`, {
+        req(`/anthropic/v1/sessions/${sessionId}/events`, {
           body: {
             events: [{
               type: "user.define_outcome",
@@ -206,9 +206,9 @@ describe("Outcomes", () => {
       const session = await createTestSession(agent.id as string, env.id as string);
       const sessionId = session.id as string;
 
-      const { handlePostEvents } = await import("../src/handlers/events");
+      const { handlePostEvents } = await import("../src/handlers/anthropic-compat/events");
       await handlePostEvents(
-        req(`/v1/sessions/${sessionId}/events`, {
+        req(`/anthropic/v1/sessions/${sessionId}/events`, {
           body: {
             events: [{
               type: "user.define_outcome",
@@ -232,9 +232,9 @@ describe("Outcomes", () => {
       const session = await createTestSession(agent.id as string, env.id as string);
       const sessionId = session.id as string;
 
-      const { handlePostEvents } = await import("../src/handlers/events");
+      const { handlePostEvents } = await import("../src/handlers/anthropic-compat/events");
       const res = await handlePostEvents(
-        req(`/v1/sessions/${sessionId}/events`, {
+        req(`/anthropic/v1/sessions/${sessionId}/events`, {
           body: {
             events: [{
               type: "user.define_outcome",
@@ -257,9 +257,9 @@ describe("Outcomes", () => {
       const session = await createTestSession(agent.id as string, env.id as string);
       const sessionId = session.id as string;
 
-      const { handlePostEvents } = await import("../src/handlers/events");
+      const { handlePostEvents } = await import("../src/handlers/anthropic-compat/events");
       await handlePostEvents(
-        req(`/v1/sessions/${sessionId}/events`, {
+        req(`/anthropic/v1/sessions/${sessionId}/events`, {
           body: {
             events: [{
               type: "user.define_outcome",
@@ -291,9 +291,9 @@ describe("Outcomes", () => {
       const env = await createTestEnv({ name: "NoOutcomeEnv" });
       const session = await createTestSession(agent.id as string, env.id as string);
 
-      const { handleGetSession } = await import("../src/handlers/sessions");
+      const { handleGetSession } = await import("../src/handlers/anthropic-compat/sessions");
       const res = await handleGetSession(
-        req(`/v1/sessions/${session.id}`),
+        req(`/anthropic/v1/sessions/${session.id}`),
         session.id as string,
       );
 
@@ -310,9 +310,9 @@ describe("Outcomes", () => {
       const sessionId = session.id as string;
 
       // Define an outcome
-      const { handlePostEvents } = await import("../src/handlers/events");
+      const { handlePostEvents } = await import("../src/handlers/anthropic-compat/events");
       await handlePostEvents(
-        req(`/v1/sessions/${sessionId}/events`, {
+        req(`/anthropic/v1/sessions/${sessionId}/events`, {
           body: {
             events: [{
               type: "user.define_outcome",
@@ -326,9 +326,9 @@ describe("Outcomes", () => {
       );
 
       // Fetch session
-      const { handleGetSession } = await import("../src/handlers/sessions");
+      const { handleGetSession } = await import("../src/handlers/anthropic-compat/sessions");
       const res = await handleGetSession(
-        req(`/v1/sessions/${sessionId}`),
+        req(`/anthropic/v1/sessions/${sessionId}`),
         sessionId,
       );
 
@@ -366,9 +366,9 @@ describe("Outcomes", () => {
         explanation: "All criteria met",
       });
 
-      const { handleGetSession } = await import("../src/handlers/sessions");
+      const { handleGetSession } = await import("../src/handlers/anthropic-compat/sessions");
       const res = await handleGetSession(
-        req(`/v1/sessions/${sessionId}`),
+        req(`/anthropic/v1/sessions/${sessionId}`),
         sessionId,
       );
 
@@ -626,9 +626,9 @@ describe("Outcomes", () => {
       expect(updatedCriteria.explanation).toBe("Output is completely wrong.");
 
       // Verify session reflects this in outcome_evaluations
-      const { handleGetSession } = await import("../src/handlers/sessions");
+      const { handleGetSession } = await import("../src/handlers/anthropic-compat/sessions");
       const res = await handleGetSession(
-        req(`/v1/sessions/${sessionId}`),
+        req(`/anthropic/v1/sessions/${sessionId}`),
         sessionId,
       );
       const body = (await res.json()) as { outcome_evaluations: Array<Record<string, unknown>> };

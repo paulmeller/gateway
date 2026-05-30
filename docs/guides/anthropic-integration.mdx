@@ -64,10 +64,10 @@ On `sessions create`, the gateway:
    land in your local bus (dedup by event ID, filter user events already
    written by the POST handler) and are served to the UI exactly like
    locally-run sessions.
-7. **Proxies execution traffic** — `POST /v1/sessions/:id/events` and
-   the SSE stream are forwarded to Anthropic with the resolved API key
-   substituted in. Your client sees one API; the heavy lifting happens
-   on Anthropic's infra.
+7. **Proxies execution traffic** — `POST /anthropic/v1/sessions/:id/events` on the
+   gateway is forwarded to Anthropic's `/v1/sessions/:id/events` (and the SSE
+   stream) with the resolved API key substituted in. Your client sees one
+   API; the heavy lifting happens on Anthropic's infra.
 
 ## What gets synced, what stays local
 

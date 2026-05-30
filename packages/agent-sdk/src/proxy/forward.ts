@@ -22,7 +22,10 @@ const BETA_HEADER = "managed-agents-2026-04-01";
  *
  * @param request  The original incoming Request (used for method, signal,
  *                 and body reading if opts.body is not provided)
- * @param path     The MA API path (e.g. "/v1/agents" or "/v1/sessions/sess_123/events")
+ * @param path     The path as it appears on the gateway. Accepts either the
+ *                 namespaced form (`/anthropic/v1/agents`) or the bare
+ *                 Anthropic form (`/v1/agents`); the `/anthropic` prefix is
+ *                 stripped before forwarding upstream.
  * @param opts.body Pre-read request body string. Required for POST routes
  *                  that already consumed the body to inspect it (e.g. to
  *                  check `body.backend`). If not provided and method is
@@ -43,7 +46,8 @@ export async function forwardToAnthropic(
     );
   }
 
-  const url = new URL(path, ANTHROPIC_BASE);
+  const upstreamPath = path.startsWith("/anthropic/") ? path.slice("/anthropic".length) : path;
+  const url = new URL(upstreamPath, ANTHROPIC_BASE);
   // Preserve query string from the original request
   const origUrl = new URL(request.url);
   url.search = origUrl.search;

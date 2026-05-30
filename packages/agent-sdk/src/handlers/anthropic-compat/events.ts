@@ -1,24 +1,24 @@
 import { z } from "zod";
-import { routeWrap, jsonOk, paginatedOk } from "../http";
-import { getDb } from "../db/client";
-import { getSession, getSessionRow, setOutcomeCriteria, bumpSessionStats, updateSessionMutable } from "../db/sessions";
-import { listEvents, rowToManagedEvent } from "../db/events";
-import { appendEvent } from "../sessions/bus";
-import { getActor } from "../sessions/actor";
-import { interruptSession } from "../sessions/interrupt";
-import { runTurn, writePermissionResponse } from "../sessions/driver";
-import { enqueueTurn } from "../queue";
-import { pushPendingUserInput, type TurnInput } from "../state";
-import { isProxied } from "../db/proxy";
-import { resolveRemoteSessionId } from "../db/sync";
-import { forwardToAnthropic } from "../proxy/forward";
-import { badRequest, notFound } from "../errors";
-import { getAgent } from "../db/agents";
-import { getEnvironment, getEnvironmentRow } from "../db/environments";
-import { getConfig } from "../config";
-import { resolveAnthropicKey as resolveAnthropicKeyShared, reportUpstreamFailure, reportUpstreamSuccess } from "../providers/upstream-keys";
-import { assertResourceTenant } from "../auth/scope";
-import { getProxiedTenantId } from "../db/proxy";
+import { routeWrap, jsonOk, paginatedOk } from "../../http";
+import { getDb } from "../../db/client";
+import { getSession, getSessionRow, setOutcomeCriteria, bumpSessionStats, updateSessionMutable } from "../../db/sessions";
+import { listEvents, rowToManagedEvent } from "../../db/events";
+import { appendEvent } from "../../sessions/bus";
+import { getActor } from "../../sessions/actor";
+import { interruptSession } from "../../sessions/interrupt";
+import { runTurn, writePermissionResponse } from "../../sessions/driver";
+import { enqueueTurn } from "../../queue";
+import { pushPendingUserInput, type TurnInput } from "../../state";
+import { isProxied } from "../../db/proxy";
+import { resolveRemoteSessionId } from "../../db/sync";
+import { forwardToAnthropic } from "../../proxy/forward";
+import { badRequest, notFound } from "../../errors";
+import { getAgent } from "../../db/agents";
+import { getEnvironment, getEnvironmentRow } from "../../db/environments";
+import { getConfig } from "../../config";
+import { resolveAnthropicKey as resolveAnthropicKeyShared, reportUpstreamFailure, reportUpstreamSuccess } from "../../providers/upstream-keys";
+import { assertResourceTenant } from "../../auth/scope";
+import { getProxiedTenantId } from "../../db/proxy";
 import {
   listMemories,
   searchMemories,
@@ -27,8 +27,8 @@ import {
   getMemory,
   deleteMemory as deleteMemoryRow,
   listMemoryStores,
-} from "../db/memory";
-import type { AuthContext } from "../types";
+} from "../../db/memory";
+import type { AuthContext } from "../../types";
 
 /**
  * Tenant guard for session-scoped endpoints (events, resources).
@@ -440,8 +440,8 @@ async function teeRemoteStreamInner(localSessionId: string, remoteSessionId: str
     console.warn(`[tee] max re-entry depth (${MAX_TEE_REENTRIES}) exceeded for session ${localSessionId}`);
   }
 }
-import { nowMs } from "../util/clock";
-import type { EventRow } from "../types";
+import { nowMs } from "../../util/clock";
+import type { EventRow } from "../../types";
 
 const TextBlock = z.object({ type: z.literal("text"), text: z.string() });
 
@@ -621,7 +621,7 @@ export function handlePostEvents(request: Request, sessionId: string): Promise<R
           // Claude can continue within the same turn.
           const currentStatus = getSessionRow(sessionId)?.status ?? "idle";
           if (currentStatus === "running") {
-            const { writeToolBridgeResponse } = await import("../sessions/driver");
+            const { writeToolBridgeResponse } = await import("../../sessions/driver");
             void writeToolBridgeResponse(
               sessionId,
               event.content as unknown[],
@@ -667,7 +667,7 @@ export function handlePostEvents(request: Request, sessionId: string): Promise<R
         }
 
         if (event.type === "user.define_outcome") {
-          const { newId: genId } = await import("../util/ids");
+          const { newId: genId } = await import("../../util/ids");
           const outcomeId = genId("outc");
           let rubricText: string;
           if (typeof event.rubric === "string") {
@@ -675,8 +675,8 @@ export function handlePostEvents(request: Request, sessionId: string): Promise<R
           } else if (event.rubric && event.rubric.type === "text") {
             rubricText = event.rubric.content;
           } else if (event.rubric && event.rubric.type === "file") {
-            const { getFile: getFileRow } = await import("../db/files");
-            const { readFile: readStoredFile } = await import("../files/storage");
+            const { getFile: getFileRow } = await import("../../db/files");
+            const { readFile: readStoredFile } = await import("../../files/storage");
             const fileRow = getFileRow(event.rubric.file_id);
             if (!fileRow) throw badRequest(`Rubric file not found: ${event.rubric.file_id}`);
             rubricText = readStoredFile(fileRow.storage_path).toString("utf-8");
@@ -745,8 +745,8 @@ export function handlePostEvents(request: Request, sessionId: string): Promise<R
 
         if (env?.config?.type === "self_hosted" && !canExecuteInline) {
           // No inline executor — queue work for a remote worker to pick up
-          const { createWorkItem } = await import("../db/work");
-          const { updateSessionStatus } = await import("../db/sessions");
+          const { createWorkItem } = await import("../../db/work");
+          const { updateSessionStatus } = await import("../../db/sessions");
 
           const inputsJson = JSON.stringify(appended.pendingForTurn);
           const envRow = getEnvironmentRow(row.environment_id);

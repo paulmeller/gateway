@@ -592,7 +592,7 @@ describe("Google Interactions API compatibility", () => {
     });
 
     const { handleCreateInteraction } = await import("../src/handlers/google-compat");
-    const { handleListAgents } = await import("../src/handlers/agents");
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
 
     // Create interaction with system_instruction
     const res = await handleCreateInteraction(req("/google/v1beta/interactions", {
@@ -605,7 +605,7 @@ describe("Google Interactions API compatibility", () => {
     expect(res.status).toBe(200);
 
     // Check the auto-created agent has the system prompt set
-    const listRes = await handleListAgents(req("/v1/agents?limit=100"));
+    const listRes = await handleListAgents(req("/anthropic/v1/agents?limit=100"));
     const listBody = await listRes.json();
     const agent = listBody.data.find((a: any) => a.system === "You are a pirate. Always talk like one.");
     expect(agent).toBeDefined();
@@ -616,7 +616,7 @@ describe("Google Interactions API compatibility", () => {
     await bootDb();
 
     const { handleCreateGoogleAgent } = await import("../src/handlers/google-compat");
-    const { handleListAgents } = await import("../src/handlers/agents");
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
 
     // Create a Google agent with base_agent
     const res = await handleCreateGoogleAgent(req("/google/v1beta/agents", {
@@ -628,7 +628,7 @@ describe("Google Interactions API compatibility", () => {
     expect(res.status).toBe(201);
 
     // Verify the internal agent has engine "gemini"
-    const listRes = await handleListAgents(req("/v1/agents?limit=100"));
+    const listRes = await handleListAgents(req("/anthropic/v1/agents?limit=100"));
     const listBody = await listRes.json();
     const agent = listBody.data.find((a: any) => a.name === "engine-test-agent");
     expect(agent).toBeDefined();
@@ -639,7 +639,7 @@ describe("Google Interactions API compatibility", () => {
     await bootDb();
 
     const { handleCreateGoogleAgent } = await import("../src/handlers/google-compat");
-    const { handleListAgents } = await import("../src/handlers/agents");
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
 
     const res = await handleCreateGoogleAgent(req("/google/v1beta/agents", {
       body: {
@@ -657,7 +657,7 @@ describe("Google Interactions API compatibility", () => {
     expect(res.status).toBe(201);
 
     // Verify the internal agent has skills attached
-    const listRes = await handleListAgents(req("/v1/agents?limit=100"));
+    const listRes = await handleListAgents(req("/anthropic/v1/agents?limit=100"));
     const listBody = await listRes.json();
     const agent = listBody.data.find((a: any) => a.name === "skills-test-agent");
     expect(agent).toBeDefined();
@@ -766,7 +766,7 @@ describe("Google Interactions API compatibility", () => {
     });
 
     const { handleCreateInteraction } = await import("../src/handlers/google-compat");
-    const { handleListAgents } = await import("../src/handlers/agents");
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
 
     // First interaction creates the agent
     const res1 = await handleCreateInteraction(req("/google/v1beta/interactions", {
@@ -775,7 +775,7 @@ describe("Google Interactions API compatibility", () => {
     expect(res1.status).toBe(200);
 
     // Check agent count
-    const listRes1 = await handleListAgents(req("/v1/agents?limit=100"));
+    const listRes1 = await handleListAgents(req("/anthropic/v1/agents?limit=100"));
     const list1 = await listRes1.json();
     const agentCount1 = list1.data.length;
 
@@ -785,7 +785,7 @@ describe("Google Interactions API compatibility", () => {
     }));
     expect(res2.status).toBe(200);
 
-    const listRes2 = await handleListAgents(req("/v1/agents?limit=100"));
+    const listRes2 = await handleListAgents(req("/anthropic/v1/agents?limit=100"));
     const list2 = await listRes2.json();
     expect(list2.data.length).toBe(agentCount1); // No new agent created
   });
@@ -805,8 +805,8 @@ describe("Google Interactions API compatibility", () => {
     });
 
     // Create an agent with a specific model via the normal API
-    const { handleCreateAgent } = await import("../src/handlers/agents");
-    const agentRes = await handleCreateAgent(req("/v1/agents", {
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
+    const agentRes = await handleCreateAgent(req("/anthropic/v1/agents", {
       body: { name: "my-claude-agent", model: { id: "claude-sonnet-4-6" } },
     }));
     expect(agentRes.status).toBe(201);
@@ -827,8 +827,8 @@ describe("Google Interactions API compatibility", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     // Should not have created a new agent — reused the existing one
-    const { handleListAgents } = await import("../src/handlers/agents");
-    const listRes = await handleListAgents(req("/v1/agents?limit=100"));
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
+    const listRes = await handleListAgents(req("/anthropic/v1/agents?limit=100"));
     const agents = (await listRes.json()).data;
     const claudeAgents = agents.filter((a: any) => a.model?.id === "claude-sonnet-4-6");
     expect(claudeAgents.length).toBe(1); // Only the original, no auto-created duplicate

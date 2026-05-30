@@ -4,24 +4,24 @@
  * Threads are delegated agent invocations within a coordinator session.
  * Each thread tracks its own agent, status, usage, and event stream.
  */
-import { routeWrap, jsonOk, paginatedOk } from "../http";
-import { getDb } from "../db/client";
-import { getSession } from "../db/sessions";
-import { listEvents, rowToManagedEvent } from "../db/events";
+import { routeWrap, jsonOk, paginatedOk } from "../../http";
+import { getDb } from "../../db/client";
+import { getSession } from "../../db/sessions";
+import { listEvents, rowToManagedEvent } from "../../db/events";
 import {
   createThread,
   getThread,
   listThreads,
   archiveThread,
-} from "../db/threads";
-import { getAgent } from "../db/agents";
-import { notFound, badRequest } from "../errors";
-import { assertResourceTenant, tenantFilter } from "../auth/scope";
-import { subscribe } from "../sessions/bus";
-import type { ManagedEvent } from "../types";
+} from "../../db/threads";
+import { getAgent } from "../../db/agents";
+import { notFound, badRequest } from "../../errors";
+import { assertResourceTenant, tenantFilter } from "../../auth/scope";
+import { subscribe } from "../../sessions/bus";
+import type { ManagedEvent } from "../../types";
 
 /** Resolve session and assert tenant access. */
-function loadSession(auth: import("../types").AuthContext, sessionId: string) {
+function loadSession(auth: import("../../types").AuthContext, sessionId: string) {
   const row = getDb()
     .prepare(`SELECT tenant_id FROM sessions WHERE id = ?`)
     .get(sessionId) as { tenant_id: string | null } | undefined;

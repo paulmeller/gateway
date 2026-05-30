@@ -121,15 +121,15 @@ describe("anthropic passthrough auth", () => {
   it("isPassthroughAllowedPath: allows Anthropic-mirror routes, rejects gateway-only routes", async () => {
     const { isPassthroughAllowedPath } = await import("../src/auth/passthrough");
     // Allowed
-    expect(isPassthroughAllowedPath("/v1/agents")).toBe(true);
-    expect(isPassthroughAllowedPath("/v1/agents/agt_123")).toBe(true);
-    expect(isPassthroughAllowedPath("/v1/sessions")).toBe(true);
-    expect(isPassthroughAllowedPath("/v1/sessions/sess_123/events")).toBe(true);
-    expect(isPassthroughAllowedPath("/v1/sessions/sess_123/events/stream")).toBe(true);
-    expect(isPassthroughAllowedPath("/v1/vaults")).toBe(true);
-    expect(isPassthroughAllowedPath("/v1/vaults/vlt_1/entries/KEY")).toBe(true);
-    expect(isPassthroughAllowedPath("/v1/files")).toBe(true);
-    expect(isPassthroughAllowedPath("/v1/environments")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/agents")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/agents/agt_123")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/sessions")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/sessions/sess_123/events")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/sessions/sess_123/events/stream")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/vaults")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/vaults/vlt_1/entries/KEY")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/files")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/environments")).toBe(true);
     // Rejected (gateway-only)
     expect(isPassthroughAllowedPath("/v1/api-keys")).toBe(false);
     expect(isPassthroughAllowedPath("/v1/settings/anything")).toBe(false);
@@ -146,18 +146,18 @@ describe("anthropic passthrough auth", () => {
   });
 
   it("rejects sk-ant-api* with 401 when passthrough is disabled (default)", async () => {
-    const { handleListAgents } = await import("../src/handlers/agents");
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
     stub = stubFetch();
-    const res = await handleListAgents(req("/v1/agents", { apiKey: PASSTHROUGH_KEY }));
+    const res = await handleListAgents(req("/anthropic/v1/agents", { apiKey: PASSTHROUGH_KEY }));
     expect(res.status).toBe(401);
     expect(stub.calls).toHaveLength(0); // never forwarded upstream
   });
 
   it("forwards sk-ant-api* to Anthropic when passthrough is enabled", async () => {
     process.env.ANTHROPIC_PASSTHROUGH_ENABLED = "true";
-    const { handleListAgents } = await import("../src/handlers/agents");
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
     stub = stubFetch();
-    const res = await handleListAgents(req("/v1/agents", { apiKey: PASSTHROUGH_KEY }));
+    const res = await handleListAgents(req("/anthropic/v1/agents", { apiKey: PASSTHROUGH_KEY }));
     expect(res.status).toBe(200);
     expect(stub.calls).toHaveLength(1);
     expect(stub.calls[0].url).toBe("https://api.anthropic.com/v1/agents");
@@ -177,18 +177,18 @@ describe("anthropic passthrough auth", () => {
 
   it("rejects sk-ant-oat* (OAuth tokens) — never enters passthrough", async () => {
     process.env.ANTHROPIC_PASSTHROUGH_ENABLED = "true";
-    const { handleListAgents } = await import("../src/handlers/agents");
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
     stub = stubFetch();
-    const res = await handleListAgents(req("/v1/agents", { apiKey: OAUTH_KEY }));
+    const res = await handleListAgents(req("/anthropic/v1/agents", { apiKey: OAUTH_KEY }));
     expect(res.status).toBe(401);
     expect(stub.calls).toHaveLength(0);
   });
 
   it("rejects garbage keys (fail-closed — never forward arbitrary strings to Anthropic)", async () => {
     process.env.ANTHROPIC_PASSTHROUGH_ENABLED = "true";
-    const { handleListAgents } = await import("../src/handlers/agents");
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
     stub = stubFetch();
-    const res = await handleListAgents(req("/v1/agents", { apiKey: "definitely-not-a-key" }));
+    const res = await handleListAgents(req("/anthropic/v1/agents", { apiKey: "definitely-not-a-key" }));
     expect(res.status).toBe(401);
     expect(stub.calls).toHaveLength(0);
   });
@@ -202,9 +202,9 @@ describe("anthropic passthrough auth", () => {
     // findByRawKey for sk-ant-api* keys, even when other keys exist.
     createApiKey({ name: "gateway-1", rawKey: "ck_real_gateway_key" });
 
-    const { handleListAgents } = await import("../src/handlers/agents");
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
     stub = stubFetch();
-    const res = await handleListAgents(req("/v1/agents", { apiKey: PASSTHROUGH_KEY }));
+    const res = await handleListAgents(req("/anthropic/v1/agents", { apiKey: PASSTHROUGH_KEY }));
     // 200 means the request reached the stubbed Anthropic endpoint —
     // i.e. shape-routing kicked in before the api_keys lookup.
     expect(res.status).toBe(200);
@@ -219,9 +219,9 @@ describe("anthropic passthrough auth", () => {
     const { createApiKey } = await import("../src/db/api_keys");
     const { key } = createApiKey({ name: "test", rawKey: "ck_test_gateway_key" });
 
-    const { handleListAgents } = await import("../src/handlers/agents");
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
     stub = stubFetch();
-    const res = await handleListAgents(req("/v1/agents", { apiKey: key }));
+    const res = await handleListAgents(req("/anthropic/v1/agents", { apiKey: key }));
     expect(res.status).toBe(200);
     // Gateway-key path must NOT call Anthropic — it serves from the local DB.
     expect(stub.calls).toHaveLength(0);
@@ -232,7 +232,7 @@ describe("anthropic passthrough auth", () => {
     const { getDb } = await import("../src/db/client");
     const db = getDb();
 
-    const { handleCreateSession } = await import("../src/handlers/sessions");
+    const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
     stub = stubFetch();
     // Stub returns a session-shaped object so the response is well-formed.
     globalThis.fetch = vi.fn(async () =>
@@ -243,7 +243,7 @@ describe("anthropic passthrough auth", () => {
     ) as typeof globalThis.fetch;
 
     const res = await handleCreateSession(
-      req("/v1/sessions", {
+      req("/anthropic/v1/sessions", {
         method: "POST",
         body: { agent: "agt_remote", environment_id: "env_remote" },
         apiKey: PASSTHROUGH_KEY,
@@ -263,12 +263,12 @@ describe("anthropic passthrough auth", () => {
 
   it("forwards POST body verbatim to Anthropic with the passthrough key", async () => {
     process.env.ANTHROPIC_PASSTHROUGH_ENABLED = "true";
-    const { handleCreateSession } = await import("../src/handlers/sessions");
+    const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
     stub = stubFetch();
 
     const body = { agent: "agt_remote", environment_id: "env_remote", title: "hello" };
     await handleCreateSession(
-      req("/v1/sessions", { method: "POST", body, apiKey: PASSTHROUGH_KEY }),
+      req("/anthropic/v1/sessions", { method: "POST", body, apiKey: PASSTHROUGH_KEY }),
     );
 
     expect(stub.calls).toHaveLength(1);
@@ -279,9 +279,9 @@ describe("anthropic passthrough auth", () => {
 
   it("missing key still 401s when passthrough is enabled", async () => {
     process.env.ANTHROPIC_PASSTHROUGH_ENABLED = "true";
-    const { handleListAgents } = await import("../src/handlers/agents");
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
     stub = stubFetch();
-    const res = await handleListAgents(req("/v1/agents", {}));
+    const res = await handleListAgents(req("/anthropic/v1/agents", {}));
     expect(res.status).toBe(401);
     expect(stub.calls).toHaveLength(0);
   });
@@ -293,9 +293,9 @@ describe("anthropic passthrough auth", () => {
     const { writeSetting } = await import("../src/config");
     writeSetting("anthropic_passthrough_enabled", "true");
 
-    const { handleListAgents } = await import("../src/handlers/agents");
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
     stub = stubFetch();
-    const res = await handleListAgents(req("/v1/agents", { apiKey: PASSTHROUGH_KEY }));
+    const res = await handleListAgents(req("/anthropic/v1/agents", { apiKey: PASSTHROUGH_KEY }));
     expect(res.status).toBe(200);
     expect(stub.calls).toHaveLength(1);
   });
@@ -304,9 +304,9 @@ describe("anthropic passthrough auth", () => {
 
   it("Authorization: Bearer header path is shape-routed identically to x-api-key", async () => {
     process.env.ANTHROPIC_PASSTHROUGH_ENABLED = "true";
-    const { handleListAgents } = await import("../src/handlers/agents");
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
     stub = stubFetch();
-    const r = new Request("http://localhost/v1/agents", {
+    const r = new Request("http://localhost/anthropic/v1/agents", {
       headers: { authorization: `Bearer ${PASSTHROUGH_KEY}` },
     });
     const res = await handleListAgents(r);
@@ -316,13 +316,13 @@ describe("anthropic passthrough auth", () => {
 
   it("trailing slash is conservatively rejected (not in allowlist)", async () => {
     const { isPassthroughAllowedPath } = await import("../src/auth/passthrough");
-    expect(isPassthroughAllowedPath("/v1/agents/")).toBe(false);
-    expect(isPassthroughAllowedPath("/v1/sessions/")).toBe(false);
+    expect(isPassthroughAllowedPath("/anthropic/v1/agents/")).toBe(false);
+    expect(isPassthroughAllowedPath("/anthropic/v1/sessions/")).toBe(false);
   });
 
   it("query string is stripped before allowlist check (no path-confusion bypass)", async () => {
     process.env.ANTHROPIC_PASSTHROUGH_ENABLED = "true";
-    const { handleListAgents } = await import("../src/handlers/agents");
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
     stub = stubFetch();
     // /v1/api-keys?x=/v1/agents must still be rejected — the allowlist
     // operates on pathname, not the raw URL string.
@@ -343,12 +343,12 @@ describe("anthropic passthrough auth", () => {
     // Anthropic, which will reject the agent id. The traversal cannot
     // escape into a different gateway-only route because regex-anchored
     // allowlist patterns operate on the URL parser's segmentation.
-    const u = new URL("/v1/agents/..%2Fapi-keys", "http://x");
-    expect(u.pathname).toBe("/v1/agents/..%2Fapi-keys");
+    const u = new URL("/anthropic/v1/agents/..%2Fapi-keys", "http://x");
+    expect(u.pathname).toBe("/anthropic/v1/agents/..%2Fapi-keys");
     expect(isPassthroughAllowedPath(u.pathname)).toBe(true);
     // A literal extra segment never matches /v1/agents/:id because
     // the allowlist regex anchors with $.
-    expect(isPassthroughAllowedPath("/v1/agents/x/api-keys")).toBe(false);
+    expect(isPassthroughAllowedPath("/anthropic/v1/agents/x/api-keys")).toBe(false);
   });
 
   it("multipart upload body is streamed through, not text-mangled", async () => {
@@ -379,8 +379,8 @@ describe("anthropic passthrough auth", () => {
       });
     }) as typeof globalThis.fetch;
 
-    const { handleUploadFile } = await import("../src/handlers/files");
-    const r = new Request("http://localhost/v1/files", {
+    const { handleUploadFile } = await import("../src/handlers/anthropic-compat/files");
+    const r = new Request("http://localhost/anthropic/v1/files", {
       method: "POST",
       headers: { "x-api-key": PASSTHROUGH_KEY },
       body: fd,
@@ -399,9 +399,9 @@ describe("anthropic passthrough auth", () => {
 
   it("forwards Idempotency-Key header to Anthropic for passthrough requests", async () => {
     process.env.ANTHROPIC_PASSTHROUGH_ENABLED = "true";
-    const { handleCreateSession } = await import("../src/handlers/sessions");
+    const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
     stub = stubFetch();
-    const r = new Request("http://localhost/v1/sessions", {
+    const r = new Request("http://localhost/anthropic/v1/sessions", {
       method: "POST",
       headers: {
         "x-api-key": PASSTHROUGH_KEY,
@@ -424,11 +424,11 @@ describe("anthropic passthrough auth", () => {
     }) as typeof globalThis.fetch;
 
     const ctrl = new AbortController();
-    const r = new Request("http://localhost/v1/agents", {
+    const r = new Request("http://localhost/anthropic/v1/agents", {
       headers: { "x-api-key": PASSTHROUGH_KEY },
       signal: ctrl.signal,
     });
-    const { handleListAgents } = await import("../src/handlers/agents");
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
     await handleListAgents(r);
     // Node's Request wraps the original signal in a new one, so we
     // can't compare references. Instead, abort the original and verify
@@ -444,11 +444,11 @@ describe("anthropic passthrough auth", () => {
     process.env.ANTHROPIC_PASSTHROUGH_ENABLED = "true";
     const { resetRateLimits, peekRateLimit } = await import("../src/auth/rate_limit");
     resetRateLimits();
-    const { handleListAgents } = await import("../src/handlers/agents");
+    const { handleListAgents } = await import("../src/handlers/anthropic-compat/agents");
     stub = stubFetch();
     // Burst many requests with the same passthrough key.
     for (let i = 0; i < 50; i++) {
-      const res = await handleListAgents(req("/v1/agents", { apiKey: PASSTHROUGH_KEY }));
+      const res = await handleListAgents(req("/anthropic/v1/agents", { apiKey: PASSTHROUGH_KEY }));
       expect(res.status).toBe(200);
     }
     // No rate-limit bucket should have been created for the
@@ -483,8 +483,8 @@ describe("anthropic passthrough auth", () => {
       });
     }) as typeof globalThis.fetch;
 
-    const { prepareSessionStream } = await import("../src/handlers/stream");
-    const r = new Request("http://localhost/v1/sessions/sess_remote/events/stream", {
+    const { prepareSessionStream } = await import("../src/handlers/anthropic-compat/stream");
+    const r = new Request("http://localhost/anthropic/v1/sessions/sess_remote/events/stream", {
       headers: { "x-api-key": PASSTHROUGH_KEY },
     });
     const result = await prepareSessionStream(r, "sess_remote");

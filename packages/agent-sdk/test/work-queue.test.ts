@@ -915,7 +915,7 @@ describe("work queue — self_hosted event dispatch", () => {
     delete process.env.DEFAULT_PROVIDER;
     await bootDb();
     const fx = await seedFixtures();
-    const { handlePostEvents } = await import("../src/handlers/events");
+    const { handlePostEvents } = await import("../src/handlers/anthropic-compat/events");
     const { listWorkItems } = await import("../src/db/work");
 
     // Verify no work items initially
@@ -924,7 +924,7 @@ describe("work queue — self_hosted event dispatch", () => {
 
     // Post a user.message event
     const res = await handlePostEvents(
-      req(`/v1/sessions/${fx.sessionId}/events`, {
+      req(`/anthropic/v1/sessions/${fx.sessionId}/events`, {
         method: "POST",
         body: {
           events: [

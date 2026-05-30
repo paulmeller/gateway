@@ -62,8 +62,8 @@ function executeSingleOp(op: BatchOp): BatchResult {
   const { method, path, body } = op;
   const upperMethod = method.toUpperCase();
 
-  // POST /v1/agents
-  if (upperMethod === "POST" && path === "/v1/agents") {
+  // POST /anthropic/v1/agents
+  if (upperMethod === "POST" && path === "/anthropic/v1/agents") {
     if (!body?.name || !body?.model) {
       throw new Error("agent creation requires name and model");
     }
@@ -81,8 +81,8 @@ function executeSingleOp(op: BatchOp): BatchResult {
     return { status: 201, body: agent };
   }
 
-  // POST /v1/environments
-  if (upperMethod === "POST" && path === "/v1/environments") {
+  // POST /anthropic/v1/environments
+  if (upperMethod === "POST" && path === "/anthropic/v1/environments") {
     if (!body?.name || !body?.config) {
       throw new Error("environment creation requires name and config");
     }
@@ -93,8 +93,8 @@ function executeSingleOp(op: BatchOp): BatchResult {
     return { status: 201, body: env };
   }
 
-  // POST /v1/sessions
-  if (upperMethod === "POST" && path === "/v1/sessions") {
+  // POST /anthropic/v1/sessions
+  if (upperMethod === "POST" && path === "/anthropic/v1/sessions") {
     if (!body?.agent || !body?.environment_id) {
       throw new Error("session creation requires agent and environment_id");
     }
@@ -120,8 +120,8 @@ function executeSingleOp(op: BatchOp): BatchResult {
     return { status: 201, body: session };
   }
 
-  // DELETE /v1/agents/{id}
-  const agentDeleteMatch = path.match(/^\/v1\/agents\/([^/]+)$/);
+  // DELETE /anthropic/v1/agents/{id}
+  const agentDeleteMatch = path.match(/^\/anthropic\/v1\/agents\/([^/]+)$/);
   if (upperMethod === "DELETE" && agentDeleteMatch) {
     const id = agentDeleteMatch[1];
     const archived = archiveAgent(id);
@@ -129,8 +129,8 @@ function executeSingleOp(op: BatchOp): BatchResult {
     return { status: 200, body: { id, type: "agent_deleted" } };
   }
 
-  // DELETE /v1/environments/{id}
-  const envDeleteMatch = path.match(/^\/v1\/environments\/([^/]+)$/);
+  // DELETE /anthropic/v1/environments/{id}
+  const envDeleteMatch = path.match(/^\/anthropic\/v1\/environments\/([^/]+)$/);
   if (upperMethod === "DELETE" && envDeleteMatch) {
     const id = envDeleteMatch[1];
     const deleted = deleteEnvironment(id);

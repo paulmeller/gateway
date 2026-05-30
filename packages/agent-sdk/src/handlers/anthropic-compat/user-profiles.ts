@@ -2,16 +2,16 @@
  * HTTP handlers for user profiles (per-user credential scoping).
  */
 import { z } from "zod";
-import { routeWrap, jsonOk, paginatedOk } from "../http";
-import { badRequest, notFound } from "../errors";
-import { resolveCreateTenant, tenantFilter } from "../auth/scope";
+import { routeWrap, jsonOk, paginatedOk } from "../../http";
+import { badRequest, notFound } from "../../errors";
+import { resolveCreateTenant, tenantFilter } from "../../auth/scope";
 import {
   createUserProfile,
   getUserProfile,
   listUserProfiles,
   updateUserProfile,
-} from "../db/user-profiles";
-import type { TrustGrant } from "../db/user-profiles";
+} from "../../db/user-profiles";
+import type { TrustGrant } from "../../db/user-profiles";
 
 // ---------------------------------------------------------------------------
 // Schemas

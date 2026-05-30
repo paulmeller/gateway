@@ -145,7 +145,7 @@ interface ContainerProvider {
 The provider is set in the environment's `config` object. Use the REST API or the gateway UI to create an environment with a specific provider:
 
 ```json
-POST /v1/environments
+POST /anthropic/v1/environments
 {
   "name": "my-env",
   "config": {
@@ -167,7 +167,7 @@ Environment config supports additional fields to control container lifecycle:
 | `default_engine` | — | Default engine for sessions created in this environment. |
 
 ```json
-POST /v1/environments
+POST /anthropic/v1/environments
 {
   "name": "high-throughput",
   "config": {

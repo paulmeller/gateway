@@ -142,9 +142,9 @@ describe("file sync — handleGetFileContent lazy proxy", () => {
       scope: { type: "session", id: "sess_fs" },
     });
 
-    const { handleGetFileContent } = await import("../src/handlers/files");
+    const { handleGetFileContent } = await import("../src/handlers/anthropic-compat/files");
     const res = await handleGetFileContent(
-      new Request(`http://localhost/v1/files/${file.id}/content`, {
+      new Request(`http://localhost/anthropic/v1/files/${file.id}/content`, {
         headers: { "x-api-key": key },
       }),
       file.id,

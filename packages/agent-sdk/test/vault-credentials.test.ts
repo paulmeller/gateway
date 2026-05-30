@@ -79,9 +79,9 @@ function req(
 async function createTestAgent(
   overrides: Record<string, unknown> = {},
 ): Promise<Record<string, unknown>> {
-  const { handleCreateAgent } = await import("../src/handlers/agents");
+  const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
   const res = await handleCreateAgent(
-    req("/v1/agents", {
+    req("/anthropic/v1/agents", {
       body: {
         name: `Agent-${Date.now()}-${Math.random()}`,
         model: { id: "claude-sonnet-4-6" },
@@ -96,9 +96,9 @@ async function createTestVault(
   agentId: string,
   name = "test-vault",
 ): Promise<Record<string, unknown>> {
-  const { handleCreateVault } = await import("../src/handlers/vaults");
+  const { handleCreateVault } = await import("../src/handlers/anthropic-compat/vaults");
   const res = await handleCreateVault(
-    req("/v1/vaults", { body: { agent_id: agentId, name } }),
+    req("/anthropic/v1/vaults", { body: { agent_id: agentId, name } }),
   );
   expect(res.status).toBe(201);
   return (await res.json()) as Record<string, unknown>;
@@ -118,10 +118,10 @@ describe("vault credentials API", () => {
     const vaultId = vault.id as string;
 
     const { handleCreateCredential } = await import(
-      "../src/handlers/credentials"
+      "../src/handlers/anthropic-compat/credentials"
     );
     const res = await handleCreateCredential(
-      req(`/v1/vaults/${vaultId}/credentials`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "GitHub Token",
           auth: { type: "static_bearer", mcp_server_url: "https://mcp.example.com/mcp", token: "ghp_abc123secret" },
@@ -152,10 +152,10 @@ describe("vault credentials API", () => {
     const vaultId = vault.id as string;
 
     const { handleCreateCredential } = await import(
-      "../src/handlers/credentials"
+      "../src/handlers/anthropic-compat/credentials"
     );
     const res = await handleCreateCredential(
-      req(`/v1/vaults/${vaultId}/credentials`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "GitHub MCP",
           auth: {
@@ -181,10 +181,10 @@ describe("vault credentials API", () => {
     const vaultId = vault.id as string;
 
     const { handleCreateCredential } = await import(
-      "../src/handlers/credentials"
+      "../src/handlers/anthropic-compat/credentials"
     );
     await handleCreateCredential(
-      req(`/v1/vaults/${vaultId}/credentials`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "dup-name",
           auth: { type: "static_bearer", mcp_server_url: "https://mcp.example.com/mcp", token: "tok1" },
@@ -193,7 +193,7 @@ describe("vault credentials API", () => {
       vaultId,
     );
     const res = await handleCreateCredential(
-      req(`/v1/vaults/${vaultId}/credentials`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "dup-name",
           auth: { type: "static_bearer", mcp_server_url: "https://mcp.example.com/mcp", token: "tok2" },
@@ -211,10 +211,10 @@ describe("vault credentials API", () => {
     const vaultId = vault.id as string;
 
     const { handleCreateCredential } = await import(
-      "../src/handlers/credentials"
+      "../src/handlers/anthropic-compat/credentials"
     );
     const res = await handleCreateCredential(
-      req(`/v1/vaults/${vaultId}/credentials`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "bad-type",
           auth: { type: "oauth2", token: "tok" },
@@ -232,10 +232,10 @@ describe("vault credentials API", () => {
     const vaultId = vault.id as string;
 
     const { handleCreateCredential } = await import(
-      "../src/handlers/credentials"
+      "../src/handlers/anthropic-compat/credentials"
     );
     const res = await handleCreateCredential(
-      req(`/v1/vaults/${vaultId}/credentials`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials`, {
         body: {
           auth: { type: "static_bearer", mcp_server_url: "https://mcp.example.com/mcp", token: "tok" },
         },
@@ -252,10 +252,10 @@ describe("vault credentials API", () => {
     const vaultId = vault.id as string;
 
     const { handleCreateCredential, handleListCredentials } = await import(
-      "../src/handlers/credentials"
+      "../src/handlers/anthropic-compat/credentials"
     );
     await handleCreateCredential(
-      req(`/v1/vaults/${vaultId}/credentials`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "cred-a",
           auth: { type: "static_bearer", mcp_server_url: "https://mcp.example.com/mcp", token: "secret-a" },
@@ -264,7 +264,7 @@ describe("vault credentials API", () => {
       vaultId,
     );
     await handleCreateCredential(
-      req(`/v1/vaults/${vaultId}/credentials`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "cred-b",
           auth: { type: "static_bearer", mcp_server_url: "https://mcp.example.com/mcp", token: "secret-b" },
@@ -274,7 +274,7 @@ describe("vault credentials API", () => {
     );
 
     const res = await handleListCredentials(
-      req(`/v1/vaults/${vaultId}/credentials`),
+      req(`/anthropic/v1/vaults/${vaultId}/credentials`),
       vaultId,
     );
     expect(res.status).toBe(200);
@@ -293,10 +293,10 @@ describe("vault credentials API", () => {
     const vaultId = vault.id as string;
 
     const { handleCreateCredential, handleGetCredential } = await import(
-      "../src/handlers/credentials"
+      "../src/handlers/anthropic-compat/credentials"
     );
     const createRes = await handleCreateCredential(
-      req(`/v1/vaults/${vaultId}/credentials`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "get-test",
           auth: { type: "static_bearer", mcp_server_url: "https://mcp.example.com/mcp", token: "get-secret" },
@@ -307,7 +307,7 @@ describe("vault credentials API", () => {
     const created = (await createRes.json()) as Record<string, unknown>;
 
     const res = await handleGetCredential(
-      req(`/v1/vaults/${vaultId}/credentials/${created.id}`),
+      req(`/anthropic/v1/vaults/${vaultId}/credentials/${created.id}`),
       vaultId,
       created.id as string,
     );
@@ -325,10 +325,10 @@ describe("vault credentials API", () => {
     const vaultId = vault.id as string;
 
     const { handleGetCredential } = await import(
-      "../src/handlers/credentials"
+      "../src/handlers/anthropic-compat/credentials"
     );
     const res = await handleGetCredential(
-      req(`/v1/vaults/${vaultId}/credentials/vcrd_nonexistent`),
+      req(`/anthropic/v1/vaults/${vaultId}/credentials/vcrd_nonexistent`),
       vaultId,
       "vcrd_nonexistent",
     );
@@ -342,10 +342,10 @@ describe("vault credentials API", () => {
     const vaultId = vault.id as string;
 
     const { handleCreateCredential, handleUpdateCredential } = await import(
-      "../src/handlers/credentials"
+      "../src/handlers/anthropic-compat/credentials"
     );
     const createRes = await handleCreateCredential(
-      req(`/v1/vaults/${vaultId}/credentials`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "old-name",
           auth: { type: "static_bearer", mcp_server_url: "https://mcp.example.com/mcp", token: "tok" },
@@ -356,7 +356,7 @@ describe("vault credentials API", () => {
     const created = (await createRes.json()) as Record<string, unknown>;
 
     const res = await handleUpdateCredential(
-      req(`/v1/vaults/${vaultId}/credentials/${created.id}`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials/${created.id}`, {
         body: { display_name: "new-name" },
       }),
       vaultId,
@@ -374,10 +374,10 @@ describe("vault credentials API", () => {
     const vaultId = vault.id as string;
 
     const { handleCreateCredential, handleUpdateCredential } = await import(
-      "../src/handlers/credentials"
+      "../src/handlers/anthropic-compat/credentials"
     );
     const createRes = await handleCreateCredential(
-      req(`/v1/vaults/${vaultId}/credentials`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "rotate-test",
           auth: { type: "static_bearer", mcp_server_url: "https://mcp.example.com/mcp", token: "old-token" },
@@ -388,7 +388,7 @@ describe("vault credentials API", () => {
     const created = (await createRes.json()) as Record<string, unknown>;
 
     const res = await handleUpdateCredential(
-      req(`/v1/vaults/${vaultId}/credentials/${created.id}`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials/${created.id}`, {
         body: { auth: { token: "new-rotated-token" } },
       }),
       vaultId,
@@ -412,9 +412,9 @@ describe("vault credentials API", () => {
     const vaultId = vault.id as string;
 
     const { handleCreateCredential, handleDeleteCredential, handleGetCredential } =
-      await import("../src/handlers/credentials");
+      await import("../src/handlers/anthropic-compat/credentials");
     const createRes = await handleCreateCredential(
-      req(`/v1/vaults/${vaultId}/credentials`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "to-delete",
           auth: { type: "static_bearer", mcp_server_url: "https://mcp.example.com/mcp", token: "tok" },
@@ -425,7 +425,7 @@ describe("vault credentials API", () => {
     const created = (await createRes.json()) as Record<string, unknown>;
 
     const res = await handleDeleteCredential(
-      req(`/v1/vaults/${vaultId}/credentials/${created.id}`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials/${created.id}`, {
         method: "DELETE",
       }),
       vaultId,
@@ -435,7 +435,7 @@ describe("vault credentials API", () => {
 
     // Verify it's gone
     const getRes = await handleGetCredential(
-      req(`/v1/vaults/${vaultId}/credentials/${created.id}`),
+      req(`/anthropic/v1/vaults/${vaultId}/credentials/${created.id}`),
       vaultId,
       created.id as string,
     );
@@ -449,10 +449,10 @@ describe("vault credentials API", () => {
     const vaultId = vault.id as string;
 
     const { handleDeleteCredential } = await import(
-      "../src/handlers/credentials"
+      "../src/handlers/anthropic-compat/credentials"
     );
     const res = await handleDeleteCredential(
-      req(`/v1/vaults/${vaultId}/credentials/vcrd_nonexistent`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials/vcrd_nonexistent`, {
         method: "DELETE",
       }),
       vaultId,
@@ -514,9 +514,9 @@ describe("vault credentials API", () => {
     });
 
     // Create agent + vault in default tenant (via global admin)
-    const { handleCreateAgent } = await import("../src/handlers/agents");
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
     const agentRes = await handleCreateAgent(
-      req("/v1/agents", {
+      req("/anthropic/v1/agents", {
         body: {
           name: "def-agent",
           model: { id: "claude-sonnet-4-6" },
@@ -527,9 +527,9 @@ describe("vault credentials API", () => {
     );
     const agent = (await agentRes.json()) as Record<string, unknown>;
 
-    const { handleCreateVault } = await import("../src/handlers/vaults");
+    const { handleCreateVault } = await import("../src/handlers/anthropic-compat/vaults");
     const vaultRes = await handleCreateVault(
-      req("/v1/vaults", {
+      req("/anthropic/v1/vaults", {
         body: { agent_id: agent.id, name: "def-vault" },
         apiKey: global.key,
       }),
@@ -539,9 +539,9 @@ describe("vault credentials API", () => {
 
     // Create credential in default tenant vault (as global admin)
     const { handleCreateCredential, handleGetCredential, handleListCredentials } =
-      await import("../src/handlers/credentials");
+      await import("../src/handlers/anthropic-compat/credentials");
     const credRes = await handleCreateCredential(
-      req(`/v1/vaults/${vaultId}/credentials`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "secret-cred",
           auth: { type: "static_bearer", mcp_server_url: "https://mcp.example.com/mcp", token: "top-secret" },
@@ -555,7 +555,7 @@ describe("vault credentials API", () => {
 
     // Acme tenant tries to read the credential -> 404 (vault tenant mismatch)
     const getRes = await handleGetCredential(
-      req(`/v1/vaults/${vaultId}/credentials/${cred.id}`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials/${cred.id}`, {
         apiKey: acme.key,
       }),
       vaultId,
@@ -565,7 +565,7 @@ describe("vault credentials API", () => {
 
     // Acme tenant tries to list credentials -> 404 (vault not found for caller)
     const listRes = await handleListCredentials(
-      req(`/v1/vaults/${vaultId}/credentials`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials`, {
         apiKey: acme.key,
       }),
       vaultId,
@@ -584,10 +584,10 @@ describe("mcp_oauth credential type", () => {
     const vaultId = vault.id as string;
 
     const { handleCreateCredential } = await import(
-      "../src/handlers/credentials"
+      "../src/handlers/anthropic-compat/credentials"
     );
     const res = await handleCreateCredential(
-      req(`/v1/vaults/${vaultId}/credentials`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "My OAuth Server",
           auth: {
@@ -641,10 +641,10 @@ describe("mcp_oauth credential type", () => {
     const vaultId = vault.id as string;
 
     const { handleCreateCredential } = await import(
-      "../src/handlers/credentials"
+      "../src/handlers/anthropic-compat/credentials"
     );
     const res = await handleCreateCredential(
-      req(`/v1/vaults/${vaultId}/credentials`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "Simple OAuth",
           auth: {
@@ -672,10 +672,10 @@ describe("mcp_oauth credential type", () => {
     const vaultId = vault.id as string;
 
     const { handleCreateCredential, handleGetCredential } = await import(
-      "../src/handlers/credentials"
+      "../src/handlers/anthropic-compat/credentials"
     );
     const createRes = await handleCreateCredential(
-      req(`/v1/vaults/${vaultId}/credentials`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "OAuth Get Test",
           auth: {
@@ -696,7 +696,7 @@ describe("mcp_oauth credential type", () => {
     const created = (await createRes.json()) as Record<string, unknown>;
 
     const res = await handleGetCredential(
-      req(`/v1/vaults/${vaultId}/credentials/${created.id}`),
+      req(`/anthropic/v1/vaults/${vaultId}/credentials/${created.id}`),
       vaultId,
       created.id as string,
     );
@@ -719,12 +719,12 @@ describe("mcp_oauth credential type", () => {
     const vaultId = vault.id as string;
 
     const { handleCreateCredential, handleListCredentials } = await import(
-      "../src/handlers/credentials"
+      "../src/handlers/anthropic-compat/credentials"
     );
 
     // Create one static_bearer and one mcp_oauth
     await handleCreateCredential(
-      req(`/v1/vaults/${vaultId}/credentials`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "Static Cred",
           auth: { type: "static_bearer", token: "static_tok" },
@@ -733,7 +733,7 @@ describe("mcp_oauth credential type", () => {
       vaultId,
     );
     await handleCreateCredential(
-      req(`/v1/vaults/${vaultId}/credentials`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "OAuth Cred",
           auth: {
@@ -747,7 +747,7 @@ describe("mcp_oauth credential type", () => {
     );
 
     const res = await handleListCredentials(
-      req(`/v1/vaults/${vaultId}/credentials`),
+      req(`/anthropic/v1/vaults/${vaultId}/credentials`),
       vaultId,
     );
     expect(res.status).toBe(200);
@@ -775,10 +775,10 @@ describe("mcp_oauth credential type", () => {
     const vaultId = vault.id as string;
 
     const { handleCreateCredential, handleUpdateCredential } = await import(
-      "../src/handlers/credentials"
+      "../src/handlers/anthropic-compat/credentials"
     );
     const createRes = await handleCreateCredential(
-      req(`/v1/vaults/${vaultId}/credentials`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials`, {
         body: {
           display_name: "Rotate OAuth",
           auth: {
@@ -794,7 +794,7 @@ describe("mcp_oauth credential type", () => {
     const created = (await createRes.json()) as Record<string, unknown>;
 
     const res = await handleUpdateCredential(
-      req(`/v1/vaults/${vaultId}/credentials/${created.id}`, {
+      req(`/anthropic/v1/vaults/${vaultId}/credentials/${created.id}`, {
         body: {
           auth: {
             access_token: "new_access_token",

@@ -7,13 +7,13 @@
  * GET  /v1/files/:id/content — download file content
  * DELETE /v1/files/:id    — delete file
  */
-import { routeWrap, jsonOk } from "../http";
-import { getDb } from "../db/client";
-import { createFile, getFile, getFileRecord, listFiles, deleteFileRecord, updateFileStoragePath } from "../db/files";
-import { storeFile, readFile, deleteFile, getMaxFileSize } from "../files/storage";
-import { badRequest, notFound } from "../errors";
-import { assertResourceTenant } from "../auth/scope";
-import type { AuthContext } from "../types";
+import { routeWrap, jsonOk } from "../../http";
+import { getDb } from "../../db/client";
+import { createFile, getFile, getFileRecord, listFiles, deleteFileRecord, updateFileStoragePath } from "../../db/files";
+import { storeFile, readFile, deleteFile, getMaxFileSize } from "../../files/storage";
+import { badRequest, notFound } from "../../errors";
+import { assertResourceTenant } from "../../auth/scope";
+import type { AuthContext } from "../../types";
 
 /**
  * Files are scoped to a session (v0.4+). Validate the caller can see
@@ -146,7 +146,7 @@ export function handleGetFileContent(request: Request, fileId: string): Promise<
     // on demand here so we don't pre-download every output file.
     if (row.storage_path.startsWith("remote:")) {
       const remoteFileId = row.storage_path.slice(7);
-      const { resolveAnthropicKey } = await import("../providers/upstream-keys");
+      const { resolveAnthropicKey } = await import("../../providers/upstream-keys");
       const resolved = resolveAnthropicKey({
         sessionId: row.scope_id ?? undefined,
       });
