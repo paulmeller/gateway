@@ -29,3 +29,8 @@ docs/plans/
 coverage/
 test-results/
 **/test-results/
+
+# Local dev state — not source artifacts
+.antigravitycli/
+gateway.db
+managed-agents.db

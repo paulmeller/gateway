@@ -29,16 +29,14 @@ docker build -t gateway . && docker run -p 4000:4000 gateway  # standalone
 
 ## Architecture
 
-TypeScript monorepo under `@agentstep/*` scope. Six packages:
+TypeScript monorepo under `@agentstep/*` scope. Four packages:
 
 - **`@agentstep/agent-sdk`** (`packages/agent-sdk`) — framework-agnostic engine. All business logic lives here. Handlers accept `Request` → return `Response`.
 - **`@agentstep/gateway`** (`packages/gateway`) — CLI tool. Bundles everything via esbuild into a single `dist/gateway.js`. The `LocalBackend` routes all operations through agent-sdk handler functions (same code path as the web app).
 - **`@agentstep/gateway-ui`** (`packages/gateway-ui`) — React + shadcn/ui web app. Builds to single HTML via Vite + vite-plugin-singlefile, then inlined into the CLI bundle.
 - **`@agentstep/gateway-hono`** (`packages/gateway-hono`) — Hono server adapter (powers `gateway serve`).
-- **`@agentstep/gateway-fastify`** (`packages/gateway-fastify`) — Fastify server adapter.
-- **`@agentstep/gateway-next`** (`packages/gateway-next`) — Next.js integration.
 
-The server packages are thin route adapters. The hosted product (agentstep.com) uses `@agentstep/agent-sdk` directly.
+`gateway-hono` is a thin route adapter. The hosted product (agentstep.com) uses `@agentstep/agent-sdk` directly via its own Next.js routes (in the separate `agentstep-product` repo).
 
 **Critical: Both CLI and web app use the same handler functions.** The CLI's `LocalBackend` constructs `Request` objects and calls handlers — never imports DB functions directly.
 

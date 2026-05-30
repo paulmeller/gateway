@@ -10,14 +10,11 @@
     "packages/agent-sdk",
     "packages/gateway",
     "packages/gateway-hono",
-    "packages/gateway-fastify",
-    "packages/gateway-next",
     "packages/gateway-ui"
   ],
   "scripts": {
     "dev": "npm run dev -w @agentstep/gateway-hono",
-    "dev:next": "npm run dev -w @agentstep/gateway-next",
-    "build": "npm run build -w @agentstep/gateway-next",
+    "build": "npm run build -w @agentstep/agent-sdk && npm run build -w @agentstep/gateway",
     "test": "npm test -w @agentstep/agent-sdk && npm test -w @agentstep/gateway",
     "typecheck": "npm run typecheck -w @agentstep/agent-sdk",
     "build:ui": "npm run build -w @agentstep/gateway-ui && npx tsx scripts/build-ui.ts"
