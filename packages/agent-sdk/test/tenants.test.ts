@@ -210,7 +210,7 @@ describe("auth/scope.ts helpers", () => {
     const { tenantFilter } = await import("../src/auth/scope");
     const global: import("../src/types").AuthContext = {
       keyId: "k1", name: "g", permissions: { admin: true, scope: null },
-      tenantId: null, isGlobalAdmin: true,
+      tenantId: null, isGlobalAdmin: true, actingAsTenant: null,
       budgetUsd: null, rateLimitRpm: null, spentUsd: 0, mode: "gateway" as const,
     };
     const scoped: import("../src/types").AuthContext = {
@@ -224,7 +224,7 @@ describe("auth/scope.ts helpers", () => {
     const { requireGlobalAdmin } = await import("../src/auth/scope");
     const global: import("../src/types").AuthContext = {
       keyId: "k1", name: "g", permissions: { admin: true, scope: null },
-      tenantId: null, isGlobalAdmin: true,
+      tenantId: null, isGlobalAdmin: true, actingAsTenant: null,
       budgetUsd: null, rateLimitRpm: null, spentUsd: 0, mode: "gateway" as const,
     };
     const tenantAdmin: import("../src/types").AuthContext = {
@@ -238,7 +238,7 @@ describe("auth/scope.ts helpers", () => {
     const { assertResourceTenant } = await import("../src/auth/scope");
     const global: import("../src/types").AuthContext = {
       keyId: "k1", name: "g", permissions: { admin: true, scope: null },
-      tenantId: null, isGlobalAdmin: true,
+      tenantId: null, isGlobalAdmin: true, actingAsTenant: null,
       budgetUsd: null, rateLimitRpm: null, spentUsd: 0, mode: "gateway" as const,
     };
     const scopedX: import("../src/types").AuthContext = {
@@ -256,7 +256,7 @@ describe("auth/scope.ts helpers", () => {
     const { resolveCreateTenant } = await import("../src/auth/scope");
     const global: import("../src/types").AuthContext = {
       keyId: "k1", name: "g", permissions: { admin: true, scope: null },
-      tenantId: null, isGlobalAdmin: true,
+      tenantId: null, isGlobalAdmin: true, actingAsTenant: null,
       budgetUsd: null, rateLimitRpm: null, spentUsd: 0, mode: "gateway" as const,
     };
     const scopedX: import("../src/types").AuthContext = {

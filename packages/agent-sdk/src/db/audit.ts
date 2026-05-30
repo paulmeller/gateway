@@ -15,6 +15,7 @@ import { nowMs, toIso } from "../util/clock";
 import type {
   AuditLogEntry, AuditLogRow, AuditOutcome, AuthContext,
 } from "../types";
+import { effectiveTenant } from "../auth/scope";
 import { hasFeature, COMMUNITY_LIMITS } from "../license";
 
 function hydrate(row: AuditLogRow): AuditLogEntry {
@@ -73,7 +74,15 @@ export function recordAudit(input: AuditInput): void {
       nowMs(),
       input.auth?.keyId ?? null,
       input.auth?.name ?? null,
-      input.tenant_id !== undefined ? input.tenant_id : (input.auth?.tenantId ?? null),
+      // Tenant resolution: explicit `input.tenant_id` wins (admin
+      // handlers that act on a specific tenant pass it explicitly).
+      // Otherwise route through `effectiveTenant()` so that the
+      // `x-agentstep-tenant` header is honored — without this, a
+      // product-initiated action on behalf of tenant X would audit as
+      // null/global (the service key's own home tenant).
+      input.tenant_id !== undefined
+        ? input.tenant_id
+        : (input.auth ? effectiveTenant(input.auth) : null),
       input.action,
       input.resource_type ?? null,
       input.resource_id ?? null,

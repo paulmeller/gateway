@@ -642,6 +642,16 @@ export interface AuthContext {
   tenantId: string | null;
   /** Convenience: tenantId === null && permissions.admin. */
   isGlobalAdmin: boolean;
+  /**
+   * Tenant id from the `x-agentstep-tenant` header, validated. Null if absent.
+   * Honored only when the key is a global admin (so the global-admin "system"
+   * key can act on behalf of a specific tenant) or when the scoped key's
+   * own `tenantId` matches the header (defensive — same value, accepted).
+   * A scoped key with a mismatched header is rejected at auth time.
+   *
+   * Use `effectiveTenant(auth)` in scope helpers — do not read this directly.
+   */
+  actingAsTenant: string | null;
   /** Null = unlimited. In USD. Enforced in the driver pre-turn. */
   budgetUsd: number | null;
   /** Null = unlimited. Fixed 60-second window enforced in routeWrap. */

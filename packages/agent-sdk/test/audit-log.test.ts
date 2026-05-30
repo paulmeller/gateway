@@ -101,6 +101,7 @@ describe("audit log — db layer", () => {
       permissions: { admin: true, scope: null as null | import("../src/types").KeyScope },
       tenantId: "tenant_default",
       isGlobalAdmin: false,
+      actingAsTenant: null,
       budgetUsd: null,
       rateLimitRpm: null,
       spentUsd: 0, mode: "gateway" as const,
@@ -125,6 +126,7 @@ describe("audit log — db layer", () => {
     const mkAuth = (keyId: string, tenantId: string | null) => ({
       keyId, name: keyId, permissions: { admin: true, scope: null },
       tenantId, isGlobalAdmin: tenantId === null,
+      actingAsTenant: null,
       budgetUsd: null, rateLimitRpm: null, spentUsd: 0, mode: "gateway" as const,
     });
     recordAudit({ auth: mkAuth("k1", "tenant_default"), action: "api_keys.create" });
@@ -150,6 +152,7 @@ describe("audit log — db layer", () => {
     const mkAuth = (tenantId: string | null) => ({
       keyId: "k", name: "k", permissions: { admin: true, scope: null },
       tenantId, isGlobalAdmin: tenantId === null,
+      actingAsTenant: null,
       budgetUsd: null, rateLimitRpm: null, spentUsd: 0, mode: "gateway" as const,
     });
     recordAudit({ auth: mkAuth("tenant_default"), action: "a" });

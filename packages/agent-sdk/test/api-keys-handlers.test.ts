@@ -229,7 +229,7 @@ describe("Scope enforcement — checkResourceScope helper", () => {
       keyId: "k",
       name: "n",
       permissions: { admin: false, scope: null },
-      tenantId: null, isGlobalAdmin: false, budgetUsd: null, rateLimitRpm: null, spentUsd: 0, mode: "gateway" as const,
+      tenantId: null, isGlobalAdmin: false, actingAsTenant: null, budgetUsd: null, rateLimitRpm: null, spentUsd: 0, mode: "gateway" as const,
     };
     expect(() => checkResourceScope(auth, { agent: "a1", env: "e1", vaults: ["v1"] })).not.toThrow();
   });
@@ -240,7 +240,7 @@ describe("Scope enforcement — checkResourceScope helper", () => {
       keyId: "k",
       name: "n",
       permissions: { admin: false, scope: { agents: ["*"], environments: ["e1"], vaults: [] } },
-      tenantId: null, isGlobalAdmin: false, budgetUsd: null, rateLimitRpm: null, spentUsd: 0, mode: "gateway" as const,
+      tenantId: null, isGlobalAdmin: false, actingAsTenant: null, budgetUsd: null, rateLimitRpm: null, spentUsd: 0, mode: "gateway" as const,
     };
     expect(() => checkResourceScope(auth, { agent: "anything", env: "e1" })).not.toThrow();
     expect(() => checkResourceScope(auth, { env: "e2" })).toThrow(/environment e2/);
@@ -252,7 +252,7 @@ describe("Scope enforcement — checkResourceScope helper", () => {
       keyId: "k",
       name: "n",
       permissions: { admin: false, scope: { agents: ["agent_a"], environments: ["*"], vaults: ["*"] } },
-      tenantId: null, isGlobalAdmin: false, budgetUsd: null, rateLimitRpm: null, spentUsd: 0, mode: "gateway" as const,
+      tenantId: null, isGlobalAdmin: false, actingAsTenant: null, budgetUsd: null, rateLimitRpm: null, spentUsd: 0, mode: "gateway" as const,
     };
     expect(() => checkResourceScope(auth, { agent: "agent_b" })).toThrow(/agent_b/);
   });
@@ -263,7 +263,7 @@ describe("Scope enforcement — checkResourceScope helper", () => {
       keyId: "k",
       name: "n",
       permissions: { admin: false, scope: { agents: ["*"], environments: ["*"], vaults: [] } },
-      tenantId: null, isGlobalAdmin: false, budgetUsd: null, rateLimitRpm: null, spentUsd: 0, mode: "gateway" as const,
+      tenantId: null, isGlobalAdmin: false, actingAsTenant: null, budgetUsd: null, rateLimitRpm: null, spentUsd: 0, mode: "gateway" as const,
     };
     expect(() => checkResourceScope(auth, { vaults: ["v1"] })).toThrow(/vault v1/);
   });

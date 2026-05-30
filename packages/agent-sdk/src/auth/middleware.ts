@@ -30,7 +30,35 @@ import { getConfig } from "../config";
 import { isAnthropicApiKey, isPassthroughAllowedPath } from "./passthrough";
 import { forwardToAnthropic } from "../proxy/forward";
 import type { AuthContext } from "../types";
-import { unauthorized } from "../errors";
+import { badRequest, forbidden, unauthorized } from "../errors";
+
+/**
+ * `x-agentstep-tenant` header — opt-in tenant impersonation for service
+ * keys. The product (agentstep.com) mints a global-admin service key and
+ * sends this header on every SDK call to scope the request to a specific
+ * tenant. PR5 lands the SDK side; PR6 wires the product side and removes
+ * the legacy `tenant_default` fallback.
+ *
+ * Validation:
+ *   - Shape: ^[a-zA-Z0-9_-]{1,64}$. Anything else → 400.
+ *   - Mode: rejected outright in passthrough mode (no tenant context).
+ *   - Authorization:
+ *       - Global admin key → header value used as the acting tenant.
+ *       - Scoped key + matching header → accepted (no-op).
+ *       - Scoped key + mismatched header → 403.
+ */
+const TENANT_HEADER = "x-agentstep-tenant";
+const TENANT_HEADER_RE = /^[a-zA-Z0-9_-]{1,64}$/;
+
+function readTenantHeader(request: Request): string | null {
+  const raw = request.headers.get(TENANT_HEADER);
+  if (raw === null) return null;
+  if (!TENANT_HEADER_RE.test(raw)) {
+    console.warn(`[auth] rejected malformed ${TENANT_HEADER} header`);
+    throw badRequest(`malformed ${TENANT_HEADER} header`);
+  }
+  return raw;
+}
 
 export function extractKey(request: Request): string | null {
   const xKey = request.headers.get("x-api-key");
@@ -58,6 +86,11 @@ export async function authenticate(request: Request): Promise<AuthContext> {
   const key = extractKey(request);
   if (!key) throw unauthorized();
 
+  // Read + shape-validate the tenant header up front. Throws 400 on
+  // malformed shape regardless of key type; mode/authorization gating
+  // happens below once we know the key shape.
+  const tenantHeader = readTenantHeader(request);
+
   // Always perform the local key lookup, even for sk-ant-api* keys, so
   // disabled-passthrough and unknown-gateway-key requests take the same
   // amount of work. Without this, a network attacker could time the
@@ -73,12 +106,20 @@ export async function authenticate(request: Request): Promise<AuthContext> {
   // side channel and makes the two key spaces strictly disjoint.
   if (isAnthropicApiKey(key)) {
     if (!getConfig().anthropicPassthroughEnabled) throw unauthorized();
+    // Passthrough has no gateway tenant context; the header is
+    // meaningless here and would silently no-op if accepted. Reject so
+    // callers don't accidentally rely on tenant scoping that won't be
+    // applied.
+    if (tenantHeader !== null) {
+      throw badRequest(`${TENANT_HEADER} header is not allowed in passthrough mode`);
+    }
     return {
       keyId: "passthrough",
       name: "anthropic-passthrough",
       permissions: { admin: false, scope: null },
       tenantId: null,
       isGlobalAdmin: false,
+      actingAsTenant: null,
       budgetUsd: null,
       rateLimitRpm: null,
       spentUsd: 0,
@@ -90,6 +131,24 @@ export async function authenticate(request: Request): Promise<AuthContext> {
   if (!row) throw unauthorized();
 
   const permissions = hydratePermissions(row.permissions_json);
+  const isGlobalAdmin = row.tenant_id === null && permissions.admin;
+
+  // Authorize the header against the key. Scoped keys may only set the
+  // header to their own tenant (defensive — a no-op, but rejecting other
+  // values surfaces misconfigured callers fast). Non-admin null-tenant
+  // keys are a corrupt shape; the resolver in scope.ts already refuses
+  // them on the write path, so we don't gate header use here.
+  let actingAsTenant: string | null = null;
+  if (tenantHeader !== null) {
+    if (isGlobalAdmin) {
+      actingAsTenant = tenantHeader;
+    } else if (row.tenant_id !== null && row.tenant_id === tenantHeader) {
+      actingAsTenant = tenantHeader;
+    } else {
+      throw forbidden(`${TENANT_HEADER} header does not match the key's tenant`);
+    }
+  }
+
   return {
     keyId: row.id,
     name: row.name,
@@ -100,7 +159,8 @@ export async function authenticate(request: Request): Promise<AuthContext> {
     // remain global admins across a 0.4 → 0.5 upgrade. This is the
     // documented default; `gateway tenants migrate-legacy` is the
     // explicit step that changes it.
-    isGlobalAdmin: row.tenant_id === null && permissions.admin,
+    isGlobalAdmin,
+    actingAsTenant,
     budgetUsd: row.budget_usd ?? null,
     rateLimitRpm: row.rate_limit_rpm ?? null,
     spentUsd: row.spent_usd ?? 0,

@@ -92,6 +92,10 @@ The `/v1/environments/:id/work/*` work-queue routes are gateway-native and stay 
 
 Gated by `anthropic_passthrough_enabled` (env or settings, default off). When on, `sk-ant-api*` keys in `x-api-key` are routed by *shape* in `auth/middleware.ts` — never compared to the local `api_keys` table — and intercepted in `routeWrap` (and `prepareSessionStream` for SSE) before any handler runs. Pure proxy: zero DB writes. Only `/anthropic/v1/*` routes on the allowlist in `auth/passthrough.ts` are forwarded upstream (the `/anthropic` prefix is stripped before the call to `api.anthropic.com`); gateway-native `/v1/*` routes reject passthrough. Random strings 401 locally.
 
+### Tenant impersonation (`x-agentstep-tenant` header)
+
+Opt-in. A global-admin "service" key can send `x-agentstep-tenant: <id>` to scope a single request to a specific tenant — no need to mint a per-tenant key. The header must match `^[a-zA-Z0-9_-]{1,64}$` (malformed → 400). Scoped keys may only set the header to their own tenant (mismatch → 403). Passthrough mode rejects the header outright. All scope helpers (`tenantFilter`, `resolveCreateTenant`, `assertResourceTenant`) and the audit-log default route through `effectiveTenant(auth)` so the header is honored uniformly; `assertResourceTenant` consults the effective tenant BEFORE the global-admin bypass so a service key acting as tenant A can't still read tenant B's resources. Added in `agent-sdk@0.5.44` (PR5 of the auth epic).
+
 ### DB
 
 libsql (SQLite) with WAL mode. Schema is idempotent (`CREATE TABLE IF NOT EXISTS` in `db/migrations.ts`). On first run, auto-seeds an API key and writes it to `.env`.
