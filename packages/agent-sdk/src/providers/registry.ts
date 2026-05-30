@@ -37,15 +37,19 @@ export async function resolveContainerProvider(
 /**
  * Resolve a container provider with precedence:
  * 1. Explicit override (from function param)
- * 2. Environment config provider (deprecated — logs warning on first use)
+ * 2. Environment config provider (per-env, the historical default)
  * 3. Process default (DEFAULT_PROVIDER env var or --provider flag)
  * 4. Throw if throwOnMissing, else return null
+ *
+ * The per-env `config.provider` field used to log a "deprecated" warning,
+ * but it's genuinely the only way to support mixed-provider deployments
+ * (e.g. one env on `sprites`, another on `apple-container`) in a single
+ * gateway process. Keeping the path; dropping the warning. Use
+ * `DEFAULT_PROVIDER` as the catch-all when an env doesn't specify one.
  *
  * Use resolveProvider() for execution paths (throws on missing).
  * Use tryResolveProvider() for background tasks (returns null on missing).
  */
-let warnedEnvProvider = false;
-
 export async function resolveProvider(opts?: {
   override?: string;
   envConfigProvider?: string | null;
@@ -68,12 +72,8 @@ export async function tryResolveProvider(opts?: {
     return resolveContainerProvider(opts.override);
   }
 
-  // 2. Environment config (deprecated fallback)
+  // 2. Per-env config (set at environment-create time)
   if (opts?.envConfigProvider) {
-    if (!warnedEnvProvider) {
-      console.warn("[provider] config.provider on environment is deprecated — use gateway serve --provider or DEFAULT_PROVIDER env var");
-      warnedEnvProvider = true;
-    }
     return resolveContainerProvider(opts.envConfigProvider);
   }
 
