@@ -145,6 +145,13 @@ export function createSession(input: {
   api_key_id?: string | null;
   /** v0.5: tenant ownership. Null = legacy/global (pre-migration). */
   tenant_id?: string | null;
+  /**
+   * 0.5.45: enable debug-prompt capture. When true, the driver will
+   * capture {argv, env (redacted), prompt} on the first turn into the
+   * `debug_prompt_json` column, retrievable via `GET /v1/sessions/:id/debug-prompt`
+   * for 1 hour from capture.
+   */
+  debug_capture?: boolean;
 }): Session {
   const db = getDrizzle();
   const id = newId("sesn");
@@ -168,6 +175,7 @@ export function createSession(input: {
     thread_depth: input.thread_depth ?? 0,
     api_key_id: input.api_key_id ?? null,
     tenant_id: input.tenant_id ?? DEFAULT_TENANT_ID,
+    debug_prompt_json: input.debug_capture ? '{"pending":true}' : null,
     created_at: now,
     updated_at: now,
   }).run();

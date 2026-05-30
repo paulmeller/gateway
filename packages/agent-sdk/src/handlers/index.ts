@@ -23,6 +23,7 @@ export { handleCreateApiKey, handleListApiKeys, handleGetApiKey, handlePatchApiK
 export { handleAddUpstreamKey, handleListUpstreamKeys, handleGetUpstreamKey, handlePatchUpstreamKey, handleDeleteUpstreamKey } from "./upstream_keys";
 export { handleCreateTenant, handleListTenants, handleGetTenant, handlePatchTenant, handleArchiveTenant } from "./tenants";
 export { handleWhoami } from "./whoami";
+export { handleGetDebugPrompt, isDebugPromptRequested, redactEnv } from "./debug-prompt";
 export { handleListAudit } from "./audit";
 export { handleGetLicense } from "./license";
 export { handleListModels } from "./models";

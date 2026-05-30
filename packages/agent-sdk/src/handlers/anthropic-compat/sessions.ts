@@ -26,6 +26,7 @@ import { badRequest, notFound } from "../../errors";
 import { nowMs } from "../../util/clock";
 import { assertResourceTenant, tenantFilter } from "../../auth/scope";
 import { getMemoryStore } from "../../db/memory";
+import { isDebugPromptRequested } from "../debug-prompt";
 import type { AuthContext, SessionStatus } from "../../types";
 
 function getAgentTenantId(id: string): string | null | undefined {
@@ -203,6 +204,7 @@ export function handleCreateSession(request: Request): Promise<Response> {
     // Capture the narrowed payload once so the inner tryCreate closure can
     // reach it without TS losing the narrowing across the async boundary.
     const data = parsed.data;
+    const debugCapture = isDebugPromptRequested(request);
 
     const initialAgentId = typeof data.agent === "string" ? data.agent : data.agent.id;
 
@@ -376,6 +378,7 @@ export function handleCreateSession(request: Request): Promise<Response> {
           user_profile_id: data.user_profile_id ?? null,
           api_key_id: auth.keyId,
           tenant_id: agentTenantId,
+          debug_capture: debugCapture,
         });
 
         // Insert into session_resources table before sync
@@ -466,6 +469,7 @@ export function handleCreateSession(request: Request): Promise<Response> {
         user_profile_id: data.user_profile_id ?? null,
         api_key_id: auth.keyId,
         tenant_id: agentTenantId,
+        debug_capture: debugCapture,
       });
 
       // Insert into session_resources table so provisioning picks them up

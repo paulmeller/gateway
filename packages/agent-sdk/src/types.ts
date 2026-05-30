@@ -303,6 +303,11 @@ export interface SessionRow {
   api_key_id: string | null;
   /** v0.5: tenant ownership. Null = legacy/global (pre-migration). */
   tenant_id: string | null;
+  /**
+   * 0.5.45: debug-prompt capture. Null = disabled. Sentinel
+   * `{"pending":true}` = enabled, no turn yet. JSON payload = captured.
+   */
+  debug_prompt_json: string | null;
   created_at: number;
   updated_at: number;
   archived_at: number | null;

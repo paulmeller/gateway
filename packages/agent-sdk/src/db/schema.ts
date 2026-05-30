@@ -150,6 +150,10 @@ export const sessions = sqliteTable("sessions", {
   tenant_id: text("tenant_id"),
   // User profile scoping:
   user_profile_id: text("user_profile_id"),
+  // Debug-prompt capture (0.5.45). Null = capture disabled. Sentinel
+  // `{"pending":true}` = enabled at create time, driver will overwrite
+  // on first turn with {captured_at, argv, env (redacted), prompt, ...}.
+  debug_prompt_json: text("debug_prompt_json"),
   created_at: integer("created_at").notNull(),
   updated_at: integer("updated_at").notNull(),
   archived_at: integer("archived_at"),

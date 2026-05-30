@@ -50,7 +50,8 @@ import type { ContainerProvider } from "../providers/types";
 import { resolveToolset } from "./tools";
 import { isProxied } from "../db/proxy";
 import { ApiError } from "../errors";
-import { nowMs } from "../util/clock";
+import { nowMs, toIso } from "../util/clock";
+import { getDb } from "../db/client";
 import { injectMcpAuthHeaders } from "./mcp-auth";
 import {
   PERMISSION_BRIDGE_PENDING_PATH,
@@ -537,6 +538,35 @@ export async function runTurn(
         ).catch(() => {});
       }
     }
+  }
+
+  // Debug-prompt capture: if the session was created with
+  // `?debug=prompt` or `X-AgentStep-Debug: prompt`, dump the assembled
+  // turn inputs to the session row on first turn. Best-effort — a
+  // capture failure must not block the turn itself.
+  try {
+    const sessionRow = getSessionRow(sessionId);
+    if (sessionRow?.debug_prompt_json === '{"pending":true}') {
+      const { redactEnv } = await import("../handlers/debug-prompt");
+      const captured = {
+        captured_at: toIso(nowMs()),
+        backend: agent.engine,
+        model: agent.model.id,
+        argv,
+        env: redactEnv(turnBuild.env),
+        prompt: turnBuild.stdin,
+        system: agent.system,
+      };
+      try {
+        getDb().prepare(
+          `UPDATE sessions SET debug_prompt_json = ?, updated_at = ? WHERE id = ?`,
+        ).run(JSON.stringify(captured), nowMs(), sessionId);
+      } catch (err) {
+        console.warn(`[debug-prompt] persist failed for ${sessionId}:`, err);
+      }
+    }
+  } catch (err) {
+    console.warn(`[debug-prompt] capture failed for ${sessionId}:`, err);
   }
 
   const runtime = getRuntime();

@@ -25,6 +25,7 @@ import {
   handleUpdateSession,
   handleDeleteSession,
   handleArchiveSession,
+  handleGetDebugPrompt,
   handlePostEvents,
   handleListEvents,
   handleSessionStream,
@@ -249,6 +250,11 @@ app.get("/anthropic/v1/sessions/:id", (c) => handleGetSession(c.req.raw, c.req.p
 app.post("/anthropic/v1/sessions/:id", (c) => handleUpdateSession(c.req.raw, c.req.param("id")));
 app.delete("/anthropic/v1/sessions/:id", (c) => handleDeleteSession(c.req.raw, c.req.param("id")));
 app.post("/anthropic/v1/sessions/:id/archive", (c) => handleArchiveSession(c.req.raw, c.req.param("id")));
+
+// Debug-prompt capture (gateway-native, not Anthropic-compat).
+// GET returns the assembled-prompt JSON dumped at first-turn time
+// when the session was created with `?debug=prompt` or `X-AgentStep-Debug: prompt`.
+app.get("/v1/sessions/:id/debug-prompt", (c) => handleGetDebugPrompt(c.req.raw, c.req.param("id")));
 
 // ── Events ───────────────────────────────────────────────────────────────
 app.post("/anthropic/v1/sessions/:id/events", (c) => handlePostEvents(c.req.raw, c.req.param("id")));

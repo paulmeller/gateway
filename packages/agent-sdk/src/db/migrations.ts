@@ -900,4 +900,13 @@ export function runMigrations(db: InstanceType<typeof Database>): void {
   try {
     db.exec(`ALTER TABLE agent_versions ADD COLUMN permission_policy_json TEXT`);
   } catch { /* column already exists */ }
+
+  // 0.5.45: debug-prompt capture column on sessions. Null = disabled.
+  // When debug capture is requested at session create time (header
+  // `X-AgentStep-Debug: prompt` or query `?debug=prompt`), this column
+  // is initialized to the sentinel `{"pending":true}`. The session
+  // driver replaces it with the captured payload on the first turn.
+  try {
+    db.exec(`ALTER TABLE sessions ADD COLUMN debug_prompt_json TEXT`);
+  } catch { /* column already exists */ }
 }
