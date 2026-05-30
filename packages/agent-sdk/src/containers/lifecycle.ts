@@ -195,12 +195,26 @@ export async function acquireForFirstTurn(sessionId: string): Promise<string> {
   // Per-env max_sandboxes overrides the global maxSandboxesPerEnv.
   const maxSandboxes = envObj?.config?.max_sandboxes ?? config.maxSandboxesPerEnv;
   // Count warm containers against the limit (they hold real provider resources).
-  const active = pool.countInEnv(env.id);
-  const warmCount = countWarm(env.id);
+  let active = pool.countInEnv(env.id);
+  let warmCount = countWarm(env.id);
   if (active + warmCount >= maxSandboxes) {
-    throw new ApiError(503, "server_busy",
-      `environment ${env.id} sandbox pool exhausted (${active} active + ${warmCount} warm, limit ${maxSandboxes})`
-    );
+    // Evict-on-pressure: the sweeper-driven idle-TTL eviction only runs
+    // once an hour by default (SESSION_MAX_AGE_MS=3600000), so a burst of
+    // sessions that complete quickly and never get explicitly deleted can
+    // exhaust the pool well before the sweeper catches up. Before failing
+    // the new acquisition, evict the oldest idle session in this env that
+    // has been quiet for at least EVICT_MIN_IDLE_MS — protects sessions
+    // that just completed a turn and may be about to send another.
+    const evicted = await evictOldestIdleInEnv(env.id);
+    if (evicted) {
+      active = pool.countInEnv(env.id);
+      warmCount = countWarm(env.id);
+    }
+    if (active + warmCount >= maxSandboxes) {
+      throw new ApiError(503, "server_busy",
+        `environment ${env.id} sandbox pool exhausted (${active} active + ${warmCount} warm, limit ${maxSandboxes})`
+      );
+    }
   }
 
   const agent = getAgent(row.agent_id, row.agent_version);
@@ -793,6 +807,64 @@ export { installClaudeWrapper };
  * Release and delete the sandbox bound to this session. Best-effort — logs
  * failures but does not throw.
  */
+/**
+ * Minimum time a session must have been idle before evict-on-pressure will
+ * reclaim its sandbox. Protects sessions that just completed a turn — a
+ * caller is often about to send the next message immediately after. Override
+ * via `EVICT_MIN_IDLE_MS` env var.
+ */
+const EVICT_MIN_IDLE_MS = Number(process.env.EVICT_MIN_IDLE_MS ?? 30_000);
+
+/**
+ * Find the longest-idle session in `envId` that has been quiet for at least
+ * EVICT_MIN_IDLE_MS, release its sandbox + archive it, and return its id.
+ * Returns null if no eligible session exists.
+ *
+ * Called from `acquireForFirstTurn` when the env's sandbox pool is full —
+ * makes a real attempt to free a slot before failing with 503/server_busy,
+ * since the sweeper's 1-hour default idle TTL can leave the pool exhausted
+ * for too long under bursty workloads.
+ */
+async function evictOldestIdleInEnv(envId: string): Promise<string | null> {
+  const candidates = pool.allSessionSandboxes().filter((e) => e.envId === envId);
+  if (candidates.length === 0) return null;
+
+  const now = nowMs();
+  type Candidate = { sessionId: string; idleSince: number };
+  const eligible: Candidate[] = [];
+  for (const entry of candidates) {
+    const row = getSessionRow(entry.sessionId);
+    if (!row || row.status !== "idle" || row.archived_at != null) continue;
+    const idleSince = row.idle_since ?? row.created_at;
+    if (now - idleSince < EVICT_MIN_IDLE_MS) continue;
+    eligible.push({ sessionId: entry.sessionId, idleSince });
+  }
+  if (eligible.length === 0) return null;
+
+  eligible.sort((a, b) => a.idleSince - b.idleSince);
+  const victim = eligible[0].sessionId;
+  console.log(`[lifecycle] evict-on-pressure: env ${envId} pool full, evicting idle session ${victim} (idle for ${Math.round((now - eligible[0].idleSince) / 1000)}s)`);
+
+  try {
+    await releaseSession(victim);
+    // Best-effort terminate event + status flip so the client can observe
+    // that we reclaimed their session. Imported lazily to avoid a cycle.
+    const { updateSessionStatus, archiveSession } = await import("../db/sessions");
+    appendEvent(victim, {
+      type: "session.status_terminated",
+      payload: { reason: "evicted_on_pressure" },
+      origin: "server",
+      processedAt: nowMs(),
+    });
+    updateSessionStatus(victim, "terminated", "evicted_on_pressure");
+    archiveSession(victim);
+  } catch (err) {
+    console.warn(`[lifecycle] evict-on-pressure: failed to release ${victim}:`, err);
+    return null;
+  }
+  return victim;
+}
+
 export async function releaseSession(sessionId: string): Promise<void> {
   const entry = pool.unregister(sessionId);
   const row = getSessionRow(sessionId);
