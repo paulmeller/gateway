@@ -13,6 +13,11 @@
 import { z } from "zod";
 import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
 import { registry } from "./registry";
+import { ENGINE_NAMES } from "../registry";
+
+// Engines (canonical list) plus the proxy-only `anthropic` value which can
+// appear on agents but doesn't have its own CLI backend.
+const ENGINE_ENUM = [...ENGINE_NAMES, "anthropic"] as unknown as [string, ...string[]];
 
 // Augment Zod with .openapi() metadata chainables. Must run before any
 // schema is registered.
@@ -158,7 +163,7 @@ export const AgentSchema = registry.register(
     metadata: z.record(z.string()).openapi({
       description: "Key-value metadata attached to the agent. Values must be strings.",
     }),
-    engine: z.enum(["claude", "opencode", "codex", "anthropic", "gemini", "factory", "pi"]).openapi({
+    engine: z.enum(ENGINE_ENUM).openapi({
       description:
         "Which agent harness powers this agent. `claude` drives `claude -p`; `opencode` drives sst/opencode-ai's `opencode run`; `gemini` drives Google's `gemini -p`; `factory` drives Factory's `droid exec`; `pi` drives the pi.dev coding agent (`pi --mode json`). Immutable after agent creation.",
     }),
@@ -224,7 +229,7 @@ export const CreateAgentRequestSchema = registry.register(
       }).catchall(z.unknown())).optional().openapi({
         description: "MCP servers as an array of objects with name, type, and optional url.",
       }),
-      engine: z.enum(["claude", "opencode", "codex", "anthropic", "gemini", "factory", "pi"]).optional().openapi({
+      engine: z.enum(ENGINE_ENUM).optional().openapi({
         description:
           "Agent harness. Auto-inferred from model prefix if omitted: `gemini-*` → gemini, `gpt-*`/`o1-*` → codex, `claude-*` → claude. Always use bare model IDs (`gemini-2.5-flash`, not `google/gemini-2.5-flash`) — provider prefixes are added internally where needed. Non-claude engines must NOT declare `tools` (they manage tool permissions internally). Required vault keys: claude → ANTHROPIC_API_KEY, gemini → GEMINI_API_KEY, codex → OPENAI_API_KEY, pi → any of the three.",
         example: "claude",

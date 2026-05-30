@@ -1,5 +1,8 @@
 import { z } from "zod";
+import { ENGINE_NAMES } from "../../registry";
 import { routeWrap, jsonOk, paginatedOk, decodeCursor } from "../../http";
+
+const ENGINE_ENUM = [...ENGINE_NAMES, "anthropic"] as unknown as [string, ...string[]];
 import { getDb } from "../../db/client";
 import { createAgent, getAgent, updateAgent, archiveAgent, listAgents, listAgentVersions } from "../../db/agents";
 import { resolveBackend } from "../../backends/registry";
@@ -239,7 +242,7 @@ const CreateSchema = z.object({
       url: z.string().optional(),
     }).passthrough(),
   ).optional(),
-  engine: z.enum(["claude", "opencode", "codex", "anthropic", "gemini", "factory", "pi"]).optional(),
+  engine: z.enum(ENGINE_ENUM).optional(),
   webhook_url: z.string().url().optional(),
   webhook_events: z.array(z.string()).optional(),
   /**

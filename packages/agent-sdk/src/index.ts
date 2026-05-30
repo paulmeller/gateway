@@ -5,6 +5,23 @@
  * from here or from subpath exports like `@agentstep/agent-sdk/db/agents`.
  */
 
+// Canonical engine + provider registry — single source of truth for the
+// list of engines, providers, and their required secret slots. Consumed by
+// the gateway-ui dropdowns, the agentstep-product engine-config, and the
+// SDK's own zod enums in openapi/schemas.ts.
+export {
+  ENGINES,
+  PROVIDERS,
+  ENGINE_NAMES,
+  PROVIDER_NAMES,
+  getEngineSecret,
+  getProviderSecret,
+  type EngineInfo,
+  type ProviderInfo,
+  type SecretField,
+} from "./registry";
+export { FALLBACK_MODELS, inferEngineFromModel, isValidModelForEngine } from "./backends/models";
+
 // HTTP helpers
 export { routeWrap, jsonOk, type RouteContext } from "./http";
 
