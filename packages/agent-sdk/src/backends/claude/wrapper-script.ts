@@ -42,8 +42,11 @@ if [ -S "$SPRITE_SOCK" ]; then
   # Cleanup on exit
   trap 'curl -sf --unix-socket "$SPRITE_SOCK" -H "Host: sprite" -X DELETE http://sprite/v1/tasks/agent-turn >/dev/null 2>&1; [ -n "$HEARTBEAT_PID" ] && kill $HEARTBEAT_PID 2>/dev/null' EXIT
 fi
-# Read env vars from stdin until blank line, save remaining stdin to temp file
-PROMPT_FILE=$(mktemp)
+# Read env vars from stdin until blank line, save remaining stdin to temp file.
+# Use a dotted prefix so container-file-sync skips these wrapper-internal
+# files (the ENV_FILE contains plaintext credentials and must never reach
+# the gateway's file store).
+PROMPT_FILE=$(mktemp /tmp/.claude-cw.XXXXXXXXXX)
 while IFS= read -r line; do [ -z "$line" ] && break; export "$line"; done
 cat > "$PROMPT_FILE"
 # Run as non-root if possible (claude requires non-root for bypassPermissions)
@@ -53,8 +56,8 @@ if [ "$(id -u)" = "0" ]; then
   fi
   chown -R agent /tmp/ 2>/dev/null
   chown -R agent /home/agent 2>/dev/null
-  # Export env vars to a file for the agent user
-  ENV_FILE=$(mktemp)
+  # Export env vars to a file for the agent user. Dotted prefix as above.
+  ENV_FILE=$(mktemp /tmp/.claude-cw.XXXXXXXXXX)
   env | grep -E '^(ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN|NODE_COMPILE_CACHE|PATH)=' > "$ENV_FILE"
   chown agent "$ENV_FILE" "$PROMPT_FILE"
   exec su -s /bin/sh agent -c ". $ENV_FILE && HOME=/home/agent claude $* < $PROMPT_FILE; rm -f $ENV_FILE $PROMPT_FILE"

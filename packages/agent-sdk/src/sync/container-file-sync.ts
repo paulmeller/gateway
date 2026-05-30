@@ -29,6 +29,18 @@ const BLOCKED_PREFIXES = [
   "/usr/bin/", "/usr/sbin/", "/usr/lib/", "/var/run/", "/var/log/",
 ];
 
+/**
+ * Blocked basenames — files that exist for wrapper/runtime bookkeeping and
+ * must never reach the gateway's file store. The wrapper's ENV_FILE
+ * contains plaintext credentials (CLAUDE_CODE_OAUTH_TOKEN, ANTHROPIC_API_KEY),
+ * so the security cost of a false negative here is high.
+ *   - `tmp.*`  — mktemp default pattern, catches wrappers that don't use a prefix
+ *   - `.claude-*` — wrapper temp files (current convention)
+ *   - `.claude-wrapper` — the wrapper script itself
+ *   - `policy-limits.json` — Claude CLI internal state
+ */
+const BLOCKED_BASENAME_RE = /^(tmp\.[A-Za-z0-9]+|\.claude-.+|policy-limits\.json)$/;
+
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 const MAX_FILES_PER_SYNC = 20;
 
@@ -100,7 +112,9 @@ function extractFilePaths(sessionId: string): ExtractResult {
 function isPathSafe(p: string): boolean {
   if (!p.startsWith("/")) return false;
   if (p.includes("..")) return false;
-  return !BLOCKED_PREFIXES.some((prefix) => p.startsWith(prefix));
+  if (BLOCKED_PREFIXES.some((prefix) => p.startsWith(prefix))) return false;
+  if (BLOCKED_BASENAME_RE.test(path.basename(p))) return false;
+  return true;
 }
 
 /**

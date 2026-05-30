@@ -436,6 +436,37 @@ describe("container-file-sync", () => {
       expect(result.skipped).toBe(blockedPaths.length);
     });
 
+    it("rejects wrapper temp files (mktemp default + .claude-cw.* + policy-limits.json) — security regression", async () => {
+      // The Claude wrapper script writes credentials (ANTHROPIC_API_KEY,
+      // CLAUDE_CODE_OAUTH_TOKEN) into a temp file before su'ing to the
+      // agent user. If the discovery scan slurps these files into the
+      // gateway's file store, the OAuth token leaks. The fix: filter
+      // mktemp's default pattern (`tmp.XXXXXXXXXX`), the wrapper's
+      // current convention (`.claude-*`), and Claude CLI internal state
+      // (`policy-limits.json`) in isPathSafe via BLOCKED_BASENAME_RE.
+      const { getDb } = await import("../src/db/client");
+      const db = getDb();
+      const sid = "sess_wrapper_leak";
+      seedSession(db, sid);
+
+      // Simulate the find command discovering wrapper temp files in /tmp.
+      // No tool events — we're testing the discovery path specifically.
+      const provider = fakeProvider({
+        find: {
+          stdout: "/tmp/tmp.AbCdEfGhIj\n/tmp/tmp.XYZ1234567\n/tmp/.claude-cw.AbCdEfGhIj\n/tmp/.claude-wrapper\n/home/agent/.config/claude/policy-limits.json\n",
+          stderr: "",
+          exit_code: 0,
+        },
+        "/mnt/session/outputs": { stdout: "", stderr: "", exit_code: 0 },
+      });
+      const { syncContainerFiles } = await import("../src/sync/container-file-sync");
+      const result = await syncContainerFiles({ sessionId: sid, sandboxName: "sb1", provider });
+
+      // ALL of these must be rejected. If any one slips through, an
+      // OAuth token may have just been written to the gateway's file store.
+      expect(result.synced).toBe(0);
+    });
+
     it("accepts safe paths like /home/user/output.docx and /tmp/result.json", async () => {
       const { getDb } = await import("../src/db/client");
       const db = getDb();
