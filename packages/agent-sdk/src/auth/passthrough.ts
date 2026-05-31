@@ -95,6 +95,14 @@ const PASSTHROUGH_ROUTE_PATTERNS: RegExp[] = [
   /^\/anthropic\/v1\/files$/,
   /^\/anthropic\/v1\/files\/[^/]+$/,
   /^\/anthropic\/v1\/files\/[^/]+\/content$/,
+  // Messages API — escape hatch for features Managed Agents doesn't
+  // expose (tool_choice forcing, assistant prefill). A passthrough
+  // caller can mix `/anthropic/v1/sessions/*` (Managed Agents) and
+  // `/anthropic/v1/messages` (raw Messages API) under one base URL +
+  // one sk-ant-api* key. Forwards to `api.anthropic.com/v1/messages`
+  // unchanged — gateway adds nothing, strips nothing.
+  /^\/anthropic\/v1\/messages$/,
+  /^\/anthropic\/v1\/messages\/count_tokens$/,
 ];
 
 export function isPassthroughAllowedPath(pathname: string): boolean {

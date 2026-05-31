@@ -130,6 +130,10 @@ describe("anthropic passthrough auth", () => {
     expect(isPassthroughAllowedPath("/anthropic/v1/vaults/vlt_1/entries/KEY")).toBe(true);
     expect(isPassthroughAllowedPath("/anthropic/v1/files")).toBe(true);
     expect(isPassthroughAllowedPath("/anthropic/v1/environments")).toBe(true);
+    // Messages API escape hatch for tool_choice + prefill features
+    // that the Managed Agents API doesn't expose.
+    expect(isPassthroughAllowedPath("/anthropic/v1/messages")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/messages/count_tokens")).toBe(true);
     // Rejected (gateway-only)
     expect(isPassthroughAllowedPath("/v1/api-keys")).toBe(false);
     expect(isPassthroughAllowedPath("/v1/settings/anything")).toBe(false);
