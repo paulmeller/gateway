@@ -1373,6 +1373,72 @@ export const SkillsSearchResponseSchema = registry.register(
   }),
 );
 
+// ─── Standalone Skills (tenant uploads) ────────────────────────────────────
+//
+// Distinct from `AgentSkillSchema` (a skill attached to an agent's config).
+// `SkillSchema` represents a row in the SDK's `skills` table — the unit
+// returned by POST /v1/skills, GET /v1/skills/:id, etc.
+
+export const SkillSchema = registry.register(
+  "Skill",
+  z.object({
+    type: z.literal("skill"),
+    id: UlidId,
+    name: z.string(),
+    description: z.string().nullable(),
+    current_version: z.string().nullable().openapi({
+      description: "Semver-ish version string of the active skill version, e.g. '1.0.0'.",
+    }),
+    created_at: z.string().datetime(),
+    updated_at: z.string().datetime(),
+    archived_at: z.string().datetime().nullable(),
+  }),
+);
+
+export const SkillVersionSchema = registry.register(
+  "SkillVersion",
+  z.object({
+    type: z.literal("skill_version"),
+    id: UlidId,
+    skill_id: UlidId,
+    version: z.string(),
+    content: z.string().openapi({
+      description: "The SKILL.md content (or main markdown body for multi-file skills).",
+    }),
+    created_at: z.string().datetime(),
+  }),
+);
+
+export const SkillListResponseSchema = listEnvelope("SkillListResponse", SkillSchema);
+export const SkillVersionListResponseSchema = listEnvelope(
+  "SkillVersionListResponse",
+  SkillVersionSchema,
+);
+
+export const SkillDeletedResponseSchema = registry.register(
+  "SkillDeletedResponse",
+  z.object({ id: UlidId, type: z.literal("skill_deleted") }),
+);
+
+export const SkillVersionDeletedResponseSchema = registry.register(
+  "SkillVersionDeletedResponse",
+  z.object({
+    skill_id: UlidId,
+    version: z.string(),
+    type: z.literal("skill_version_deleted"),
+  }),
+);
+
+export const CreateSkillVersionRequestSchema = registry.register(
+  "CreateSkillVersionRequest",
+  z.object({
+    content: z.string().openapi({ description: "Skill content (SKILL.md body)." }),
+    version: z.string().optional().openapi({
+      description: "Explicit version label. Auto-incremented from current_version if omitted.",
+    }),
+  }),
+);
+
 export const SkillsStatsResponseSchema = registry.register(
   "SkillsStatsResponse",
   z.record(z.unknown()).openapi({ description: "Aggregated skill statistics." }),

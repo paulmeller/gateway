@@ -96,6 +96,13 @@ import {
   SkillsSearchResponseSchema,
   SkillsStatsResponseSchema,
   SkillsSourcesResponseSchema,
+  SkillSchema,
+  SkillVersionSchema,
+  SkillListResponseSchema,
+  SkillVersionListResponseSchema,
+  SkillDeletedResponseSchema,
+  SkillVersionDeletedResponseSchema,
+  CreateSkillVersionRequestSchema,
   // Metrics
   MetricsResponseSchema,
   ApiMetricsResponseSchema,
@@ -1363,23 +1370,21 @@ registry.registerPath({
   method: "get",
   path: "/v1/skills",
   tags: ["Skills"],
-  summary: "Search the full skills index",
-  description: "Full-text search across 72k+ skills with filters, pagination, and sorting.",
+  summary: "List the caller's uploaded skills",
+  description:
+    "Returns a paginated list of skills uploaded by this tenant. Anthropic Managed Agents convention. The community catalog (skills.sh index) lives at /v1/skills/catalog — see also /v1/skills/feed, /sources, /stats. To search the catalog, use /v1/skills/index?q=…",
   security: [{ ApiKey: [] }],
   request: {
     query: z.object({
-      q: z.string().optional().describe("Free-text search query."),
-      owner: z.string().optional().describe("Filter by skill owner/author."),
-      source: z.string().optional().describe("Filter by source repository."),
-      sort: z.enum(["installs", "name", "created"]).optional(),
-      limit: z.coerce.number().int().optional(),
-      offset: z.coerce.number().int().optional(),
+      limit: z.coerce.number().int().min(1).max(100).optional().describe("Page size (default 20)."),
+      after_id: z.string().optional().describe("Pagination cursor."),
+      include_archived: z.coerce.boolean().optional().describe("Include archived skills (default false)."),
     }),
   },
   responses: {
     200: {
-      description: "Search results",
-      content: { "application/json": { schema: SkillsSearchResponseSchema } },
+      description: "Paginated list of skills",
+      content: { "application/json": { schema: SkillListResponseSchema } },
     },
     ...ErrorResponses,
   },
@@ -1389,13 +1394,50 @@ registry.registerPath({
   method: "post",
   path: "/v1/skills",
   tags: ["Skills"],
-  summary: "Create a standalone skill (stub)",
-  description: "Not yet supported. Returns 501. Add skills directly to agents via the skills[] field.",
+  summary: "Create a skill (multipart upload)",
+  description:
+    "Uploads a SKILL.md or .zip bundle as a new standalone skill. The first version is created automatically (1.0.0). Use POST /v1/skills/{id}/versions to add subsequent versions. The multipart body matches Anthropic's deploy-managed-agent.sh shape (`display_title` + `files=@path` or `files[]=@path`); a JSON body with `{ name, description?, content, tenant_id? }` is also accepted.",
   security: [{ ApiKey: [] }],
+  request: {
+    body: {
+      content: {
+        "multipart/form-data": {
+          schema: z.object({
+            display_title: z.string(),
+            files: z.unknown().openapi({ format: "binary", description: "SKILL.md or .zip bundle. `files[]` is also accepted." }),
+          }),
+        },
+        "application/json": {
+          schema: z.object({
+            name: z.string(),
+            description: z.string().optional(),
+            content: z.string(),
+            tenant_id: z.string().optional(),
+          }),
+        },
+      },
+    },
+  },
   responses: {
-    501: {
-      description: "Not implemented",
-      content: { "application/json": { schema: ErrorEnvelopeSchema } },
+    201: {
+      description: "Skill created",
+      content: { "application/json": { schema: SkillSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/v1/skills/{id}",
+  tags: ["Skills"],
+  summary: "Get a skill by id",
+  security: [{ ApiKey: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: "Skill",
+      content: { "application/json": { schema: SkillSchema } },
     },
     ...ErrorResponses,
   },
@@ -1405,14 +1447,120 @@ registry.registerPath({
   method: "delete",
   path: "/v1/skills/{id}",
   tags: ["Skills"],
-  summary: "Delete a standalone skill (stub)",
-  description: "Not yet supported. Returns 501. Remove skills from agents via PATCH /v1/agents.",
+  summary: "Delete a skill",
+  description: "Hard-deletes the skill and all its versions.",
   security: [{ ApiKey: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
-    501: {
-      description: "Not implemented",
-      content: { "application/json": { schema: ErrorEnvelopeSchema } },
+    200: {
+      description: "Skill deleted",
+      content: { "application/json": { schema: SkillDeletedResponseSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/v1/skills/{id}/versions",
+  tags: ["Skills"],
+  summary: "List versions of a skill",
+  security: [{ ApiKey: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    query: z.object({
+      limit: z.coerce.number().int().min(1).max(100).optional(),
+      after_id: z.string().optional(),
+    }),
+  },
+  responses: {
+    200: {
+      description: "Paginated list of skill versions",
+      content: { "application/json": { schema: SkillVersionListResponseSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/v1/skills/{id}/versions",
+  tags: ["Skills"],
+  summary: "Create a new version of a skill",
+  description: "Appends a new version. Auto-increments from the current version if no explicit `version` is supplied.",
+  security: [{ ApiKey: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { "application/json": { schema: CreateSkillVersionRequestSchema } } },
+  },
+  responses: {
+    201: {
+      description: "Skill version created",
+      content: { "application/json": { schema: SkillVersionSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/v1/skills/{id}/versions/{version}",
+  tags: ["Skills"],
+  summary: "Get a specific version of a skill",
+  description:
+    "Returns version metadata + content. Pass `version: latest` to resolve to the skill's current version without pinning to a specific string — the recommended pattern for agent tool refs `{ type: \"custom\", skill_id, version: \"latest\" }`.",
+  security: [{ ApiKey: [] }],
+  request: {
+    params: z.object({
+      id: z.string(),
+      version: z.string().describe("Version string or the literal `latest`."),
+    }),
+  },
+  responses: {
+    200: {
+      description: "Skill version",
+      content: { "application/json": { schema: SkillVersionSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "delete",
+  path: "/v1/skills/{id}/versions/{version}",
+  tags: ["Skills"],
+  summary: "Delete a specific version of a skill",
+  description: "Cannot delete the skill's `current_version` — promote another version first.",
+  security: [{ ApiKey: [] }],
+  request: {
+    params: z.object({ id: z.string(), version: z.string() }),
+  },
+  responses: {
+    200: {
+      description: "Version deleted",
+      content: { "application/json": { schema: SkillVersionDeletedResponseSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/v1/skills/{id}/versions/{version}/content",
+  tags: ["Skills"],
+  summary: "Download raw skill content",
+  description: "Returns the SKILL.md content as `text/markdown` with a Content-Disposition attachment header.",
+  security: [{ ApiKey: [] }],
+  request: {
+    params: z.object({
+      id: z.string(),
+      version: z.string().describe("Version string or the literal `latest`."),
+    }),
+  },
+  responses: {
+    200: {
+      description: "Raw skill content",
+      content: { "text/markdown": { schema: z.string() } },
     },
     ...ErrorResponses,
   },
