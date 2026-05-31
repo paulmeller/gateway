@@ -76,7 +76,16 @@ handle_request() {
 
   case "$method" in
     initialize)
-      send_response '{"jsonrpc":"2.0","id":'"$id"',"result":{"protocolVersion":"2025-11-25","capabilities":{"tools":{"listChanged":false}},"serverInfo":{"name":"tool-bridge","version":"1.0.0"}}}'
+      # Echo the client's protocolVersion if present (MCP spec: server
+      # should respond with the negotiated/supported version). Falls back
+      # to 2024-11-05 which is what claude code 2.x expects -- responding
+      # with a newer version like 2025-11-25 causes claude to silently
+      # drop the server's tools from its registry, surfacing as
+      # "No such tool available" errors on the first turn even though
+      # the bridge responded successfully.
+      client_pv=$(echo "$body" | grep -oE '"protocolVersion":"[^"]+"' | head -1 | cut -d'"' -f4)
+      [ -z "$client_pv" ] && client_pv="2024-11-05"
+      send_response '{"jsonrpc":"2.0","id":'"$id"',"result":{"protocolVersion":"'"$client_pv"'","capabilities":{"tools":{"listChanged":false}},"serverInfo":{"name":"tool-bridge","version":"1.0.0"}}}'
       ;;
     notifications/*) ;;
     ping)
