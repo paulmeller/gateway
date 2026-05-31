@@ -1000,12 +1000,17 @@ registry.registerPath({
   method: "post",
   path: "/anthropic/v1/vaults/{id}/credentials",
   tags: ["Credentials"],
-  summary: "Create a vault credential",
+  summary: "Create an MCP-server credential (Anthropic CMA-compat)",
   description:
-    "Creates a credential in the vault for MCP server authentication or plain API key storage. " +
-    "The token is encrypted at rest and never returned in responses. " +
-    "When `mcp_server_url` is provided, the credential is automatically injected as MCP auth during sessions. " +
-    "Without `mcp_server_url`, the token is injected as an env var derived from `display_name`.",
+    "Creates an MCP-shaped credential record. **Reach for this when you have an " +
+    "MCP server URL plus an auth token** (OAuth, bearer, etc.). The token is " +
+    "encrypted at rest, never returned in responses, and automatically injected " +
+    "as MCP auth during sessions that attach this vault.\n\n" +
+    "If your token is a plain env-var-style secret (`SPRITE_TOKEN`, " +
+    "`ANTHROPIC_API_KEY`, custom API keys) **not** associated with a specific MCP " +
+    "server URL, use `PUT /vaults/{id}/entries/{key}` (AgentStep extension) " +
+    "instead. Entries are injected as env vars into the container at session time " +
+    "and don't require an `mcp_server_url`.",
   security: [{ ApiKey: [] }],
   request: {
     params: z.object({ id: z.string() }),
@@ -1097,11 +1102,33 @@ registry.registerPath({
 // /v1/vaults/{id}/entries
 // ---------------------------------------------------------------------------
 
+// AgentStep extension: entries are NOT part of the Anthropic CMA spec.
+// They model the "raw env-var injection" use case that container providers
+// (sprites, apple-container, docker, …) need but Anthropic's hosted CMA
+// doesn't have an analogue for (Anthropic never surfaces the container, so
+// there's no env-var concept at the API layer). Documenting them here under
+// /anthropic/v1/* because our gateway mounts them there for path convenience,
+// but the description on each endpoint marks the gap explicitly so callers
+// using the Anthropic SDK against our base URL know to expect them to be
+// reachable only via raw HTTP or via @agentstep/agent-sdk.
+const ENTRIES_EXTENSION_NOTE =
+  "**AgentStep extension — not part of Anthropic CMA.** " +
+  "The official Anthropic Managed Agents API exposes only `/credentials` " +
+  "(MCP-shaped, requires `mcp_server_url`). Entries are an AgentStep addition " +
+  "for raw key/value secrets that need to appear as environment variables " +
+  "inside the session container (e.g. `SPRITE_TOKEN`, `ANTHROPIC_API_KEY`, " +
+  "custom API keys). The Anthropic SDK won't expose these — call via raw " +
+  "HTTP or `@agentstep/agent-sdk` (`setEntry`, `listEntries`, etc.).";
+
 registry.registerPath({
   method: "get",
   path: "/anthropic/v1/vaults/{id}/entries",
   tags: ["Vaults"],
-  summary: "List vault entries",
+  summary: "List vault entries (AgentStep extension)",
+  description:
+    "Lists the metadata for each entry in the vault (key names, timestamps). " +
+    "**Never returns plaintext values** — use `GET /entries/{key}` for the " +
+    "decrypted value.\n\n" + ENTRIES_EXTENSION_NOTE,
   security: [{ ApiKey: [] }],
   request: { params: z.object({ id: z.string() }) },
   responses: {
@@ -1117,7 +1144,11 @@ registry.registerPath({
   method: "get",
   path: "/anthropic/v1/vaults/{id}/entries/{key}",
   tags: ["Vaults"],
-  summary: "Get a vault entry",
+  summary: "Get a vault entry (AgentStep extension)",
+  description:
+    "Returns the decrypted value for a single entry. The value is encrypted at " +
+    "rest with `VAULT_ENCRYPTION_KEY`; this endpoint is the only path that " +
+    "decrypts it.\n\n" + ENTRIES_EXTENSION_NOTE,
   security: [{ ApiKey: [] }],
   request: { params: z.object({ id: z.string(), key: z.string() }) },
   responses: {
@@ -1133,7 +1164,20 @@ registry.registerPath({
   method: "put",
   path: "/anthropic/v1/vaults/{id}/entries/{key}",
   tags: ["Vaults"],
-  summary: "Set a vault entry",
+  summary: "Set a raw env-var entry e.g. SPRITE_TOKEN (AgentStep extension)",
+  description:
+    "Upserts a raw key/value entry. The key (URL path) becomes the env-var " +
+    "name; the value (body) is the secret. At session-create time the SDK " +
+    "injects every entry from the agent's attached vault(s) into the container " +
+    "as environment variables, so the agent runtime sees `process.env.SPRITE_TOKEN " +
+    "=== \"<value>\"`.\n\n" +
+    "**Use cases:** sprites/apple-container/docker provider auth tokens, " +
+    "additional API keys an agent needs at runtime, custom env vars referenced " +
+    "by MCP servers declared on the agent.\n\n" +
+    "**Don't use for MCP server auth** — for that, `POST /vaults/{id}/credentials` " +
+    "is the right path (structured shape with `mcp_server_url`, auto-injection " +
+    "into the MCP client transport, Anthropic CMA-compatible).\n\n" +
+    ENTRIES_EXTENSION_NOTE,
   security: [{ ApiKey: [] }],
   request: {
     params: z.object({ id: z.string(), key: z.string() }),
@@ -1155,7 +1199,8 @@ registry.registerPath({
   method: "delete",
   path: "/anthropic/v1/vaults/{id}/entries/{key}",
   tags: ["Vaults"],
-  summary: "Delete a vault entry",
+  summary: "Delete a vault entry (AgentStep extension)",
+  description: ENTRIES_EXTENSION_NOTE,
   security: [{ ApiKey: [] }],
   request: { params: z.object({ id: z.string(), key: z.string() }) },
   responses: {
@@ -2489,8 +2534,28 @@ export function buildOpenApiDocument(opts: {
       { name: "Events", description: "Event append, history, and streaming" },
       { name: "Resources", description: "Session resource attachments" },
       { name: "Files", description: "File upload, download, and management" },
-      { name: "Vaults", description: "Secret vault management" },
-      { name: "Credentials", description: "Vault credential CRUD (structured auth)" },
+      {
+        name: "Vaults",
+        description:
+          "Secret vault management. A vault holds two distinct kinds of secrets: " +
+          "**(1) Credentials** (`POST /vaults/{id}/credentials`) — MCP-shaped auth " +
+          "records with required `mcp_server_url`. Part of Anthropic's Managed Agents " +
+          "API; injected as MCP auth at session time. " +
+          "**(2) Entries** (`PUT /vaults/{id}/entries/{key}`) — raw key/value strings " +
+          "(`SPRITE_TOKEN`, `ANTHROPIC_API_KEY`, custom API keys). AgentStep extension; " +
+          "injected into the session container as env vars. " +
+          "Reach for *credentials* when you have an MCP server URL + auth token; reach " +
+          "for *entries* when you have a plain token that should appear as `$NAME` " +
+          "inside the agent's runtime.",
+      },
+      {
+        name: "Credentials",
+        description:
+          "Vault credential CRUD — MCP-shaped structured auth (`mcp_server_url`, " +
+          "`oauth_token`, etc). Anthropic CMA-compatible. For plain env-var-style " +
+          "tokens that don't tie to an MCP server, use the Vaults entries endpoints " +
+          "(`PUT /vaults/{id}/entries/{key}`) instead.",
+      },
       { name: "Memory", description: "Memory stores and memories" },
       { name: "Skills", description: "Skills catalog, search, and management" },
       { name: "Settings", description: "Gateway configuration settings" },
