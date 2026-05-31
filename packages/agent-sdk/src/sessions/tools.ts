@@ -48,6 +48,18 @@ export function resolveToolset(tools: ToolConfig[]): ResolvedTools {
     builtInEnabled = new Set();
   }
 
+  // ToolSearch must always be allowed, even when the agent has zero
+  // built-in tools enabled. Claude Code uses it as the discovery
+  // mechanism for MCP tools that are still in the "pending" state at
+  // session start — if it's blocked, claude can't load MCP tool
+  // schemas and dispatches all first-turn calls as synthetic
+  // "No such tool available" errors. ToolSearch itself has no side
+  // effects (it just returns tool schemas), so always-allowing it is
+  // safe even on tightly-scoped agents.
+  if (customToolNames.size > 0 && BUILT_IN_TOOL_NAMES.includes("ToolSearch" as BuiltInToolName)) {
+    builtInEnabled.add("ToolSearch" as BuiltInToolName);
+  }
+
   const allowedTools = Array.from(builtInEnabled);
   const disallowedTools = BUILT_IN_TOOL_NAMES.filter((n) => !builtInEnabled.has(n));
 
