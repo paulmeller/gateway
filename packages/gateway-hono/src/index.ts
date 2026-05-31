@@ -65,6 +65,7 @@ import {
   handleGetProviderStatus,
   handleGetSkillsCatalog,
   handleSearchSkills,
+  handleListSkills,
   handleGetSkillsStats,
   handleGetSkillsSources,
   handleGetSkillsIndex,
@@ -425,7 +426,13 @@ app.post("/v1/skills/:id/versions", (c) => handleCreateSkillVersion(c.req.raw, c
 app.get("/v1/skills/:id/versions", (c) => handleListSkillVersions(c.req.raw, c.req.param("id")));
 app.post("/v1/skills", (c) => handleCreateSkill(c.req.raw));
 app.get("/v1/skills/:id", (c) => handleGetSkill(c.req.raw, c.req.param("id")));
-app.get("/v1/skills", (c) => handleSearchSkills(c.req.raw));
+// Anthropic Managed Agents convention: GET /v1/skills returns the
+// caller's uploaded skills. Community catalog search lives at
+// /v1/skills/catalog (mounted above). Kept handleSearchSkills imported
+// because the CLI's LocalBackend (packages/gateway/src/backend/local.ts)
+// still calls it directly with query params for its `skills search`
+// command — semantically a community-catalog search, not a list.
+app.get("/v1/skills", (c) => handleListSkills(c.req.raw));
 app.delete("/v1/skills/:id", (c) => handleDeleteSkill(c.req.raw, c.req.param("id")));
 
 // ── Batch ────────────────────────────────────────────────────────────────
