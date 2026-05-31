@@ -211,13 +211,28 @@ export function getSkillVersion(
   version: string,
 ): SkillVersion | undefined {
   const db = getDrizzle();
+
+  // Convention: `version: "latest"` resolves to the skill's current_version.
+  // Matches the documented agent-tool pattern `{ type: "custom", skill_id,
+  // version: "latest" }` so callers don't have to pin to an explicit string.
+  let resolvedVersion = version;
+  if (version === "latest") {
+    const skill = db
+      .select({ current_version: schema.skills.current_version })
+      .from(schema.skills)
+      .where(eq(schema.skills.id, skillId))
+      .get();
+    if (!skill?.current_version) return undefined;
+    resolvedVersion = skill.current_version;
+  }
+
   const row = db
     .select()
     .from(schema.skillVersions)
     .where(
       and(
         eq(schema.skillVersions.skill_id, skillId),
-        eq(schema.skillVersions.version, version),
+        eq(schema.skillVersions.version, resolvedVersion),
       ),
     )
     .get();
