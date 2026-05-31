@@ -18,7 +18,8 @@ import { createClaudeTranslator } from "./translator";
 import { CLAUDE_WRAPPER_PATH, installClaudeWrapper } from "./wrapper-script";
 import {
   generateBridgeScript,
-  buildBridgeMcpConfig,
+  buildBridgeMcpConfigFile,
+  TOOL_BRIDGE_MCP_CONFIG_PATH,
   toolsToJson,
   TOOL_BRIDGE_DIR,
   TOOL_BRIDGE_SCRIPT_PATH,
@@ -48,6 +49,9 @@ function buildTurn(input: BuildTurnInput): BuildTurnResult {
   const customTools = agent.tools.filter((t): t is CustomTool => t.type === "custom");
   const hasBridgeTools = customTools.length > 0 || agent.threads_enabled;
   if (hasBridgeTools || (agent.mcp_servers && agent.mcp_servers.length > 0)) {
+    // Strip any inline --mcp-config that buildClaudeArgs added (it would
+    // have been for agent.mcp_servers only). We rebuild here so the
+    // tool-bridge gets a file-path config and the rest goes inline.
     const mcpIdx = argsBase.indexOf("--mcp-config");
     let existingServers: Record<string, unknown> = {};
     if (mcpIdx >= 0 && mcpIdx + 1 < argsBase.length) {
@@ -57,8 +61,22 @@ function buildTurn(input: BuildTurnInput): BuildTurnResult {
       } catch {}
       argsBase.splice(mcpIdx, 2);
     }
-    const merged = hasBridgeTools ? buildBridgeMcpConfig(existingServers) : existingServers;
-    argsBase.push("--mcp-config", JSON.stringify({ mcpServers: merged }));
+
+    // File-path form: tool-bridge config is pre-written by
+    // installToolBridge into the container. Inline argv had a race
+    // where claude's first inference fired before MCP tool
+    // registration completed, dropping the first turn's tool calls
+    // as "No such tool available".
+    if (hasBridgeTools) {
+      argsBase.push("--mcp-config", TOOL_BRIDGE_MCP_CONFIG_PATH);
+    }
+    // Agent-level mcp_servers (rare) still go inline — they vary per
+    // session and aren't pre-written by the bridge installer.
+    if (Object.keys(existingServers).length > 0) {
+      argsBase.push("--mcp-config", JSON.stringify({ mcpServers: existingServers }));
+    }
+    // Ignore ~/.claude/.mcp.json and similar — only use what we passed.
+    argsBase.push("--strict-mcp-config");
   }
 
   if (toolResults.length > 0) {
@@ -124,6 +142,15 @@ async function installToolBridge(
     { stdin: toolsToJson(customTools) },
   );
   await provider.exec(sandboxName, ["chmod", "+x", TOOL_BRIDGE_SCRIPT_PATH]);
+  // Pre-write the mcp-config JSON to disk. buildTurn passes
+  // `--mcp-config <path>` (not inline JSON) — file-path form avoids
+  // the inline-argv race where claude's first inference fires before
+  // MCP tool registration completes.
+  await provider.exec(
+    sandboxName,
+    ["sh", "-c", `cat > "${TOOL_BRIDGE_MCP_CONFIG_PATH}"`],
+    { stdin: buildBridgeMcpConfigFile() },
+  );
 }
 
 /**

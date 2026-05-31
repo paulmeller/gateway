@@ -28,6 +28,14 @@ export const TOOL_BRIDGE_TOOLS_PATH = `${TOOL_BRIDGE_DIR}/tools.json`;
 export const TOOL_BRIDGE_REQUEST_PATH = `${TOOL_BRIDGE_DIR}/request.json`;
 export const TOOL_BRIDGE_RESPONSE_PATH = `${TOOL_BRIDGE_DIR}/response.json`;
 export const TOOL_BRIDGE_PENDING_PATH = `${TOOL_BRIDGE_DIR}/pending`;
+// Per-session MCP config file. Claude 2.1.158+ accepts `--mcp-config <path>`
+// AND `--mcp-config '<inline-json>'`, but the file-path form proves more
+// reliable in practice — inline JSON via argv has edge cases where the
+// MCP server starts but tool registration races claude's first inference,
+// resulting in spurious "No such tool available" errors on the first turn.
+// Pre-writing the config lets claude's MCP boot follow its standard load
+// path (same as `~/.claude/.mcp.json`) instead of the argv-string parser.
+export const TOOL_BRIDGE_MCP_CONFIG_PATH = `${TOOL_BRIDGE_DIR}/mcp-config.json`;
 
 /**
  * Generate the MCP stdio server script as a string.
@@ -170,6 +178,22 @@ export function buildBridgeMcpConfig(
       args: [TOOL_BRIDGE_SCRIPT_PATH],
     },
   };
+}
+
+/**
+ * Serialize the bridge mcp-config to the format claude expects on disk.
+ * Written into the container by installToolBridge so callers can pass
+ * `--mcp-config <file-path>` instead of inline JSON.
+ */
+export function buildBridgeMcpConfigFile(): string {
+  return JSON.stringify({
+    mcpServers: {
+      "tool-bridge": {
+        command: "bash",
+        args: [TOOL_BRIDGE_SCRIPT_PATH],
+      },
+    },
+  });
 }
 
 /**
