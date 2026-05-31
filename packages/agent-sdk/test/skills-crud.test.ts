@@ -89,10 +89,11 @@ describe("Skills CRUD", () => {
     );
     expect(res.status).toBe(201);
     const skill = await res.json();
-    expect(skill.type).toBe("skill");
-    expect(skill.name).toBe("test-skill");
+    expect(skill.display_title).toBe("test-skill");
     expect(skill.description).toBe("A test skill");
-    expect(skill.current_version).toBe("1.0.0");
+    expect(skill.source).toBe("custom");
+    // Anthropic CMA-compat: latest_version is an epoch-microsecond string.
+    expect(skill.latest_version).toMatch(/^\d+$/);
     expect(skill.id).toMatch(/^skill_/);
   });
 
@@ -109,7 +110,7 @@ describe("Skills CRUD", () => {
     expect(getRes.status).toBe(200);
     const skill = await getRes.json();
     expect(skill.id).toBe(created.id);
-    expect(skill.name).toBe("my-skill");
+    expect(skill.display_title).toBe("my-skill");
   });
 
   it("returns 404 for non-existent skill", async () => {
@@ -186,7 +187,10 @@ describe("Skill Versions", () => {
     expect(vRes.status).toBe(201);
     const version = await vRes.json();
     expect(version.type).toBe("skill_version");
-    expect(version.version).toBe("1.0.1"); // auto-incremented from 1.0.0
+    // Auto-generated versions are epoch-microsecond strings (Anthropic
+    // CMA-compat). Strictly increasing for sequential creates.
+    expect(version.version).toMatch(/^\d+$/);
+    expect(Number(version.version)).toBeGreaterThan(Number(skill.latest_version));
     expect(version.content).toBe("v2 content");
     expect(version.skill_id).toBe(skill.id);
   });
@@ -209,7 +213,7 @@ describe("Skill Versions", () => {
     expect(version.version).toBe("2.0.0");
   });
 
-  it("updates skill current_version after creating a version", async () => {
+  it("updates skill latest_version after creating a version", async () => {
     await bootDb();
     const { handleCreateSkill, handleCreateSkillVersion, handleGetSkill } = await import("../src/handlers/skills-write");
 
@@ -218,14 +222,15 @@ describe("Skill Versions", () => {
     );
     const skill = await createRes.json();
 
-    await handleCreateSkillVersion(
+    const vRes = await handleCreateSkillVersion(
       req(`/v1/skills/${skill.id}/versions`, { body: { content: "v2" } }),
       skill.id,
     );
+    const newVersion = (await vRes.json()).version;
 
     const getRes = await handleGetSkill(req(`/v1/skills/${skill.id}`), skill.id);
     const updated = await getRes.json();
-    expect(updated.current_version).toBe("1.0.1");
+    expect(updated.latest_version).toBe(newVersion);
   });
 
   it("lists versions", async () => {
@@ -252,7 +257,7 @@ describe("Skill Versions", () => {
     );
     expect(listRes.status).toBe(200);
     const body = await listRes.json();
-    expect(body.data.length).toBe(3); // 1.0.0, 1.0.1, 1.0.2
+    expect(body.data.length).toBe(3);
   });
 
   it("gets a specific version", async () => {
@@ -263,15 +268,16 @@ describe("Skill Versions", () => {
       req("/v1/skills", { body: { name: "sv", content: "first version content" } }),
     );
     const skill = await createRes.json();
+    const v0 = skill.latest_version;
 
     const getRes = await handleGetSkillVersion(
-      req(`/v1/skills/${skill.id}/versions/1.0.0`),
+      req(`/v1/skills/${skill.id}/versions/${v0}`),
       skill.id,
-      "1.0.0",
+      v0,
     );
     expect(getRes.status).toBe(200);
     const version = await getRes.json();
-    expect(version.version).toBe("1.0.0");
+    expect(version.version).toBe(v0);
     expect(version.content).toBe("first version content");
   });
 
@@ -300,18 +306,19 @@ describe("Skill Versions", () => {
       req("/v1/skills", { body: { name: "dv", content: "v1" } }),
     );
     const skill = await createRes.json();
+    const v0 = skill.latest_version;
 
-    // Create a second version — now current_version = 1.0.1
+    // Create a second version — latest_version advances forward
     await handleCreateSkillVersion(
       req(`/v1/skills/${skill.id}/versions`, { body: { content: "v2" } }),
       skill.id,
     );
 
-    // Delete the old version 1.0.0 (not current)
+    // Delete v0 (no longer current)
     const delRes = await handleDeleteSkillVersion(
-      req(`/v1/skills/${skill.id}/versions/1.0.0`, { method: "DELETE" }),
+      req(`/v1/skills/${skill.id}/versions/${v0}`, { method: "DELETE" }),
       skill.id,
-      "1.0.0",
+      v0,
     );
     expect(delRes.status).toBe(200);
     const body = await delRes.json();
@@ -319,9 +326,9 @@ describe("Skill Versions", () => {
 
     // Confirm it's gone
     const getRes = await handleGetSkillVersion(
-      req(`/v1/skills/${skill.id}/versions/1.0.0`),
+      req(`/v1/skills/${skill.id}/versions/${v0}`),
       skill.id,
-      "1.0.0",
+      v0,
     );
     expect(getRes.status).toBe(404);
   });
@@ -334,12 +341,13 @@ describe("Skill Versions", () => {
       req("/v1/skills", { body: { name: "cd", content: "v1" } }),
     );
     const skill = await createRes.json();
+    const v0 = skill.latest_version;
 
-    // Try to delete the current version (1.0.0)
+    // Try to delete the current (only) version
     const delRes = await handleDeleteSkillVersion(
-      req(`/v1/skills/${skill.id}/versions/1.0.0`, { method: "DELETE" }),
+      req(`/v1/skills/${skill.id}/versions/${v0}`, { method: "DELETE" }),
       skill.id,
-      "1.0.0",
+      v0,
     );
     expect(delRes.status).toBe(400);
     const body = await delRes.json();
@@ -412,7 +420,7 @@ describe("Anthropic skill format on agent create", () => {
     expect(agent.skills.length).toBe(1);
     expect(agent.skills[0].name).toBe("db-skill");
     expect(agent.skills[0].content).toBe("# DB Skill\nDo something.");
-    expect(agent.skills[0].source).toBe(`skill:${skill.id}@1.0.0`);
+    expect(agent.skills[0].source).toBe(`skill:${skill.id}@${skill.latest_version}`);
   });
 
   it("accepts skill_id with explicit version", async () => {
@@ -424,6 +432,7 @@ describe("Anthropic skill format on agent create", () => {
       req("/v1/skills", { body: { name: "ver-skill", content: "v1" } }),
     );
     const skill = await skillRes.json();
+    const v0 = skill.latest_version;
 
     // Create a second version
     await handleCreateSkillVersion(
@@ -431,20 +440,20 @@ describe("Anthropic skill format on agent create", () => {
       skill.id,
     );
 
-    // Create an agent referencing the first version
+    // Create an agent referencing the first version explicitly
     const agentRes = await handleCreateAgent(
       req("/anthropic/v1/agents", {
         body: {
           name: "ver-agent",
           model: { id: "claude-sonnet-4-20250514" },
-          skills: [{ skill_id: skill.id, version: "1.0.0" }],
+          skills: [{ skill_id: skill.id, version: v0 }],
         },
       }),
     );
     expect(agentRes.status).toBe(201);
     const agent = await agentRes.json();
     expect(agent.skills[0].content).toBe("v1"); // v1, not v2
-    expect(agent.skills[0].source).toBe(`skill:${skill.id}@1.0.0`);
+    expect(agent.skills[0].source).toBe(`skill:${skill.id}@${v0}`);
   });
 
   it("returns 400 for non-existent skill_id", async () => {
@@ -788,18 +797,19 @@ describe("Skills DB layer", () => {
     freshDbEnv();
   });
 
-  it("auto-increments versions correctly", async () => {
+  it("auto-increments versions strictly monotonically (epoch-microsecond)", async () => {
     await bootDb();
     const { createSkill, createSkillVersion } = await import("../src/db/skills");
 
     const skill = createSkill({ name: "auto", content: "v1" });
-    expect(skill.current_version).toBe("1.0.0");
+    expect(skill.latest_version).toMatch(/^\d+$/);
 
     const v2 = createSkillVersion(skill.id, { content: "v2" });
-    expect(v2!.version).toBe("1.0.1");
-
     const v3 = createSkillVersion(skill.id, { content: "v3" });
-    expect(v3!.version).toBe("1.0.2");
+    expect(v2!.version).toMatch(/^\d+$/);
+    expect(v3!.version).toMatch(/^\d+$/);
+    expect(Number(v2!.version)).toBeGreaterThan(Number(skill.latest_version));
+    expect(Number(v3!.version)).toBeGreaterThan(Number(v2!.version));
   });
 
   it("hard-deletes skill and all versions", async () => {
@@ -821,7 +831,7 @@ describe("Skills DB layer", () => {
     const { createSkill, deleteSkillVersion } = await import("../src/db/skills");
 
     const skill = createSkill({ name: "nodel", content: "v1" });
-    const result = deleteSkillVersion(skill.id, "1.0.0");
+    const result = deleteSkillVersion(skill.id, skill.latest_version);
     expect(result.ok).toBe(false);
     expect(result.reason).toBe("cannot delete the current version");
   });

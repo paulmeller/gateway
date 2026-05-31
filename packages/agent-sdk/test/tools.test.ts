@@ -66,7 +66,7 @@ describe("resolveToolset", () => {
     expect(r.allowedTools).toContain("Bash");
   });
 
-  it("returns no built-ins when agent_toolset is absent", () => {
+  it("allows only ToolSearch when agent_toolset is absent + custom tools present", () => {
     const r = resolveToolset([
       {
         type: "custom",
@@ -75,7 +75,10 @@ describe("resolveToolset", () => {
         input_schema: {},
       },
     ]);
-    expect(r.allowedTools).toEqual([]);
+    // ToolSearch is always allowed when custom tools are present —
+    // Claude Code uses it as the MCP-tool discovery fallback while
+    // MCP servers transition from "pending" → "ready" (0.5.54).
+    expect(r.allowedTools).toEqual(["ToolSearch"]);
     expect(r.customToolNames.has("foo")).toBe(true);
   });
 

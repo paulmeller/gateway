@@ -25,19 +25,15 @@ function hydrateSkill(row: {
   updated_at: number;
   archived_at: number | null;
 }): Skill {
-  const version = row.current_version ?? "1.0.0";
   return {
     // ─── Anthropic CMA-compat (canonical) ──────────────────────────
     id: row.id,
     display_title: row.name,
     source: "custom",
-    latest_version: version,
+    latest_version: row.current_version ?? "",
     created_at: toIso(row.created_at),
-    // ─── AgentStep alias / extension ───────────────────────────────
-    type: "skill",
-    name: row.name,
+    // ─── AgentStep extensions (not in Anthropic CMA) ───────────────
     description: row.description ?? "",
-    current_version: version,
     updated_at: toIso(row.updated_at),
     archived_at: row.archived_at ? toIso(row.archived_at) : null,
   };
@@ -79,12 +75,12 @@ export function createSkill(input: {
   const db = getDrizzle();
   const id = newId("skill");
   const versionId = newId("sklv");
+  // Version format: epoch-microsecond timestamp, matching Anthropic's
+  // Skills API convention (e.g. "1759178010641129"). Old semver values
+  // ("1.0.0", "1.0.1") in the DB still resolve via exact-match lookup
+  // — only newly-created skills + versions use the new format.
+  const version = nextVersionId();
   const now = nowMs();
-  // First version is "1.0.0" — semver-ish. The version-format
-  // alignment to Anthropic's epoch-microsecond convention ships in a
-  // separate release (this one is field-name aliases only). See
-  // Skill schema deprecation notes on `current_version` for the path.
-  const version = "1.0.0";
 
   db.transaction((tx) => {
     tx.insert(schema.skills).values({
@@ -173,11 +169,28 @@ export function deleteSkill(id: string): boolean {
 /**
  * Auto-increment a semver patch version. "1.0.0" -> "1.0.1", etc.
  */
-function autoIncrement(current: string): string {
-  const parts = current.split(".");
-  if (parts.length !== 3) return `${current}.1`;
-  const patch = parseInt(parts[2], 10);
-  return `${parts[0]}.${parts[1]}.${isNaN(patch) ? 1 : patch + 1}`;
+// Anthropic Skills API uses epoch-microsecond timestamps for version
+// IDs (e.g. "1759178010641129"). Migrating to that convention so
+// pinned `{ skill_id, version }` refs survive across SDKs without
+// translation. Old semver versions stored from before 0.5.57 still
+// resolve via exact match — this only affects the next-version
+// generator.
+//
+// Node's millisecond clock can give the same `Date.now()` for rapid
+// successive calls; the in-process counter below guarantees strict
+// monotonicity ("v_next > v_prev") even within a single millisecond.
+// Behaves like an epoch microsecond clock for normal-paced traffic and
+// degrades to a counter-on-millisecond for tight loops (tests, batches).
+let _lastSkillVersion = 0;
+function nextVersionId(): string {
+  let v = nowMs() * 1000;
+  if (v <= _lastSkillVersion) v = _lastSkillVersion + 1;
+  _lastSkillVersion = v;
+  return String(v);
+}
+
+function autoIncrement(_current: string): string {
+  return nextVersionId();
 }
 
 export function createSkillVersion(

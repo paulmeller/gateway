@@ -327,7 +327,7 @@ export function handleGetSkillVersionContent(
     return new Response(sv.content, {
       headers: {
         "Content-Type": "text/markdown",
-        "Content-Disposition": `attachment; filename="${skill.name}-${version}.md"`,
+        "Content-Disposition": `attachment; filename="${skill.display_title}-${version}.md"`,
         "Content-Length": String(Buffer.byteLength(sv.content, "utf-8")),
       },
     });

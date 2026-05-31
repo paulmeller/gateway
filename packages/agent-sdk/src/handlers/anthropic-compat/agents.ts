@@ -176,11 +176,11 @@ async function resolveSkillInputs(
 
       if (dbSkill) {
         // DB-stored skill (custom or previously uploaded)
-        const version = s.version ?? dbSkill.current_version;
+        const version = s.version ?? dbSkill.latest_version;
         const sv = dbGetSkillVersion(s.skill_id, version);
         if (!sv) throw badRequest(`skill version ${version} not found for skill ${s.skill_id}`);
         resolved.push({
-          name: dbSkill.name,
+          name: dbSkill.display_title,
           source: `skill:${s.skill_id}@${version}`,
           content: sv.content,
           ...(sv.files && Object.keys(sv.files).length > 0 ? { files: sv.files } : {}),

@@ -1379,20 +1379,19 @@ export const SkillsSearchResponseSchema = registry.register(
 // `SkillSchema` represents a row in the SDK's `skills` table — the unit
 // returned by POST /v1/skills, GET /v1/skills/:id, etc.
 
-// Skill — Anthropic Skills API shape, with AgentStep aliases for
-// back-compat with callers that pinned to our pre-0.5.56 field names.
-// The Anthropic-canonical fields are non-optional; the alias fields are
-// also non-optional but marked deprecated, so existing clients keep
-// deserializing. A future release will drop the aliased fields.
+// Skill — Anthropic Skills API shape (cutover release 0.5.57).
+// Deprecated AgentStep aliases (`type`, `name`, `current_version`) were
+// dropped; callers should now read `display_title` and `latest_version`.
+// Extension fields (`description`, `updated_at`, `archived_at`) carry
+// information beyond the Anthropic shape — Anthropic SDK consumers
+// ignore them harmlessly.
 export const SkillSchema = registry.register(
   "Skill",
   z.object({
     // ─── Anthropic CMA-compat fields ─────────────────────────────────
     id: UlidId,
     display_title: z.string().openapi({
-      description:
-        "Human-readable skill name. Anthropic CMA-compat field. " +
-        "AgentStep also returns the same value under the deprecated `name` field.",
+      description: "Human-readable skill name.",
     }),
     source: z.enum(["custom", "anthropic"]).openapi({
       description:
@@ -1402,34 +1401,22 @@ export const SkillSchema = registry.register(
     }),
     latest_version: z.string().openapi({
       description:
-        "Active skill version. Currently semver-ish (e.g. `1.0.0`, " +
-        "`1.0.1`, auto-incremented). A future agent-sdk release will " +
-        "align this to Anthropic's epoch-microsecond convention " +
-        "(e.g. `1759178010641129`); both formats will resolve.",
+        "Active skill version. Format: epoch-microsecond timestamp " +
+        "(e.g. `1759178010641129`) for skills created on agent-sdk " +
+        "0.5.57+. Older skills retain semver-ish values (e.g. " +
+        "`1.0.0`); both formats resolve identically via the versions " +
+        "endpoints.",
     }),
     created_at: z.string().datetime(),
-    // ─── AgentStep aliases / extensions ──────────────────────────────
-    type: z.literal("skill").openapi({
-      description: "AgentStep convention; not part of Anthropic CMA.",
-    }),
-    name: z.string().openapi({
-      description:
-        "**Deprecated** alias for `display_title`. Returned for back-compat; " +
-        "will be removed in a future release. Use `display_title`.",
-    }),
+    // ─── AgentStep extensions (not in Anthropic CMA) ─────────────────
     description: z.string().nullable().openapi({
-      description: "AgentStep extension: optional free-form description.",
-    }),
-    current_version: z.string().openapi({
-      description:
-        "**Deprecated** alias for `latest_version`. Returned for back-compat; " +
-        "will be removed in a future release. Use `latest_version`.",
+      description: "Optional free-form description.",
     }),
     updated_at: z.string().datetime().openapi({
-      description: "AgentStep extension: last-modified timestamp.",
+      description: "Last-modified timestamp.",
     }),
     archived_at: z.string().datetime().nullable().openapi({
-      description: "AgentStep extension: archive marker, null when active.",
+      description: "Archive marker; null when active.",
     }),
   }),
 );

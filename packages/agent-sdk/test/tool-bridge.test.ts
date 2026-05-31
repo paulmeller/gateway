@@ -516,12 +516,16 @@ describe("tool bridge bash script", () => {
     }
   }
 
-  it.skipIf(!hasBash)("handles initialize request", () => {
+  it.skipIf(!hasBash)("echoes client protocolVersion in initialize response", () => {
+    // Per 0.5.53: bridge echoes the client's protocolVersion (MCP spec)
+    // instead of hardcoding a single version. Claude Code 2.x sends
+    // various versions over the beta lifetime; echoing keeps the
+    // handshake compatible across releases.
     const msg = JSON.stringify({
       jsonrpc: "2.0",
       id: 1,
       method: "initialize",
-      params: {},
+      params: { protocolVersion: "2025-11-25" },
     });
     const output = sendToScript(msg);
     const resp = JSON.parse(output);
@@ -530,6 +534,18 @@ describe("tool bridge bash script", () => {
     expect(resp.result.protocolVersion).toBe("2025-11-25");
     expect(resp.result.capabilities.tools).toBeDefined();
     expect(resp.result.serverInfo.name).toBe("tool-bridge");
+  });
+
+  it.skipIf(!hasBash)("falls back to 2024-11-05 when client omits protocolVersion", () => {
+    const msg = JSON.stringify({
+      jsonrpc: "2.0",
+      id: 2,
+      method: "initialize",
+      params: {},
+    });
+    const output = sendToScript(msg);
+    const resp = JSON.parse(output);
+    expect(resp.result.protocolVersion).toBe("2024-11-05");
   });
 
   it.skipIf(!hasBash)("handles ping request", () => {
