@@ -59,8 +59,35 @@ if [ "$(id -u)" = "0" ]; then
   # Export env vars to a file for the agent user. Dotted prefix as above.
   ENV_FILE=$(mktemp /tmp/.claude-cw.XXXXXXXXXX)
   env | grep -E '^(ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN|NODE_COMPILE_CACHE|PATH)=' > "$ENV_FILE"
-  chown agent "$ENV_FILE" "$PROMPT_FILE"
-  exec su -s /bin/sh agent -c ". $ENV_FILE && HOME=/home/agent claude $* < $PROMPT_FILE; rm -f $ENV_FILE $PROMPT_FILE"
+  # Build a runner script with each argv entry properly single-quoted.
+  # Passing args via \\$* (or whitespace-joined re-expansion) inside the
+  # inner \`su -c "..."\` word-splits multi-word entries like
+  # --system-prompt "Long text..." — claude then mis-parses the system
+  # prompt and the runover words become the positional prompt, dropping
+  # the real user input on the floor.
+  #
+  # Strategy: write a per-invocation runner script that contains the
+  # properly-quoted claude invocation, then \`su -c "exec $RUN_FILE"\`.
+  # The single string passed to \`su -c\` is just a /tmp path with no
+  # spaces, so its own re-tokenisation can't break anything.
+  RUN_FILE=$(mktemp /tmp/.claude-cw.XXXXXXXXXX)
+  {
+    echo '#!/bin/sh'
+    echo ". $ENV_FILE"
+    printf 'HOME=/home/agent exec claude'
+    for arg in "$@"; do
+      # POSIX sh single-quote escape: every ' becomes '\\''
+      # (close the open '-quoted string, escaped \\', reopen '-quoted).
+      # We use awk with the \\x27 escape so the awk program text never
+      # contains an actual ' that would collide with shell quoting.
+      esc=$(printf '%s' "$arg" | awk 'BEGIN{ORS=""} {gsub(/\\x27/, "\\x27\\\\\\x27\\x27"); print}')
+      printf " '%s'" "$esc"
+    done
+    printf ' < %s\\n' "$PROMPT_FILE"
+  } > "$RUN_FILE"
+  chmod +x "$RUN_FILE"
+  chown agent "$ENV_FILE" "$PROMPT_FILE" "$RUN_FILE"
+  exec su -s /bin/sh agent -c "exec $RUN_FILE; rm -f $ENV_FILE $PROMPT_FILE $RUN_FILE"
 fi
 # Run claude and clean up temp file (no exec — let cleanup run)
 claude "$@" < "$PROMPT_FILE"
