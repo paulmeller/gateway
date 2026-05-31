@@ -25,13 +25,19 @@ function hydrateSkill(row: {
   updated_at: number;
   archived_at: number | null;
 }): Skill {
+  const version = row.current_version ?? "1.0.0";
   return {
-    type: "skill",
+    // ─── Anthropic CMA-compat (canonical) ──────────────────────────
     id: row.id,
+    display_title: row.name,
+    source: "custom",
+    latest_version: version,
+    created_at: toIso(row.created_at),
+    // ─── AgentStep alias / extension ───────────────────────────────
+    type: "skill",
     name: row.name,
     description: row.description ?? "",
-    current_version: row.current_version ?? "1.0.0",
-    created_at: toIso(row.created_at),
+    current_version: version,
     updated_at: toIso(row.updated_at),
     archived_at: row.archived_at ? toIso(row.archived_at) : null,
   };
@@ -74,6 +80,10 @@ export function createSkill(input: {
   const id = newId("skill");
   const versionId = newId("sklv");
   const now = nowMs();
+  // First version is "1.0.0" — semver-ish. The version-format
+  // alignment to Anthropic's epoch-microsecond convention ships in a
+  // separate release (this one is field-name aliases only). See
+  // Skill schema deprecation notes on `current_version` for the path.
   const version = "1.0.0";
 
   db.transaction((tx) => {

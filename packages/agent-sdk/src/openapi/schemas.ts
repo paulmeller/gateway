@@ -1379,19 +1379,58 @@ export const SkillsSearchResponseSchema = registry.register(
 // `SkillSchema` represents a row in the SDK's `skills` table — the unit
 // returned by POST /v1/skills, GET /v1/skills/:id, etc.
 
+// Skill — Anthropic Skills API shape, with AgentStep aliases for
+// back-compat with callers that pinned to our pre-0.5.56 field names.
+// The Anthropic-canonical fields are non-optional; the alias fields are
+// also non-optional but marked deprecated, so existing clients keep
+// deserializing. A future release will drop the aliased fields.
 export const SkillSchema = registry.register(
   "Skill",
   z.object({
-    type: z.literal("skill"),
+    // ─── Anthropic CMA-compat fields ─────────────────────────────────
     id: UlidId,
-    name: z.string(),
-    description: z.string().nullable(),
-    current_version: z.string().nullable().openapi({
-      description: "Semver-ish version string of the active skill version, e.g. '1.0.0'.",
+    display_title: z.string().openapi({
+      description:
+        "Human-readable skill name. Anthropic CMA-compat field. " +
+        "AgentStep also returns the same value under the deprecated `name` field.",
+    }),
+    source: z.enum(["custom", "anthropic"]).openapi({
+      description:
+        "`custom` for skills uploaded via POST /v1/skills. `anthropic` " +
+        "is reserved for pre-built Anthropic skills (forward-compat — " +
+        "AgentStep doesn't yet ship pre-built skills under this field).",
+    }),
+    latest_version: z.string().openapi({
+      description:
+        "Active skill version. Currently semver-ish (e.g. `1.0.0`, " +
+        "`1.0.1`, auto-incremented). A future agent-sdk release will " +
+        "align this to Anthropic's epoch-microsecond convention " +
+        "(e.g. `1759178010641129`); both formats will resolve.",
     }),
     created_at: z.string().datetime(),
-    updated_at: z.string().datetime(),
-    archived_at: z.string().datetime().nullable(),
+    // ─── AgentStep aliases / extensions ──────────────────────────────
+    type: z.literal("skill").openapi({
+      description: "AgentStep convention; not part of Anthropic CMA.",
+    }),
+    name: z.string().openapi({
+      description:
+        "**Deprecated** alias for `display_title`. Returned for back-compat; " +
+        "will be removed in a future release. Use `display_title`.",
+    }),
+    description: z.string().nullable().openapi({
+      description: "AgentStep extension: optional free-form description.",
+    }),
+    current_version: z.string().openapi({
+      description:
+        "**Deprecated** alias for `latest_version`. Returned for back-compat; " +
+        "will be removed in a future release. Use `latest_version`.",
+    }),
+    updated_at: z.string().datetime().openapi({
+      description: "AgentStep extension: last-modified timestamp.",
+    }),
+    archived_at: z.string().datetime().nullable().openapi({
+      description: "AgentStep extension: archive marker, null when active.",
+    }),
   }),
 );
 

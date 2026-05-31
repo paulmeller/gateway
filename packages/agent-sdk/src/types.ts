@@ -555,14 +555,42 @@ export interface MemoryVersion {
 // Skills (standalone, DB-stored)
 // ---------------------------------------------------------------------------
 
+/**
+ * Skill — aligned with Anthropic Claude Skills API shape (currently
+ * beta-gated by header `anthropic-beta: skills-2025-10-02`). Includes
+ * aliases over our internal column names so callers using the official
+ * Anthropic SDK see the field names they expect:
+ *
+ *   `display_title`  ↔ `name`            (Anthropic uses display_title)
+ *   `latest_version` ↔ `current_version`
+ *   `source`                                constant "custom" — Anthropic
+ *                                           also returns "anthropic" for
+ *                                           their pre-built skills.
+ *
+ * The Anthropic-canonical fields are listed first; AgentStep aliases
+ * (`type`, `name`, `description`, `current_version`, `updated_at`,
+ * `archived_at`) follow and will be removed in a future release once
+ * callers have migrated.
+ */
 export interface Skill {
-  type: "skill";
+  // ─── Anthropic CMA-compat fields ─────────────────────────────────
   id: string;
-  name: string;
-  description: string;
-  current_version: string;
+  display_title: string;
+  source: "custom" | "anthropic";
+  latest_version: string;
   created_at: string;
+  // ─── AgentStep aliases / extension fields ────────────────────────
+  /** AgentStep convention; Anthropic responses omit this. */
+  type: "skill";
+  /** @deprecated alias for `display_title` — will be removed in a future release */
+  name: string;
+  /** AgentStep extension: free-form description. Not part of Anthropic CMA. */
+  description: string;
+  /** @deprecated alias for `latest_version` — will be removed in a future release */
+  current_version: string;
+  /** AgentStep extension: last-modified timestamp. */
   updated_at: string;
+  /** AgentStep extension: archive marker. */
   archived_at: string | null;
 }
 
