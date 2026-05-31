@@ -79,7 +79,20 @@ handle_request() {
       ;;
     tools/call)
       local tool_name
-      tool_name=$(echo "$body" | grep -o '"name":"[^"]*"' | tail -1 | cut -d'"' -f4)
+      # Extract tool name from params.name (NOT from any nested
+      # arguments.name field). Body shape:
+      #   {..., "params":{"name":"<TOOL>","arguments":{...}}}
+      # Tools whose input schema includes a "name" property (e.g. our
+      # propose_name with input { name: "..." }) would otherwise have
+      # the argument value mis-extracted by a plain grep | tail -1.
+      # Anchor on the "params":{ opener so we only match the "name":
+      # field immediately after it.
+      tool_name=$(echo "$body" | grep -oE '"params":\\{"name":"[^"]+"' | head -1 | sed 's/.*"name":"//;s/"$//')
+      if [ -z "$tool_name" ]; then
+        # Fallback: first "name":"..." in the body (params may have
+        # been pretty-printed or contain whitespace between { and "name").
+        tool_name=$(echo "$body" | grep -o '"name":"[^"]*"' | head -1 | cut -d'"' -f4)
+      fi
 
       # Reject unknown tools immediately (don't wait for gateway response)
       if [ -n "$TOOLS_LIST_JSON" ]; then
