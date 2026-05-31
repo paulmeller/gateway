@@ -2303,15 +2303,34 @@ registry.registerPath({
 // Generate the final document
 // ---------------------------------------------------------------------------
 
-export function buildOpenApiDocument(opts: { serverUrl: string }): unknown {
+/**
+ * Build the OpenAPI document.
+ *
+ * `pathPrefix` (optional): when set to "/anthropic/v1", "/v1", or
+ * "/google/v1beta", only paths under that prefix are emitted, and the
+ * title is adjusted to match the surface. This lets each API surface
+ * publish its own openapi.json (e.g. /anthropic/v1/openapi.json) so
+ * downstream tooling — like the Anthropic SDK code generator — only
+ * sees the routes it cares about. With no prefix, every path on every
+ * surface is included (back-compat for /v1/openapi.json before the
+ * per-surface split).
+ */
+export function buildOpenApiDocument(opts: {
+  serverUrl: string;
+  pathPrefix?: string;
+}): unknown {
   const generator = new OpenApiGeneratorV31(registry.definitions);
-  return generator.generateDocument({
+
+  // Per-surface metadata. Keep the base description neutral so the
+  // combined-surface spec (no prefix) keeps its current copy.
+  const meta = surfaceMetadata(opts.pathPrefix);
+
+  const doc = generator.generateDocument({
     openapi: "3.1.0",
     info: {
-      title: "AgentStep Gateway",
+      title: meta.title,
       version: "0.4.16",
-      description:
-        "Open-source, drop-in replacement for the Claude Managed Agents API. Self-hosted agent gateway with 7 agent harnesses and 11 sandbox providers. Use with `@agentstep/agent-sdk` or the official Anthropic SDK — just change the baseURL.",
+      description: meta.description,
     },
     servers: [{ url: opts.serverUrl, description: "This host" }],
     security: [{ ApiKey: [] }],
@@ -2341,4 +2360,52 @@ export function buildOpenApiDocument(opts: { serverUrl: string }): unknown {
       { name: "Google Compat", description: "Google Interactions API compatibility layer" },
     ],
   });
+
+  // Filter paths by surface if a prefix was supplied. The doc shape
+  // is `{ paths: { "/some/path": { get, post, ... } } }`, so we filter
+  // the keys.
+  if (opts.pathPrefix) {
+    const prefix = opts.pathPrefix;
+    const filteredPaths: Record<string, unknown> = {};
+    const allPaths = (doc as { paths?: Record<string, unknown> }).paths ?? {};
+    for (const [pathKey, pathDef] of Object.entries(allPaths)) {
+      if (pathKey === prefix || pathKey.startsWith(prefix + "/")) {
+        filteredPaths[pathKey] = pathDef;
+      }
+    }
+    (doc as { paths: Record<string, unknown> }).paths = filteredPaths;
+  }
+  return doc;
+}
+
+function surfaceMetadata(pathPrefix?: string): {
+  title: string;
+  description: string;
+} {
+  switch (pathPrefix) {
+    case "/anthropic/v1":
+      return {
+        title: "AgentStep — Anthropic Managed Agents API",
+        description:
+          "Anthropic Managed Agents API surface. Drop-in compatible with the official Anthropic Managed Agents API — change the baseURL on your Anthropic SDK and stay on the same shapes (agents, sessions, vaults, environments, files, threads, resources, user_profiles, oauth).",
+      };
+    case "/google/v1beta":
+      return {
+        title: "AgentStep — Google Interactions API",
+        description:
+          "Google Interactions API compatibility surface. Drop-in compatible with Google's Interactions API shape.",
+      };
+    case "/v1":
+      return {
+        title: "AgentStep — Gateway-native API",
+        description:
+          "Gateway-native API surface: settings, api-keys, metrics, audit, tenants, upstream-keys, license, traces, providers, models, batch, skills, whoami, memory_stores, work. Anthropic-shaped resources live under /anthropic/v1/* and have their own spec at /anthropic/v1/openapi.json.",
+      };
+    default:
+      return {
+        title: "AgentStep Gateway",
+        description:
+          "Open-source, drop-in replacement for the Claude Managed Agents API. Self-hosted agent gateway with 7 agent harnesses and 11 sandbox providers. Use with `@agentstep/agent-sdk` or the official Anthropic SDK — just change the baseURL.",
+      };
+  }
 }
