@@ -1218,7 +1218,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: "/v1/memory_stores",
+  path: "/anthropic/v1/memory_stores",
   tags: ["Memory"],
   summary: "Create a memory store",
   security: [{ ApiKey: [] }],
@@ -1239,7 +1239,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/memory_stores",
+  path: "/anthropic/v1/memory_stores",
   tags: ["Memory"],
   summary: "List memory stores",
   security: [{ ApiKey: [] }],
@@ -1259,7 +1259,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/memory_stores/{id}",
+  path: "/anthropic/v1/memory_stores/{id}",
   tags: ["Memory"],
   summary: "Get a memory store",
   security: [{ ApiKey: [] }],
@@ -1275,7 +1275,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "delete",
-  path: "/v1/memory_stores/{id}",
+  path: "/anthropic/v1/memory_stores/{id}",
   tags: ["Memory"],
   summary: "Delete a memory store",
   security: [{ ApiKey: [] }],
@@ -1291,7 +1291,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: "/v1/memory_stores/{id}/memories",
+  path: "/anthropic/v1/memory_stores/{id}/memories",
   tags: ["Memory"],
   summary: "Create or upsert a memory",
   description:
@@ -1315,7 +1315,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/memory_stores/{id}/memories",
+  path: "/anthropic/v1/memory_stores/{id}/memories",
   tags: ["Memory"],
   summary: "List memories in a store",
   security: [{ ApiKey: [] }],
@@ -1331,7 +1331,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/memory_stores/{id}/memories/{memId}",
+  path: "/anthropic/v1/memory_stores/{id}/memories/{memId}",
   tags: ["Memory"],
   summary: "Get a memory",
   security: [{ ApiKey: [] }],
@@ -1347,7 +1347,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "patch",
-  path: "/v1/memory_stores/{id}/memories/{memId}",
+  path: "/anthropic/v1/memory_stores/{id}/memories/{memId}",
   tags: ["Memory"],
   summary: "Update a memory's content",
   description:
@@ -1371,7 +1371,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "delete",
-  path: "/v1/memory_stores/{id}/memories/{memId}",
+  path: "/anthropic/v1/memory_stores/{id}/memories/{memId}",
   tags: ["Memory"],
   summary: "Delete a memory",
   security: [{ ApiKey: [] }],
@@ -1413,7 +1413,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/skills",
+  path: "/anthropic/v1/skills",
   tags: ["Skills"],
   summary: "List the caller's uploaded skills",
   description:
@@ -1437,7 +1437,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: "/v1/skills",
+  path: "/anthropic/v1/skills",
   tags: ["Skills"],
   summary: "Create a skill (multipart upload)",
   description:
@@ -1474,7 +1474,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/skills/{id}",
+  path: "/anthropic/v1/skills/{id}",
   tags: ["Skills"],
   summary: "Get a skill by id",
   security: [{ ApiKey: [] }],
@@ -1490,7 +1490,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "delete",
-  path: "/v1/skills/{id}",
+  path: "/anthropic/v1/skills/{id}",
   tags: ["Skills"],
   summary: "Delete a skill",
   description: "Hard-deletes the skill and all its versions.",
@@ -1507,7 +1507,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/skills/{id}/versions",
+  path: "/anthropic/v1/skills/{id}/versions",
   tags: ["Skills"],
   summary: "List versions of a skill",
   security: [{ ApiKey: [] }],
@@ -1529,7 +1529,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: "/v1/skills/{id}/versions",
+  path: "/anthropic/v1/skills/{id}/versions",
   tags: ["Skills"],
   summary: "Create a new version of a skill",
   description: "Appends a new version. Auto-increments from the current version if no explicit `version` is supplied.",
@@ -1549,7 +1549,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/skills/{id}/versions/{version}",
+  path: "/anthropic/v1/skills/{id}/versions/{version}",
   tags: ["Skills"],
   summary: "Get a specific version of a skill",
   description:
@@ -1572,7 +1572,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "delete",
-  path: "/v1/skills/{id}/versions/{version}",
+  path: "/anthropic/v1/skills/{id}/versions/{version}",
   tags: ["Skills"],
   summary: "Delete a specific version of a skill",
   description: "Cannot delete the skill's `current_version` — promote another version first.",
@@ -1591,7 +1591,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/skills/{id}/versions/{version}/content",
+  path: "/anthropic/v1/skills/{id}/versions/{version}/content",
   tags: ["Skills"],
   summary: "Download raw skill content",
   description: "Returns the SKILL.md content as `text/markdown` with a Content-Disposition attachment header.",
@@ -1751,7 +1751,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/v1/models",
+  path: "/anthropic/v1/models",
   tags: ["Models"],
   summary: "List available models",
   description:
@@ -2619,7 +2619,7 @@ function surfaceMetadata(pathPrefix?: string): {
       return {
         title: "AgentStep — Anthropic Managed Agents API",
         description:
-          "Anthropic Managed Agents API surface. Drop-in compatible with the official Anthropic Managed Agents API — change the baseURL on your Anthropic SDK and stay on the same shapes (agents, sessions, vaults, environments, files, threads, resources, user_profiles, oauth).",
+          "Anthropic Managed Agents API surface. Drop-in compatible with the official Anthropic Managed Agents API — change the baseURL on your Anthropic SDK and stay on the same shapes: agents, sessions, vaults, environments, files, threads, resources, user_profiles, oauth, skills, memory_stores, models, environments/{id}/work.",
       };
     case "/google/v1beta":
       return {
@@ -2631,13 +2631,13 @@ function surfaceMetadata(pathPrefix?: string): {
       return {
         title: "AgentStep — Gateway-native API",
         description:
-          "Gateway-native API surface (canonical, PR8): settings, api-keys, metrics, audit, tenants, upstream-keys, license, traces, providers, models, batch, skills, whoami, memory_stores, work, debug-prompt. Anthropic-shaped resources live under /anthropic/v1/* — see /anthropic/v1/openapi.json. The same routes are also reachable under the deprecated /v1/* prefix (RFC 8594 `Deprecation` header on responses); new integrations should target /agentstep/v1/*.",
+          "Gateway-native API surface (canonical): settings, api-keys, metrics, audit, tenants, upstream-keys, license, traces, providers, batch, whoami, plus AgentStep-only extensions on CMA-shape resources (skills/{catalog,feed,index,sources,stats}, memory_stores/{id}/dream, sessions/{id}/debug-prompt). Anthropic-shaped resources (agents, sessions, vaults, environments, files, skills CRUD, memory_stores CRUD, models, environments/{id}/work) live under /anthropic/v1/* — see /anthropic/v1/openapi.json. The same routes are reachable under the deprecated /v1/* prefix (RFC 8594 `Deprecation` header on responses); new integrations should target /agentstep/v1/*.",
       };
     case "/v1":
       return {
         title: "AgentStep — /v1/* (deprecated alias)",
         description:
-          "Deprecated alias surface (PR8). Every route here is reachable at its canonical /agentstep/v1/* path; responses include an RFC 8594 `Deprecation` header and a `Link: rel=\"successor-version\"` pointing at the canonical URL. Existing integrations keep working — new integrations should target /agentstep/v1/openapi.json. Anthropic-shaped resources moved to /anthropic/v1/* and are NOT included in this alias.",
+          "Deprecated alias surface. Every gateway-native route here is reachable at its canonical /agentstep/v1/* path; responses include an RFC 8594 `Deprecation` header and a `Link: rel=\"successor-version\"` pointing at the canonical URL. CMA-shape resources (agents, sessions, vaults, environments, files, skills, memory_stores, models, environments/{id}/work) 308-redirect to /anthropic/v1/* and are NOT included in this alias.",
       };
     default:
       return {

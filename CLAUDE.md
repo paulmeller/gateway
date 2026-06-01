@@ -80,13 +80,17 @@ All handlers use `routeWrap()` from `http.ts` which handles init-on-first-reques
 
 ### API namespace
 
-Vendor-compat surfaces live under their own URL prefix:
+Three canonical surfaces:
 
-- `/anthropic/v1/*` — Anthropic Managed Agents API shape (agents, sessions, vaults, environments, files, threads, resources, user_profiles, oauth). Handlers in `packages/agent-sdk/src/handlers/anthropic-compat/`.
+- `/anthropic/v1/*` — Anthropic Managed Agents API shape. Drop-in for the stock Anthropic SDK with `base_url=…/anthropic`. Resources: agents, sessions, vaults, environments, files, threads, resources, user_profiles, oauth, **skills** (CRUD + versions + content), **memory_stores** (CRUD + memories + memory_versions + archive), **models**, **environments/:id/work/\*** (work queue, 8 verbs). Handlers in `packages/agent-sdk/src/handlers/anthropic-compat/` and the top-level skills/memory/model/work handlers.
+- `/agentstep/v1/*` — Gateway-native API. Resources: settings, api-keys, metrics, audit, tenants, upstream-keys, license, traces, providers, batch, whoami, plus AgentStep-only extensions on CMA-shape resources (`/skills/{catalog,feed,index,sources,stats}`, `/memory_stores/:id/dream`, `/sessions/:id/debug-prompt`). Handlers at the top level of `packages/agent-sdk/src/handlers/`.
 - `/google/v1beta/*` — Google Interactions API shape. Handlers in `packages/agent-sdk/src/handlers/google-compat/`.
-- `/v1/*` — Gateway-native API (settings, api-keys, metrics, audit, tenants, upstream-keys, license, traces, providers, models, batch, skills, whoami, memory_stores, work). Handlers at the top level of `packages/agent-sdk/src/handlers/`.
 
-The `/v1/environments/:id/work/*` work-queue routes are gateway-native and stay under `/v1/*` even though they share a path parameter with `/anthropic/v1/environments/:id`.
+Plus one deprecated alias:
+
+- `/v1/*` — Each route resolves to either `/anthropic/v1/*` (CMA-shape resources 308-redirect, preserving method/body per RFC 7231 §6.4.7) or `/agentstep/v1/*` (gateway-native still serves, with RFC 8594 `Deprecation` + `Link: rel="successor-version"` headers). Meta endpoints `/v1/openapi.json` + `/v1/docs` stay as the combined back-compat entrypoint.
+
+`/agentstep/v1/*` is implemented as a catch-all internal forwarder onto `/v1/*` handler mounts. CMA-canonical paths (skills, memory_stores, models, environments/:id/work) under `/agentstep/v1/*` 404 with a `Link: rel="canonical"` pointing at `/anthropic/v1/*` — the namespace explicitly rejects vendor-shape resources to prevent silent classification drift.
 
 ### Anthropic API key passthrough
 
