@@ -60,6 +60,19 @@ import {
   UpdateMemoryRequestSchema,
   MemoryListResponseSchema,
   MemoryDeletedResponseSchema,
+  MemoryVersionSchema,
+  MemoryVersionListResponseSchema,
+  // Work queue
+  WorkStateSchema,
+  WorkItemSchema,
+  WorkItemListResponseSchema,
+  WorkQueueStatsSchema,
+  UpdateWorkRequestSchema,
+  PollWorkResponseSchema,
+  AckWorkRequestSchema,
+  StopWorkRequestSchema,
+  // MCP OAuth
+  McpOauthValidationResultSchema,
   // Resources
   SessionResourceSchema,
   AddResourceRequestSchema,
@@ -438,6 +451,189 @@ registry.registerPath({
     200: {
       description: "Environment archived",
       content: { "application/json": { schema: EnvironmentSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+// ---------------------------------------------------------------------------
+// /v1/environments/{id}/work — self-hosted runner work queue
+// ---------------------------------------------------------------------------
+
+const WORK_NOTE =
+  "Only available on environments with `config.type = \"self_hosted\"`. Returns 400 (`bad_request`) on cloud environments. Self-hosted runners poll for work, ack to claim, heartbeat while active, and ack-complete or stop when done.";
+
+registry.registerPath({
+  method: "get",
+  path: "/anthropic/v1/environments/{id}/work",
+  tags: ["Work"],
+  summary: "List work items in an environment",
+  description: WORK_NOTE,
+  security: [{ ApiKey: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    query: z.object({
+      state: WorkStateSchema.optional().describe("Filter by lifecycle state."),
+      limit: z.coerce.number().int().min(1).max(100).optional(),
+      after_id: z.string().optional().describe("Opaque pagination cursor returned by a prior call."),
+    }),
+  },
+  responses: {
+    200: {
+      description: "Work item list",
+      content: { "application/json": { schema: WorkItemListResponseSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/anthropic/v1/environments/{id}/work/poll",
+  tags: ["Work"],
+  summary: "Poll for the next queued work item",
+  description:
+    WORK_NOTE +
+    " Returns the next `queued` item and atomically moves it to `pending`. Pass `worker_id` to record the claiming worker. If the queue is empty, returns `{data: null}`.",
+  security: [{ ApiKey: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    query: z.object({
+      worker_id: z.string().optional().describe("Identifier of the polling worker."),
+    }),
+  },
+  responses: {
+    200: {
+      description: "Reserved work item (or null when empty)",
+      content: { "application/json": { schema: PollWorkResponseSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/anthropic/v1/environments/{id}/work/stats",
+  tags: ["Work"],
+  summary: "Get queue stats",
+  description: WORK_NOTE,
+  security: [{ ApiKey: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: "Queue stats",
+      content: { "application/json": { schema: WorkQueueStatsSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/anthropic/v1/environments/{id}/work/{workId}",
+  tags: ["Work"],
+  summary: "Get a work item",
+  description: WORK_NOTE,
+  security: [{ ApiKey: [] }],
+  request: { params: z.object({ id: z.string(), workId: z.string() }) },
+  responses: {
+    200: {
+      description: "Work item",
+      content: { "application/json": { schema: WorkItemSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/anthropic/v1/environments/{id}/work/{workId}",
+  tags: ["Work"],
+  summary: "Update work-item metadata",
+  description:
+    WORK_NOTE +
+    " Set keys with string values; set a key to `null` to delete it. Other lifecycle fields are immutable here — use the dedicated `/ack`, `/heartbeat`, `/stop` sub-paths.",
+  security: [{ ApiKey: [] }],
+  request: {
+    params: z.object({ id: z.string(), workId: z.string() }),
+    body: {
+      required: true,
+      content: { "application/json": { schema: UpdateWorkRequestSchema } },
+    },
+  },
+  responses: {
+    200: {
+      description: "Updated work item",
+      content: { "application/json": { schema: WorkItemSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/anthropic/v1/environments/{id}/work/{workId}/ack",
+  tags: ["Work"],
+  summary: "Acknowledge a polled work item",
+  description:
+    WORK_NOTE +
+    " Confirms the worker has accepted responsibility for the item and moves it from `pending` to `active`. Must be called within the pending grace window or the item is requeued for another worker.",
+  security: [{ ApiKey: [] }],
+  request: {
+    params: z.object({ id: z.string(), workId: z.string() }),
+    body: {
+      required: false,
+      content: { "application/json": { schema: AckWorkRequestSchema } },
+    },
+  },
+  responses: {
+    200: {
+      description: "Acknowledged",
+      content: { "application/json": { schema: WorkItemSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/anthropic/v1/environments/{id}/work/{workId}/heartbeat",
+  tags: ["Work"],
+  summary: "Heartbeat an active work item",
+  description:
+    WORK_NOTE +
+    " Updates `latest_heartbeat_at`. Workers that stop heartbeating within the heartbeat window are considered dead and their items are requeued.",
+  security: [{ ApiKey: [] }],
+  request: { params: z.object({ id: z.string(), workId: z.string() }) },
+  responses: {
+    200: {
+      description: "Heartbeat accepted",
+      content: { "application/json": { schema: WorkItemSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/anthropic/v1/environments/{id}/work/{workId}/stop",
+  tags: ["Work"],
+  summary: "Stop a work item",
+  description:
+    WORK_NOTE +
+    " `force: false` (default) requests a graceful stop — sets `stop_requested_at` and waits for the worker to ack. `force: true` immediately marks the item stopped.",
+  security: [{ ApiKey: [] }],
+  request: {
+    params: z.object({ id: z.string(), workId: z.string() }),
+    body: {
+      required: false,
+      content: { "application/json": { schema: StopWorkRequestSchema } },
+    },
+  },
+  responses: {
+    200: {
+      description: "Stop requested",
+      content: { "application/json": { schema: WorkItemSchema } },
     },
     ...ErrorResponses,
   },
@@ -1177,6 +1373,24 @@ registry.registerPath({
   },
 });
 
+registry.registerPath({
+  method: "post",
+  path: "/anthropic/v1/vaults/{id}/credentials/{credId}/mcp_oauth_validate",
+  tags: ["Credentials"],
+  summary: "Validate an MCP OAuth credential",
+  description:
+    "Round-trips the credential's refresh token against the configured token endpoint and reports whether it still authenticates. Only valid for credentials with `auth.type = \"mcp_oauth\"`. Returns 200 with `{ valid: true|false, error? }` — the upstream provider's failure is surfaced in `error`, not as an HTTP error.",
+  security: [{ ApiKey: [] }],
+  request: { params: z.object({ id: z.string(), credId: z.string() }) },
+  responses: {
+    200: {
+      description: "Validation result",
+      content: { "application/json": { schema: McpOauthValidationResultSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
 // ---------------------------------------------------------------------------
 // /v1/vaults/{id}/entries
 // ---------------------------------------------------------------------------
@@ -1477,6 +1691,65 @@ registry.registerPath({
     200: {
       description: "Memory store archived",
       content: { "application/json": { schema: MemoryStoreSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/anthropic/v1/memory_stores/{id}/memory_versions",
+  tags: ["Memory"],
+  summary: "List memory versions",
+  description:
+    "Audit log of every create/update/delete on memories in this store. Filter to a single memory with `memory_id`.",
+  security: [{ ApiKey: [] }],
+  request: {
+    params: z.object({ id: z.string() }),
+    query: z.object({
+      memory_id: z.string().optional().describe("Restrict to versions of a single memory."),
+      limit: z.coerce.number().int().min(1).max(500).optional(),
+      cursor: z.string().optional().describe("Opaque pagination cursor returned by a prior call."),
+    }),
+  },
+  responses: {
+    200: {
+      description: "Memory versions",
+      content: { "application/json": { schema: MemoryVersionListResponseSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/anthropic/v1/memory_stores/{id}/memory_versions/{vid}",
+  tags: ["Memory"],
+  summary: "Get a memory version",
+  security: [{ ApiKey: [] }],
+  request: { params: z.object({ id: z.string(), vid: z.string() }) },
+  responses: {
+    200: {
+      description: "Memory version",
+      content: { "application/json": { schema: MemoryVersionSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/anthropic/v1/memory_stores/{id}/memory_versions/{vid}/redact",
+  tags: ["Memory"],
+  summary: "Redact a memory version",
+  description:
+    "Strips the `content` field from this version's audit row. Cannot redact the current head of a live memory — redact a successor version first or delete the memory. Returns the (now-redacted) version.",
+  security: [{ ApiKey: [] }],
+  request: { params: z.object({ id: z.string(), vid: z.string() }) },
+  responses: {
+    200: {
+      description: "Memory version redacted",
+      content: { "application/json": { schema: MemoryVersionSchema } },
     },
     ...ErrorResponses,
   },
@@ -2672,6 +2945,7 @@ export function buildOpenApiDocument(opts: {
           "(`PUT /vaults/{id}/entries/{key}`) instead.",
       },
       { name: "Memory", description: "Memory stores and memories" },
+      { name: "Work", description: "Self-hosted environment work queue (poll/ack/heartbeat/stop)" },
       { name: "Skills", description: "Skills catalog, search, and management" },
       { name: "Settings", description: "Gateway configuration settings" },
       { name: "Providers", description: "Container provider status" },

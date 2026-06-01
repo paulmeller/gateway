@@ -1041,6 +1041,146 @@ export const MemoryDeletedResponseSchema = registry.register(
   z.object({ id: UlidId, type: z.literal("memory_deleted") }),
 );
 
+// Memory versions (immutable audit log of memory ops).
+export const MemoryVersionSchema = registry.register(
+  "MemoryVersion",
+  z.object({
+    type: z.literal("memory_version"),
+    id: UlidId,
+    memory_store_id: UlidId,
+    memory_id: UlidId,
+    path: z.string(),
+    operation: z.enum(["create", "update", "delete"]),
+    content: z.string().optional().openapi({
+      description: "Snapshot of the memory content at this version. Absent on `delete` ops and on redacted versions.",
+    }),
+    content_sha256: z.string().optional(),
+    session_id: z.string().optional().openapi({
+      description: "Session that produced this version, when applicable.",
+    }),
+    redacted_at: z.string().datetime().optional().openapi({
+      description: "Set when this version's `content` has been redacted via POST /memory_versions/{vid}/redact.",
+    }),
+    created_at: IsoTimestamp,
+  }),
+);
+
+export const MemoryVersionListResponseSchema = listEnvelope(
+  "MemoryVersionListResponse",
+  MemoryVersionSchema,
+);
+
+// ---------------------------------------------------------------------------
+// Work queue (self-hosted environment runners)
+// ---------------------------------------------------------------------------
+
+export const WorkStateSchema = registry.register(
+  "WorkState",
+  z.enum(["queued", "pending", "active", "completed", "failed"]),
+);
+
+export const WorkItemSchema = registry.register(
+  "WorkItem",
+  z.object({
+    type: z.literal("work"),
+    id: UlidId,
+    environment_id: UlidId,
+    state: WorkStateSchema,
+    data: z.object({
+      type: z.literal("session"),
+      id: UlidId,
+    }).openapi({
+      description: "Payload identifying the work unit. v1 only emits session work.",
+    }),
+    metadata: z.record(z.string()).openapi({
+      description: "Caller-supplied free-form key/value metadata. Use POST .../work/{id} to mutate (null value deletes a key).",
+    }),
+    worker_id: z.string().nullable().openapi({
+      description: "ID of the worker currently holding this item, or null if unclaimed.",
+    }),
+    created_at: IsoTimestamp,
+    acknowledged_at: z.string().datetime().nullable(),
+    started_at: z.string().datetime().nullable(),
+    latest_heartbeat_at: z.string().datetime().nullable(),
+    stop_requested_at: z.string().datetime().nullable(),
+    stopped_at: z.string().datetime().nullable(),
+  }),
+);
+
+export const WorkItemListResponseSchema = listEnvelope(
+  "WorkItemListResponse",
+  WorkItemSchema,
+);
+
+export const WorkQueueStatsSchema = registry.register(
+  "WorkQueueStats",
+  z.object({
+    type: z.literal("work_queue_stats"),
+    depth: z.number().int().openapi({
+      description: "Total items queued or active (not yet completed/failed).",
+    }),
+    pending: z.number().int().openapi({
+      description: "Items reserved by a worker but not yet acknowledged (still in pending grace period).",
+    }),
+    workers_polling: z.number().int().nullable().openapi({
+      description: "Approximate count of workers polling within the recent heartbeat window. Null if not tracked.",
+    }),
+    oldest_queued_at: z.string().datetime().nullable(),
+  }),
+);
+
+export const UpdateWorkRequestSchema = registry.register(
+  "UpdateWorkRequest",
+  z.object({
+    metadata: z.record(z.string().nullable()).openapi({
+      description: "Partial metadata mutation. Set a key to a string value to upsert; set to null to delete.",
+    }),
+  }),
+);
+
+export const PollWorkResponseSchema = registry.register(
+  "PollWorkResponse",
+  z.object({
+    data: WorkItemSchema.nullable().openapi({
+      description: "The reserved work item, or `null` if the queue is empty.",
+    }),
+  }),
+);
+
+export const AckWorkRequestSchema = registry.register(
+  "AckWorkRequest",
+  z.object({
+    worker_id: z.string().optional().openapi({
+      description: "Worker claiming the item. Optional — falls back to the worker_id set at poll time.",
+    }),
+  }),
+);
+
+export const StopWorkRequestSchema = registry.register(
+  "StopWorkRequest",
+  z.object({
+    force: z.boolean().optional().openapi({
+      description: "If true, mark stopped immediately. Default false requests a graceful stop and waits for the worker to ack.",
+    }),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// MCP OAuth validation
+// ---------------------------------------------------------------------------
+
+export const McpOauthValidationResultSchema = registry.register(
+  "McpOauthValidationResult",
+  z.object({
+    type: z.literal("mcp_oauth_validation_result"),
+    credential_id: UlidId,
+    valid: z.boolean(),
+    error: z.string().optional().openapi({
+      description: "Human-readable explanation when `valid` is false. Includes the upstream status code and message snippet (first 200 chars).",
+    }),
+  }),
+);
+
 // ---------------------------------------------------------------------------
 // Session Resources
 // ---------------------------------------------------------------------------
