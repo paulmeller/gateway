@@ -1,12 +1,13 @@
 /**
- * GET /v1/models — List available models from provider APIs.
+ * Models surface — list + retrieve. Mirrors Anthropic CMA's
+ * `GET /v1/models` and `GET /v1/models/{model_id}`.
  *
- * Supports query params:
- *   - engine: filter to models compatible with a specific engine
- *   - provider: filter by provider (anthropic, openai, google, ollama, openrouter)
- *   - q: free-text search on model ID
+ * List supports filtering by engine/provider/free-text. Retrieve
+ * returns the same ModelEntry shape; 404 if the bare-id isn't in
+ * the registry.
  */
 import { routeWrap, jsonOk } from "../http";
+import { notFound } from "../errors";
 import { getModels } from "../lib/model-registry";
 
 export function handleListModels(request: Request): Promise<Response> {
@@ -17,5 +18,14 @@ export function handleListModels(request: Request): Promise<Response> {
     const q = url.searchParams.get("q") ?? undefined;
     const models = await getModels({ engine, provider, q });
     return jsonOk({ data: models });
+  });
+}
+
+export function handleGetModel(request: Request, modelId: string): Promise<Response> {
+  return routeWrap(request, async () => {
+    const models = await getModels({});
+    const model = models.find((m) => m.id === modelId);
+    if (!model) throw notFound(`model not found: ${modelId}`);
+    return jsonOk(model);
   });
 }

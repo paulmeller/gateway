@@ -123,6 +123,7 @@ import {
   handleDreamMemoryStore,
   handleUpdateResource,
   handleListModels,
+  handleGetModel,
   handleListWork,
   handleGetWork,
   handleUpdateWork,
@@ -519,6 +520,7 @@ app.get("/v1/providers/status", (c) => handleGetProviderStatus(c.req.raw));
 // CMA-canonical (PR9). Anthropic SDK exposes `GET /v1/models` on the
 // Managed Agents API surface.
 app.get("/anthropic/v1/models", (c) => handleListModels(c.req.raw));
+app.get("/anthropic/v1/models/:id", (c) => handleGetModel(c.req.raw, c.req.param("id")));
 
 // ── Skills ────────────────────────────────────────────────────────────
 // CMA-canonical CRUD goes under /anthropic/v1/* (PR9). The

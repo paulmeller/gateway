@@ -26,7 +26,7 @@ export { handleWhoami } from "./whoami";
 export { handleGetDebugPrompt, isDebugPromptRequested, redactEnv } from "./debug-prompt";
 export { handleListAudit } from "./audit";
 export { handleGetLicense } from "./license";
-export { handleListModels } from "./models";
+export { handleListModels, handleGetModel } from "./models";
 export { handleListWork, handleGetWork, handleUpdateWork, handlePollWork, handleWorkStats, handleAckWork, handleHeartbeatWork, handleStopWork } from "./work";
 export { handleCreateUserProfile, handleListUserProfiles, handleGetUserProfile, handleUpdateUserProfile } from "./anthropic-compat/user-profiles";
 export { handleEnrollmentUrl, handleOAuthCallback } from "./anthropic-compat/enrollment";

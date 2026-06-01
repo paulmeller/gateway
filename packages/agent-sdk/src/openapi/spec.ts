@@ -113,6 +113,7 @@ import {
   ProviderStatusResponseSchema,
   // Models
   ModelListResponseSchema,
+  ModelEntrySchema,
   // Auth
   WhoamiResponseSchema,
   LicenseResponseSchema,
@@ -691,6 +692,84 @@ registry.registerPath({
     200: {
       description: "Child thread sessions",
       content: { "application/json": { schema: SessionListResponseSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/anthropic/v1/sessions/{id}/threads/{tid}",
+  tags: ["Sessions"],
+  summary: "Get a thread session",
+  description: "Retrieve a single child-thread session by id.",
+  security: [{ ApiKey: [] }],
+  request: { params: z.object({ id: z.string(), tid: z.string() }) },
+  responses: {
+    200: {
+      description: "Thread session",
+      content: { "application/json": { schema: SessionSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/anthropic/v1/sessions/{id}/threads/{tid}/archive",
+  tags: ["Sessions"],
+  summary: "Archive a thread session",
+  description: "Soft-delete a child-thread session.",
+  security: [{ ApiKey: [] }],
+  request: { params: z.object({ id: z.string(), tid: z.string() }) },
+  responses: {
+    200: {
+      description: "Thread archived",
+      content: { "application/json": { schema: SessionSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/anthropic/v1/sessions/{id}/threads/{tid}/events",
+  tags: ["Events"],
+  summary: "List events for a thread",
+  description: "Replay the recorded event log for a specific child thread.",
+  security: [{ ApiKey: [] }],
+  request: {
+    params: z.object({ id: z.string(), tid: z.string() }),
+    query: z.object({
+      after_seq: z.coerce.number().int().optional(),
+      limit: z.coerce.number().int().min(1).max(500).optional(),
+    }),
+  },
+  responses: {
+    200: {
+      description: "Thread events",
+      content: { "application/json": { schema: EventListResponseSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/anthropic/v1/sessions/{id}/threads/{tid}/stream",
+  tags: ["Events"],
+  summary: "Server-Sent Events stream for a thread",
+  description:
+    "Long-lived SSE connection delivering thread events as they arrive. Each event arrives as `event: <type>\\ndata: <json>\\n\\n`; the connection emits `data: {\"type\":\"ping\"}` every 15s as keepalive. Disconnect by closing the HTTP connection.",
+  security: [{ ApiKey: [] }],
+  request: {
+    params: z.object({ id: z.string(), tid: z.string() }),
+    query: z.object({ after_seq: z.coerce.number().int().optional() }),
+  },
+  responses: {
+    200: {
+      description: "SSE stream",
+      content: { "text/event-stream": { schema: z.string() } },
     },
     ...ErrorResponses,
   },
@@ -1385,6 +1464,24 @@ registry.registerPath({
   },
 });
 
+registry.registerPath({
+  method: "post",
+  path: "/anthropic/v1/memory_stores/{id}/archive",
+  tags: ["Memory"],
+  summary: "Archive a memory store",
+  description:
+    "Soft-deletes a memory store: keeps memories readable but blocks new writes. Reversible via PATCH on the store record.",
+  security: [{ ApiKey: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: "Memory store archived",
+      content: { "application/json": { schema: MemoryStoreSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
 // ---------------------------------------------------------------------------
 // /v1/skills
 // ---------------------------------------------------------------------------
@@ -1768,6 +1865,24 @@ registry.registerPath({
     200: {
       description: "List of available models",
       content: { "application/json": { schema: ModelListResponseSchema } },
+    },
+    ...ErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/anthropic/v1/models/{id}",
+  tags: ["Models"],
+  summary: "Retrieve a single model",
+  description:
+    "Look up a model entry by its bare id (e.g. `claude-sonnet-4-6`, `gemini-3.5-flash`). 404 if the model isn't in the cached registry. Matches Anthropic CMA `GET /v1/models/{model_id}`.",
+  security: [{ ApiKey: [] }],
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: {
+      description: "Model entry",
+      content: { "application/json": { schema: ModelEntrySchema } },
     },
     ...ErrorResponses,
   },

@@ -1380,15 +1380,18 @@ export const SkillsSearchResponseSchema = registry.register(
 // returned by POST /v1/skills, GET /v1/skills/:id, etc.
 
 // Skill — Anthropic Skills API shape (cutover release 0.5.57).
-// Deprecated AgentStep aliases (`type`, `name`, `current_version`) were
-// dropped; callers should now read `display_title` and `latest_version`.
-// Extension fields (`description`, `updated_at`, `archived_at`) carry
-// information beyond the Anthropic shape — Anthropic SDK consumers
-// ignore them harmlessly.
+// Verified against the upstream spec
+// (`anthropics/skills/skills/claude-api/shared/managed-agents-api-reference.md`)
+// in PR9's audit: `id`, `display_title`, `source`, `latest_version`,
+// `created_at`, `description`, and `updated_at` are all canonical CMA
+// fields. The only AgentStep extension here is `archived_at` —
+// Anthropic's Skills resource has DELETE only, no archive concept.
+// Earlier annotations that flagged `description` / `updated_at` as
+// extensions were wrong and have been corrected.
 export const SkillSchema = registry.register(
   "Skill",
   z.object({
-    // ─── Anthropic CMA-compat fields ─────────────────────────────────
+    // ─── Anthropic CMA fields ────────────────────────────────────────
     id: UlidId,
     display_title: z.string().openapi({
       description: "Human-readable skill name.",
@@ -1407,16 +1410,21 @@ export const SkillSchema = registry.register(
         "`1.0.0`); both formats resolve identically via the versions " +
         "endpoints.",
     }),
-    created_at: z.string().datetime(),
-    // ─── AgentStep extensions (not in Anthropic CMA) ─────────────────
     description: z.string().nullable().openapi({
-      description: "Optional free-form description.",
+      description: "Optional free-form description (CMA field).",
     }),
+    created_at: z.string().datetime(),
     updated_at: z.string().datetime().openapi({
-      description: "Last-modified timestamp.",
+      description: "Last-modified timestamp (CMA field).",
     }),
+    // ─── AgentStep extensions (not in Anthropic CMA) ─────────────────
     archived_at: z.string().datetime().nullable().openapi({
-      description: "Archive marker; null when active.",
+      description:
+        "**AgentStep extension** — not present in the upstream Anthropic " +
+        "Skills shape. Skills in CMA have DELETE only, no archive " +
+        "operation. AgentStep keeps the column for soft-delete; field " +
+        "is null on active skills. Anthropic SDK consumers can ignore " +
+        "it harmlessly.",
     }),
   }),
 );
