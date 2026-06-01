@@ -120,21 +120,44 @@ describe("anthropic passthrough auth", () => {
 
   it("isPassthroughAllowedPath: allows Anthropic-mirror routes, rejects gateway-only routes", async () => {
     const { isPassthroughAllowedPath } = await import("../src/auth/passthrough");
-    // Allowed
+    // Allowed — CMA-canonical resources
     expect(isPassthroughAllowedPath("/anthropic/v1/agents")).toBe(true);
     expect(isPassthroughAllowedPath("/anthropic/v1/agents/agt_123")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/agents/agt_123/archive")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/agents/agt_123/versions")).toBe(true);
     expect(isPassthroughAllowedPath("/anthropic/v1/sessions")).toBe(true);
     expect(isPassthroughAllowedPath("/anthropic/v1/sessions/sess_123/events")).toBe(true);
     expect(isPassthroughAllowedPath("/anthropic/v1/sessions/sess_123/events/stream")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/sessions/sess_123/threads")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/sessions/sess_123/threads/thr_456")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/sessions/sess_123/threads/thr_456/stream")).toBe(true);
     expect(isPassthroughAllowedPath("/anthropic/v1/vaults")).toBe(true);
     expect(isPassthroughAllowedPath("/anthropic/v1/vaults/vlt_1/entries/KEY")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/vaults/vlt_1/credentials/cred_1/mcp_oauth_validate")).toBe(true);
     expect(isPassthroughAllowedPath("/anthropic/v1/files")).toBe(true);
     expect(isPassthroughAllowedPath("/anthropic/v1/environments")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/environments/env_1/work")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/environments/env_1/work/poll")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/environments/env_1/work/wrk_1/heartbeat")).toBe(true);
+    // PR13: skills/memory_stores/models/user_profiles — moved to
+    // /anthropic/v1/* in PR9; the matching passthrough rules were
+    // missing until this PR. Counselproof's deploy script hit
+    // GET /anthropic/v1/skills with a real sk-ant-api* key and got 401.
+    expect(isPassthroughAllowedPath("/anthropic/v1/skills")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/skills/skill_1")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/skills/skill_1/versions")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/skills/skill_1/versions/v1/content")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/memory_stores")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/memory_stores/ms_1/memories/m_1")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/memory_stores/ms_1/memory_versions/mv_1/redact")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/models")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/models/claude-sonnet-4-6")).toBe(true);
+    expect(isPassthroughAllowedPath("/anthropic/v1/user_profiles/up_1/enrollment_url")).toBe(true);
     // Messages API escape hatch for tool_choice + prefill features
     // that the Managed Agents API doesn't expose.
     expect(isPassthroughAllowedPath("/anthropic/v1/messages")).toBe(true);
     expect(isPassthroughAllowedPath("/anthropic/v1/messages/count_tokens")).toBe(true);
-    // Rejected (gateway-only)
+    // Rejected (gateway-only and AgentStep extensions)
     expect(isPassthroughAllowedPath("/v1/api-keys")).toBe(false);
     expect(isPassthroughAllowedPath("/v1/settings/anything")).toBe(false);
     expect(isPassthroughAllowedPath("/v1/metrics")).toBe(false);
@@ -144,8 +167,14 @@ describe("anthropic passthrough auth", () => {
     expect(isPassthroughAllowedPath("/v1/license")).toBe(false);
     expect(isPassthroughAllowedPath("/v1/whoami")).toBe(false);
     expect(isPassthroughAllowedPath("/v1/traces/abc")).toBe(false);
+    // Bare /v1/* paths (no /anthropic prefix) never passthrough,
+    // even for CMA-canonical resources — Anthropic SDK clients use
+    // the /anthropic prefix per our docs.
     expect(isPassthroughAllowedPath("/v1/models")).toBe(false);
     expect(isPassthroughAllowedPath("/v1/skills")).toBe(false);
+    // AgentStep extensions on CMA paths — explicitly NOT passthrough.
+    expect(isPassthroughAllowedPath("/v1/skills/catalog")).toBe(false);
+    expect(isPassthroughAllowedPath("/agentstep/v1/skills/feed")).toBe(false);
     expect(isPassthroughAllowedPath("/")).toBe(false);
   });
 

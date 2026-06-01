@@ -74,27 +74,71 @@ const PASSTHROUGH_ROUTE_PATTERNS: RegExp[] = [
   // Agents
   /^\/anthropic\/v1\/agents$/,
   /^\/anthropic\/v1\/agents\/[^/]+$/,
+  /^\/anthropic\/v1\/agents\/[^/]+\/archive$/,
+  /^\/anthropic\/v1\/agents\/[^/]+\/versions$/,
   // Sessions + sub-resources
   /^\/anthropic\/v1\/sessions$/,
   /^\/anthropic\/v1\/sessions\/[^/]+$/,
   /^\/anthropic\/v1\/sessions\/[^/]+\/archive$/,
   /^\/anthropic\/v1\/sessions\/[^/]+\/events$/,
   /^\/anthropic\/v1\/sessions\/[^/]+\/events\/stream$/,
+  /^\/anthropic\/v1\/sessions\/[^/]+\/resources$/,
+  /^\/anthropic\/v1\/sessions\/[^/]+\/resources\/[^/]+$/,
+  /^\/anthropic\/v1\/sessions\/[^/]+\/threads$/,
+  /^\/anthropic\/v1\/sessions\/[^/]+\/threads\/[^/]+$/,
+  /^\/anthropic\/v1\/sessions\/[^/]+\/threads\/[^/]+\/archive$/,
+  /^\/anthropic\/v1\/sessions\/[^/]+\/threads\/[^/]+\/events$/,
+  /^\/anthropic\/v1\/sessions\/[^/]+\/threads\/[^/]+\/stream$/,
   // Vaults + entries + credentials
   /^\/anthropic\/v1\/vaults$/,
   /^\/anthropic\/v1\/vaults\/[^/]+$/,
+  /^\/anthropic\/v1\/vaults\/[^/]+\/archive$/,
   /^\/anthropic\/v1\/vaults\/[^/]+\/entries$/,
   /^\/anthropic\/v1\/vaults\/[^/]+\/entries\/[^/]+$/,
   /^\/anthropic\/v1\/vaults\/[^/]+\/credentials$/,
   /^\/anthropic\/v1\/vaults\/[^/]+\/credentials\/[^/]+$/,
-  // Environments
+  /^\/anthropic\/v1\/vaults\/[^/]+\/credentials\/[^/]+\/archive$/,
+  /^\/anthropic\/v1\/vaults\/[^/]+\/credentials\/[^/]+\/mcp_oauth_validate$/,
+  // Environments + work queue
   /^\/anthropic\/v1\/environments$/,
   /^\/anthropic\/v1\/environments\/[^/]+$/,
   /^\/anthropic\/v1\/environments\/[^/]+\/archive$/,
+  /^\/anthropic\/v1\/environments\/[^/]+\/work$/,
+  /^\/anthropic\/v1\/environments\/[^/]+\/work\/poll$/,
+  /^\/anthropic\/v1\/environments\/[^/]+\/work\/stats$/,
+  /^\/anthropic\/v1\/environments\/[^/]+\/work\/[^/]+$/,
+  /^\/anthropic\/v1\/environments\/[^/]+\/work\/[^/]+\/ack$/,
+  /^\/anthropic\/v1\/environments\/[^/]+\/work\/[^/]+\/heartbeat$/,
+  /^\/anthropic\/v1\/environments\/[^/]+\/work\/[^/]+\/stop$/,
   // Files
   /^\/anthropic\/v1\/files$/,
   /^\/anthropic\/v1\/files\/[^/]+$/,
   /^\/anthropic\/v1\/files\/[^/]+\/content$/,
+  // Skills (CMA, beta `skills-2025-10-02`) — PR9 moved these from
+  // /v1/* to /anthropic/v1/*; the matching passthrough rules were
+  // missed in that change, breaking Counselproof's deploy script's
+  // GET /anthropic/v1/skills against a real sk-ant-api* key.
+  /^\/anthropic\/v1\/skills$/,
+  /^\/anthropic\/v1\/skills\/[^/]+$/,
+  /^\/anthropic\/v1\/skills\/[^/]+\/versions$/,
+  /^\/anthropic\/v1\/skills\/[^/]+\/versions\/[^/]+$/,
+  /^\/anthropic\/v1\/skills\/[^/]+\/versions\/[^/]+\/content$/,
+  // Memory stores (CMA, beta `managed-agents-2026-04-01`)
+  /^\/anthropic\/v1\/memory_stores$/,
+  /^\/anthropic\/v1\/memory_stores\/[^/]+$/,
+  /^\/anthropic\/v1\/memory_stores\/[^/]+\/archive$/,
+  /^\/anthropic\/v1\/memory_stores\/[^/]+\/memories$/,
+  /^\/anthropic\/v1\/memory_stores\/[^/]+\/memories\/[^/]+$/,
+  /^\/anthropic\/v1\/memory_stores\/[^/]+\/memory_versions$/,
+  /^\/anthropic\/v1\/memory_stores\/[^/]+\/memory_versions\/[^/]+$/,
+  /^\/anthropic\/v1\/memory_stores\/[^/]+\/memory_versions\/[^/]+\/redact$/,
+  // Models
+  /^\/anthropic\/v1\/models$/,
+  /^\/anthropic\/v1\/models\/[^/]+$/,
+  // User profiles
+  /^\/anthropic\/v1\/user_profiles$/,
+  /^\/anthropic\/v1\/user_profiles\/[^/]+$/,
+  /^\/anthropic\/v1\/user_profiles\/[^/]+\/enrollment_url$/,
   // Messages API — escape hatch for features Managed Agents doesn't
   // expose (tool_choice forcing, assistant prefill). A passthrough
   // caller can mix `/anthropic/v1/sessions/*` (Managed Agents) and
