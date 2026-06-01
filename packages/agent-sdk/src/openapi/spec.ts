@@ -2577,12 +2577,31 @@ export function buildOpenApiDocument(opts: {
   // Filter paths by surface if a prefix was supplied. The doc shape
   // is `{ paths: { "/some/path": { get, post, ... } } }`, so we filter
   // the keys.
+  //
+  // Special case for `/agentstep/v1` (PR8): every gateway-native path
+  // is still registered as `/v1/*` in the registry (back-compat for
+  // codegen tools pinned to that prefix). When the canonical
+  // `/agentstep/v1/openapi.json` surface is requested, we include
+  // those `/v1/*` paths but rewrite the keys to `/agentstep/v1/*` in
+  // the emitted document. /v1/openapi.json and /v1/docs are meta
+  // routes that stay at /v1 (no canonical move).
   if (opts.pathPrefix) {
     const prefix = opts.pathPrefix;
     const filteredPaths: Record<string, unknown> = {};
     const allPaths = (doc as { paths?: Record<string, unknown> }).paths ?? {};
+    const isAgentstepSurface = prefix === "/agentstep/v1";
     for (const [pathKey, pathDef] of Object.entries(allPaths)) {
-      if (pathKey === prefix || pathKey.startsWith(prefix + "/")) {
+      if (isAgentstepSurface) {
+        // Source is /v1/*; rewrite to /agentstep/v1/*. Skip meta routes.
+        const META_AT_V1 = pathKey === "/v1/openapi.json" || pathKey === "/v1/docs";
+        if (META_AT_V1) continue;
+        if (pathKey === "/v1" || pathKey.startsWith("/v1/")) {
+          const rewritten = pathKey === "/v1"
+            ? "/agentstep/v1"
+            : pathKey.replace(/^\/v1\//, "/agentstep/v1/");
+          filteredPaths[rewritten] = pathDef;
+        }
+      } else if (pathKey === prefix || pathKey.startsWith(prefix + "/")) {
         filteredPaths[pathKey] = pathDef;
       }
     }
@@ -2608,11 +2627,17 @@ function surfaceMetadata(pathPrefix?: string): {
         description:
           "Google Interactions API compatibility surface. Drop-in compatible with Google's Interactions API shape.",
       };
-    case "/v1":
+    case "/agentstep/v1":
       return {
         title: "AgentStep — Gateway-native API",
         description:
-          "Gateway-native API surface: settings, api-keys, metrics, audit, tenants, upstream-keys, license, traces, providers, models, batch, skills, whoami, memory_stores, work. Anthropic-shaped resources live under /anthropic/v1/* and have their own spec at /anthropic/v1/openapi.json.",
+          "Gateway-native API surface (canonical, PR8): settings, api-keys, metrics, audit, tenants, upstream-keys, license, traces, providers, models, batch, skills, whoami, memory_stores, work, debug-prompt. Anthropic-shaped resources live under /anthropic/v1/* — see /anthropic/v1/openapi.json. The same routes are also reachable under the deprecated /v1/* prefix (RFC 8594 `Deprecation` header on responses); new integrations should target /agentstep/v1/*.",
+      };
+    case "/v1":
+      return {
+        title: "AgentStep — /v1/* (deprecated alias)",
+        description:
+          "Deprecated alias surface (PR8). Every route here is reachable at its canonical /agentstep/v1/* path; responses include an RFC 8594 `Deprecation` header and a `Link: rel=\"successor-version\"` pointing at the canonical URL. Existing integrations keep working — new integrations should target /agentstep/v1/openapi.json. Anthropic-shaped resources moved to /anthropic/v1/* and are NOT included in this alias.",
       };
     default:
       return {

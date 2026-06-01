@@ -156,6 +156,54 @@ const app = new Hono();
 // authenticated API calls if the user's API key is in localStorage.
 app.use("/v1/*", cors({ origin: (origin) => origin, credentials: true }));
 app.use("/anthropic/v1/*", cors({ origin: (origin) => origin, credentials: true }));
+app.use("/agentstep/v1/*", cors({ origin: (origin) => origin, credentials: true }));
+
+// ── /v1/* Deprecation alias (PR8) ─────────────────────────────────────────
+//
+// Gateway-native routes now live at /agentstep/v1/* (the canonical
+// surface). /v1/* keeps working as an alias for ≥1 release and
+// every response gains an RFC 8594 `Deprecation` header pointing at
+// the successor URL.
+//
+// Meta routes (/v1/openapi.json, /v1/docs) stay at /v1 — they aren't
+// resource endpoints and we want the combined spec discoverable at
+// the historical path. They get no Deprecation header.
+//
+// Requests forwarded internally from /agentstep/v1/* (canonical) to
+// /v1/* (handler) carry the `x-internal-canonical` marker so the
+// outer response isn't tagged.
+app.use("/v1/*", async (c, next) => {
+  await next();
+  if (c.req.header("x-internal-canonical") === "agentstep") return;
+  const p = c.req.path;
+  if (p === "/v1/openapi.json" || p === "/v1/docs") return;
+  c.header("Deprecation", "true");
+  c.header(
+    "Link",
+    `<${p.replace(/^\/v1\//, "/agentstep/v1/")}>; rel="successor-version"`,
+  );
+});
+
+// ── /agentstep/v1/* canonical-surface forwarder (PR8) ─────────────────────
+//
+// Internally rewrite /agentstep/v1/<path> → /v1/<path> and re-enter
+// the app. The single registration covers every gateway-native
+// route without duplicating ~60 `app.{get,post,...}` lines. The
+// `x-internal-canonical` header tells the /v1/* deprecation
+// middleware "I'm already on the canonical surface, don't tag me."
+//
+// Specific /agentstep/v1/* routes that need different behavior than
+// their /v1/* counterpart (currently just openapi.json/docs, which
+// filter to the gateway-native surface) MUST be registered ABOVE
+// this catch-all so Hono's registration-order match picks them
+// first.
+const agentstepCanonicalForward = async (c: Context): Promise<Response> => {
+  const url = new URL(c.req.url);
+  url.pathname = url.pathname.replace(/^\/agentstep\/v1\//, "/v1/");
+  const innerReq = new Request(url, c.req.raw);
+  innerReq.headers.set("x-internal-canonical", "agentstep");
+  return app.fetch(innerReq, c.env);
+};
 
 // Security headers for all responses
 app.use("*", async (c, next) => {
@@ -216,6 +264,18 @@ app.get("/api/health", (c) => c.json({ status: "ok" }));
 // ── OpenAPI (no auth) ────────────────────────────────────────────────────
 app.get("/v1/openapi.json", (c) => handleGetOpenApiSpec(c.req.raw));
 app.get("/v1/docs", () => handleGetDocs());
+// Canonical gateway-native surface (PR8). handleGetOpenApiSpec reads
+// the URL path → emits the /agentstep/v1/* filtered doc.
+app.get("/agentstep/v1/openapi.json", (c) => handleGetOpenApiSpec(c.req.raw));
+app.get("/agentstep/v1/docs", () => handleGetDocs());
+// Anthropic-shape + Google-compat per-surface specs.
+app.get("/anthropic/v1/openapi.json", (c) => handleGetOpenApiSpec(c.req.raw));
+app.get("/google/v1beta/openapi.json", (c) => handleGetOpenApiSpec(c.req.raw));
+// Catch-all canonical forwarder. Registered AFTER the specific
+// /agentstep/v1/openapi.json + /agentstep/v1/docs so they take
+// precedence. Every other /agentstep/v1/* path is rewritten to
+// /v1/* and re-dispatched in-process.
+app.all("/agentstep/v1/*", agentstepCanonicalForward);
 
 // ── Agents ───────────────────────────────────────────────────────────────
 app.post("/anthropic/v1/agents", (c) => handleCreateAgent(c.req.raw));
