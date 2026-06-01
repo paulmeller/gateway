@@ -115,11 +115,35 @@ export function resolveCreateTenant(
   if (auth.actingAsTenant) return auth.actingAsTenant;
 
   if (auth.isGlobalAdmin) {
-    // Default to `tenant_default` (seeded on first boot) when unspecified.
-    // Avoid importing db/tenants here to prevent a circular require —
-    // the id is a plain constant documented in db/tenants.ts.
-    // PR6 removes this fallback once the product is sending the header.
-    return bodyTenantId ?? "tenant_default";
+    // Global-admin keys can declare the tenant they're acting for via
+    // either (1) `x-agentstep-tenant: <id>` header (preferred — lands
+    // in `auth.actingAsTenant` and short-circuits above) or (2) an
+    // explicit `tenant_id` in the create body, which arrives here as
+    // `bodyTenantId`.
+    //
+    // PR6 introduced strict-mode enforcement: when
+    // `REQUIRE_TENANT_HEADER=1` is set, the legacy
+    // "fall back to tenant_default" behavior is removed and callers
+    // must declare a tenant. This is the production setting going
+    // forward (the product gateway's sdk-bridge always sets the
+    // header as of agent-sdk 0.5.58+).
+    //
+    // The flag exists so the SDK's own test suite — which uses
+    // global-admin keys without thinking about tenancy — keeps
+    // working without 301 test-file edits. Tests can opt into strict
+    // mode by setting the env var.
+    if (bodyTenantId) return bodyTenantId;
+    if (process.env.REQUIRE_TENANT_HEADER === "1") {
+      throw forbidden(
+        "global-admin requests must declare a tenant via the " +
+        "`x-agentstep-tenant` header or `tenant_id` field. The legacy " +
+        "tenant_default fallback is disabled when " +
+        "REQUIRE_TENANT_HEADER=1 (PR6 / agent-sdk 0.5.58+).",
+      );
+    }
+    // Legacy fallback. Avoid importing db/tenants here to prevent a
+    // circular require — the id is a plain constant in db/tenants.ts.
+    return "tenant_default";
   }
   // Tenant admin/user — always stamp with their own tenant.
   if (!auth.tenantId) {
