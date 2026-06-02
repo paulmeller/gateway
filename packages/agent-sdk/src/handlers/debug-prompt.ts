@@ -106,6 +106,22 @@ export function handleGetDebugPrompt(request: Request, id: string): Promise<Resp
     if (!row) throw notFound(`session not found: ${id}`);
     assertResourceTenant(auth, row.tenant_id, `session not found: ${id}`);
 
+    // ZDR (PR-Z3): purged session's debug_prompt_json is NULLed by the
+    // engine. Return 410 with a clear "session purged" reason so the
+    // caller can distinguish from never-captured (404) and from the
+    // captured-then-expired-by-TTL case (410, different message).
+    if (row.status === "purged" || row.retention_purged_at != null) {
+      return Response.json(
+        {
+          type: "error",
+          error: {
+            type: "invalid_request_error",
+            message: "debug-prompt unavailable — session was purged under zero-data-retention policy",
+          },
+        },
+        { status: 410 },
+      );
+    }
     if (row.debug_prompt_json === null) {
       throw notFound("debug-prompt capture was not enabled for this session");
     }

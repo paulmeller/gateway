@@ -19,6 +19,7 @@ import {
   handleUpdateEnvironment,
   handleDeleteEnvironment,
   handleArchiveEnvironment,
+  handlePurgeEnvironmentExisting,
   handleCreateSession,
   handleListSessions,
   handleGetSession,

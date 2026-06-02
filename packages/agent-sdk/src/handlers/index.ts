@@ -1,5 +1,6 @@
 export { handleCreateAgent, handleListAgents, handleGetAgent, handleUpdateAgent, handleDeleteAgent, handleArchiveAgent, handleListAgentVersions } from "./anthropic-compat/agents";
 export { handleCreateEnvironment, handleListEnvironments, handleGetEnvironment, handleUpdateEnvironment, handleDeleteEnvironment, handleArchiveEnvironment } from "./anthropic-compat/environments";
+export { handlePurgeEnvironmentExisting } from "./zero-retention";
 export { handleCreateSession, handleListSessions, handleGetSession, handleUpdateSession, handleDeleteSession, handleArchiveSession } from "./anthropic-compat/sessions";
 export { handlePostEvents, handleListEvents } from "./anthropic-compat/events";
 export { handleSessionStream, prepareSessionStream } from "./anthropic-compat/stream";
