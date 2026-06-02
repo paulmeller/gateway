@@ -909,4 +909,28 @@ export function runMigrations(db: InstanceType<typeof Database>): void {
   try {
     db.exec(`ALTER TABLE sessions ADD COLUMN debug_prompt_json TEXT`);
   } catch { /* column already exists */ }
+
+  // 0.5.64: ZDR Phase 0a — backfill NULL tenant_id rows from pre-0.5.
+  //
+  // The tenant_id columns on `sessions` and `audit_log` were added as
+  // nullable ALTER TABLE during the v0.5 multi-tenancy work. Rows
+  // created before that migration have NULL tenant_id and can't be
+  // tenant-filtered, which would let a ZDR purge or a tenant-scoped
+  // query miss them. We backfill "tenant_default" (the canonical
+  // single-tenant id every pre-0.5 install was on) for any NULL row.
+  //
+  // Idempotent: re-running affects zero rows once filled.
+  //
+  // NOTE: `events` and `memory_stores` deliberately do NOT have
+  // tenant_id columns today. ZDR purge doesn't need them — it
+  // resolves the tenant from `sessions.tenant_id` before any DELETE,
+  // and the session_id FK on events/memory_versions/etc. is unique
+  // and bound to that session. Adding tenant_id columns there is
+  // defense-in-depth worth doing in a follow-up, but it's NOT a ZDR
+  // prerequisite. Both prior architect reviews of the ZDR plan were
+  // wrong about events/memory_stores already having the column —
+  // this comment exists so the next person looking doesn't make the
+  // same mistake.
+  db.exec(`UPDATE sessions  SET tenant_id = 'tenant_default' WHERE tenant_id IS NULL`);
+  db.exec(`UPDATE audit_log SET tenant_id = 'tenant_default' WHERE tenant_id IS NULL`);
 }
