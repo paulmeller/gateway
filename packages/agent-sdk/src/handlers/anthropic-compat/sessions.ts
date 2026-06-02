@@ -379,6 +379,8 @@ export function handleCreateSession(request: Request): Promise<Response> {
           api_key_id: auth.keyId,
           tenant_id: agentTenantId,
           debug_capture: debugCapture,
+          // ZDR (PR-Z1): inherit from env config at create; immutable.
+          zero_data_retention: env.config?.zero_data_retention ?? false,
         });
 
         // Insert into session_resources table before sync
@@ -470,6 +472,8 @@ export function handleCreateSession(request: Request): Promise<Response> {
         api_key_id: auth.keyId,
         tenant_id: agentTenantId,
         debug_capture: debugCapture,
+        // ZDR (PR-Z1): inherit from env config at create; immutable.
+        zero_data_retention: env.config?.zero_data_retention ?? false,
       });
 
       // Insert into session_resources table so provisioning picks them up

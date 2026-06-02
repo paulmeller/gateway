@@ -933,4 +933,22 @@ export function runMigrations(db: InstanceType<typeof Database>): void {
   // same mistake.
   db.exec(`UPDATE sessions  SET tenant_id = 'tenant_default' WHERE tenant_id IS NULL`);
   db.exec(`UPDATE audit_log SET tenant_id = 'tenant_default' WHERE tenant_id IS NULL`);
+
+  // 0.5.64: ZDR (PR-Z1) — flag + purge marker columns on sessions.
+  // `zero_data_retention` is copied from EnvironmentConfig at session
+  // create and is immutable thereafter (see docs/zdr.mdx). Defaults
+  // to 0 so existing sessions stay non-ZDR.
+  //
+  // `retention_purged_at` is set by purgeSession() in PR-Z2 *before*
+  // any DELETEs run, alongside `status='purging'`. The boot-time
+  // reaper finds any session in status='purging' on next startup and
+  // re-drives the purge — that's how we recover from a crash partway
+  // through a multi-table DELETE on a flaky FUSE mount.
+  try {
+    db.exec(`ALTER TABLE sessions ADD COLUMN zero_data_retention INTEGER NOT NULL DEFAULT 0`);
+  } catch { /* column already exists */ }
+  try {
+    db.exec(`ALTER TABLE sessions ADD COLUMN retention_purged_at INTEGER`);
+  } catch { /* column already exists */ }
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_purging ON sessions(status) WHERE status = 'purging'`);
 }

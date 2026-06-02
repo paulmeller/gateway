@@ -154,6 +154,16 @@ export const sessions = sqliteTable("sessions", {
   // `{"pending":true}` = enabled at create time, driver will overwrite
   // on first turn with {captured_at, argv, env (redacted), prompt, ...}.
   debug_prompt_json: text("debug_prompt_json"),
+  // ZDR (PR-Z1, 0.5.64): copied from environment.config.zero_data_retention
+  // at session create. Immutable for the session's lifetime — toggling
+  // the env flag does not retroactively change in-flight sessions.
+  zero_data_retention: integer("zero_data_retention", { mode: "boolean" })
+    .notNull().default(false),
+  // ZDR (PR-Z1): epoch ms set by purgeSession() once the session is
+  // purged to its stub form. Null = not yet purged. PR-Z2 will set
+  // status='purging' + retention_purged_at BEFORE any DELETEs so a
+  // crash-mid-purge can be recovered by the boot-time orphan reaper.
+  retention_purged_at: integer("retention_purged_at"),
   created_at: integer("created_at").notNull(),
   updated_at: integer("updated_at").notNull(),
   archived_at: integer("archived_at"),

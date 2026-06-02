@@ -335,6 +335,23 @@ export const EnvironmentConfigSchema = registry.register(
     }),
     packages: EnvironmentPackages.optional(),
     networking: EnvironmentNetworking.optional(),
+    zero_data_retention: z.boolean().optional().openapi({
+      description:
+        "**AgentStep extension — not in Anthropic CMA.** Zero-Data-Retention " +
+        "mode (PR-Z1+, agent-sdk 0.5.64+). When true, sessions created against " +
+        "this environment are purged at terminate: events, threads, resources, " +
+        "memory_versions tagged to the session, and file bytes are deleted. " +
+        "The sessions row is stubbed (content fields nulled, status set to " +
+        "\"purged\"). The audit_log entry for the purge is preserved. " +
+        "Immutable per session: the flag is copied from this field into " +
+        "`sessions.zero_data_retention` at session create and toggling this " +
+        "field afterwards does NOT retroactively purge existing sessions " +
+        "(use POST /agentstep/v1/environments/{id}/purge-existing for that). " +
+        "V1 limitations: backups retain data up to 24h; remote-provider " +
+        "container disks (sprites/e2b/fly/modal) are not scrubbed; " +
+        "Anthropic-side logs are governed by the customer's separate " +
+        "Anthropic ZDR agreement. See docs/zdr.mdx.",
+    }),
   }),
 );
 
@@ -417,7 +434,7 @@ const SessionUsageSchema = z.object({
 
 export const SessionStatusSchema = registry.register(
   "SessionStatus",
-  z.enum(["idle", "running", "rescheduling", "terminated"]),
+  z.enum(["idle", "running", "rescheduling", "terminated", "purging", "purged"]),
 );
 
 export const SessionSchema = registry.register(
@@ -472,6 +489,20 @@ export const SessionSchema = registry.register(
     }),
     stats: SessionStatsSchema,
     usage: SessionUsageSchema,
+    zero_data_retention: z.boolean().openapi({
+      description:
+        "**AgentStep extension — not in Anthropic CMA.** True when the " +
+        "environment was created with config.zero_data_retention=true. " +
+        "Copied at session create; immutable for the session's lifetime. " +
+        "When true, session is purged at terminate (events, resources, " +
+        "memory_versions, file bytes deleted; row stubbed). See docs/zdr.mdx.",
+    }),
+    retention_purged_at: IsoTimestamp.nullable().openapi({
+      description:
+        "**AgentStep extension — not in Anthropic CMA.** Timestamp when " +
+        "ZDR purge completed. Null if not yet purged. When set, all " +
+        "content fields on this session are nulled and `status=\"purged\"`.",
+    }),
     created_at: IsoTimestamp,
     updated_at: IsoTimestamp,
     archived_at: IsoTimestamp.nullable(),

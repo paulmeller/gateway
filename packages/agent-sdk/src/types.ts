@@ -225,6 +225,33 @@ export interface EnvironmentConfig {
   max_sandboxes?: number;
   /** Default engine for warm pool containers. Null/undefined = "claude". */
   default_engine?: string;
+  /**
+   * Zero-Data-Retention mode (AgentStep extension, not in CMA).
+   *
+   * When `true`, sessions created against this environment are purged
+   * at terminate: events, session_threads, session_resources,
+   * work_items, memory_versions tagged to the session, and the file
+   * bytes are deleted. The sessions row is stubbed (content fields
+   * NULLed, retention_purged_at timestamped, status = "purged"). The
+   * audit_log entry for the purge is preserved.
+   *
+   * The flag is **immutable per session** — it's copied from the
+   * environment into `sessions.zero_data_retention` at session create
+   * time, and toggling this field on the environment afterwards does
+   * NOT retroactively purge existing sessions. Use the admin
+   * `/agentstep/v1/environments/{id}/purge-existing` endpoint
+   * (PR-Z3) for retroactive purges.
+   *
+   * V1 limitations (see docs/zdr.mdx):
+   *   - Backups retain data for up to 24h per the bucket lifecycle
+   *     policy. Not procurement-grade for enterprise law-firm buyers
+   *     until the libsql migration ships.
+   *   - Remote-provider container disks (sprites, e2b, fly, modal)
+   *     are not scrubbed by AgentStep — only DB rows + local files.
+   *   - `claude_session_id`'s Anthropic-side logs are governed by
+   *     the customer's Anthropic ZDR agreement, separate from this.
+   */
+  zero_data_retention?: boolean;
 }
 
 export interface EnvironmentRow {
@@ -263,7 +290,7 @@ export interface Environment {
 // Session
 // ---------------------------------------------------------------------------
 
-export type SessionStatus = "idle" | "running" | "rescheduling" | "terminated";
+export type SessionStatus = "idle" | "running" | "rescheduling" | "terminated" | "purging" | "purged";
 
 export interface SessionRow {
   id: string;
@@ -308,6 +335,17 @@ export interface SessionRow {
    * `{"pending":true}` = enabled, no turn yet. JSON payload = captured.
    */
   debug_prompt_json: string | null;
+  /**
+   * ZDR (PR-Z1, 0.5.64). 0/false default; copied from environment
+   * config at session create. Immutable for the session's lifetime.
+   */
+  zero_data_retention: number | boolean;
+  /**
+   * ZDR (PR-Z1). Epoch ms when the purge completed. Null = not yet
+   * purged. Set by purgeSession() in PR-Z2 *before* the first DELETE
+   * so a crash-mid-purge can be recovered by the boot-time reaper.
+   */
+  retention_purged_at: number | null;
   created_at: number;
   updated_at: number;
   archived_at: number | null;
@@ -387,6 +425,18 @@ export interface Session {
     };
     cost_usd: number;
   };
+  /**
+   * ZDR (PR-Z1, 0.5.64): Inherited from environment.config.zero_data_retention
+   * at session create. Immutable for the session's lifetime. When true,
+   * lifecycle hooks (PR-Z2) purge the session at terminate.
+   */
+  zero_data_retention: boolean;
+  /**
+   * ZDR (PR-Z1): ISO timestamp when the purge completed. Null = not
+   * yet purged. When set, content fields above are nulled out and
+   * `status` is "purged".
+   */
+  retention_purged_at: string | null;
   created_at: string;
   updated_at: string;
   archived_at: string | null;
