@@ -71,6 +71,9 @@ const ConfigSchema = z.object({
   packages: PackagesSchema,
   networking: NetworkingSchema.optional(),
   warm_pool_size: z.number().int().min(0).optional(),
+  // ZDR (PR-Z1+, agent-sdk 0.5.64+) — AgentStep extension. See docs/zdr.mdx.
+  // When true, sessions created against this env are auto-purged at terminate.
+  zero_data_retention: z.boolean().optional(),
 });
 
 const CreateSchema = z.object({
