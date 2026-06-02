@@ -121,6 +121,7 @@ export function hydrateSession(row: SessionRow): Session {
       },
       cost_usd: row.usage_cost_usd,
     },
+    tenant_id: row.tenant_id ?? null,
     // ZDR (PR-Z1): coerce to boolean — SQLite stores as integer.
     zero_data_retention: Boolean(row.zero_data_retention),
     retention_purged_at: row.retention_purged_at ? toIso(row.retention_purged_at) : null,

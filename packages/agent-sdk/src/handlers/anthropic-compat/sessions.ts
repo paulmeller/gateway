@@ -737,7 +737,7 @@ export function handleDeleteSession(request: Request, id: string): Promise<Respo
       if (res.ok) unmarkProxied(id);
       return res;
     }
-    loadSessionForCaller(auth, id); // tenant guard
+    const sessionRow = loadSessionForCaller(auth, id); // tenant guard
 
     const actor = getActor(id);
     await actor.enqueue(async () => {
@@ -750,6 +750,13 @@ export function handleDeleteSession(request: Request, id: string): Promise<Respo
         processedAt: nowMs(),
       });
       updateSessionStatus(id, "terminated", "deleted");
+      // ZDR (PR-Z2): purge session content + memory_versions + files
+      // before responding success. The purge engine has its own tenant
+      // guard so even a future call-site bug can't cross tenants.
+      if (sessionRow.zero_data_retention && sessionRow.tenant_id) {
+        const { purgeSession } = await import("../../db/zero-retention");
+        purgeSession({ tenantId: sessionRow.tenant_id, sessionId: id });
+      }
     });
     dropActor(id);
     dropEmitter(id);
@@ -765,12 +772,17 @@ export function handleArchiveSession(request: Request, id: string): Promise<Resp
       if (res.ok) unmarkProxied(id);
       return res;
     }
-    loadSessionForCaller(auth, id); // tenant guard
+    const sessionRow = loadSessionForCaller(auth, id); // tenant guard
 
     const actor = getActor(id);
     await actor.enqueue(async () => {
       await releaseSession(id);
       archiveSession(id);
+      // ZDR (PR-Z2): purge after archive completes
+      if (sessionRow.zero_data_retention && sessionRow.tenant_id) {
+        const { purgeSession } = await import("../../db/zero-retention");
+        purgeSession({ tenantId: sessionRow.tenant_id, sessionId: id });
+      }
     });
     return jsonOk(getSession(id));
   });

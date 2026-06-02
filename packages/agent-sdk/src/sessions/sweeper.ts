@@ -150,6 +150,14 @@ async function evictIdleSessions(): Promise<void> {
         });
         updateSessionStatus(sessionId, "terminated", "idle_ttl");
         archiveSession(sessionId);
+        // ZDR (PR-Z2): purge after idle-TTL archive for ZDR sessions.
+        // `row` was read above inside the same actor; flag + tenant
+        // are captured there. Dynamic import keeps zero-retention out
+        // of the sweeper's hot path for non-ZDR sessions.
+        if (row.zero_data_retention && row.tenant_id) {
+          const { purgeSession } = await import("../db/zero-retention");
+          purgeSession({ tenantId: row.tenant_id, sessionId });
+        }
       });
       dropActor(sessionId);
       dropEmitter(sessionId);

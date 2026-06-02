@@ -60,6 +60,30 @@ export function getDb(): DB {
 
   g.__caDb = db;
   g.__caDbPath = dbPath;
+
+  // ZDR boot-time orphan reaper (PR-Z2). Sessions left in
+  // `status='purging'` from a previous process that crashed
+  // mid-purge get re-driven now. Best-effort: failures log and
+  // continue, never block boot. The reaper is wrapped in a
+  // try/catch so a regression here can't prevent DB init.
+  //
+  // Skipped when SKIP_ZDR_REAPER=1 (tests that boot the DB
+  // multiple times and don't want the reaper noise). Production
+  // never sets this.
+  if (process.env.SKIP_ZDR_REAPER !== "1") {
+    try {
+      // Dynamic import to avoid an init-time circular reference
+      // through audit-log → client.ts.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { reapPurgingSessions } = require("./zero-retention") as {
+        reapPurgingSessions(): { reaped: number; failed: number };
+      };
+      reapPurgingSessions();
+    } catch (err) {
+      console.warn("[zdr.reaper] boot reaper failed (ignoring):", err);
+    }
+  }
+
   return db;
 }
 

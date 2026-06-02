@@ -426,6 +426,14 @@ export interface Session {
     cost_usd: number;
   };
   /**
+   * Tenant scope of this session. Surfaced on the Session shape (in
+   * addition to SessionRow) so lifecycle hooks like the ZDR purge
+   * engine can resolve tenant context from a Session without a
+   * second DB lookup. Null = legacy/pre-0.5 row that hasn't been
+   * backfilled yet.
+   */
+  tenant_id: string | null;
+  /**
    * ZDR (PR-Z1, 0.5.64): Inherited from environment.config.zero_data_retention
    * at session create. Immutable for the session's lifetime. When true,
    * lifecycle hooks (PR-Z2) purge the session at terminate.
