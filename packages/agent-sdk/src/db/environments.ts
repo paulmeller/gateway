@@ -13,6 +13,17 @@ function hydrate(row: EnvironmentRow): Environment {
     config = { ...config, type: "self_hosted" };
   }
 
+  // ZDR (0.5.68): always include zero_data_retention in the response,
+  // defaulting to false when absent. Pre-0.5.64 environments have
+  // config_json that doesn't include the field at all; without this
+  // default, GET responses return `config` with no key, leaving
+  // consumers unable to tell "ZDR off" from "this gateway doesn't
+  // support ZDR." Hydrate-time default covers both old rows and new
+  // POSTs that omitted the field.
+  if (config.zero_data_retention === undefined) {
+    config = { ...config, zero_data_retention: false };
+  }
+
   return {
     type: "environment" as const,
     id: row.id,
