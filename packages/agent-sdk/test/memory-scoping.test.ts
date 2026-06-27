@@ -213,4 +213,44 @@ describe("memory store agent scoping", () => {
     );
     expect(res.status).toBe(404);
   });
+
+  it("rejects attaching a memory store from a DIFFERENT tenant to a session", async () => {
+    const { globalKey, acmeKey } = await bootTenants();
+    const { handleCreateAgent } = await import("../src/handlers/anthropic-compat/agents");
+    const { handleCreateEnvironment } = await import("../src/handlers/anthropic-compat/environments");
+    const { handleCreateMemoryStore } = await import("../src/handlers/memory");
+    const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
+
+    // Agent + store in the DEFAULT tenant.
+    const defAgent = await (await handleCreateAgent(
+      req("/anthropic/v1/agents", globalKey, {
+        body: { name: "def-a", model: { id: "claude-sonnet-4-6" }, tenant_id: "tenant_default" },
+      }),
+    )).json() as { id: string };
+    const defStore = await (await handleCreateMemoryStore(
+      req("/v1/memory_stores", globalKey, { body: { name: "def-s", agent_id: defAgent.id } }),
+    )).json() as { id: string };
+
+    // Agent + env in the ACME tenant.
+    const acmeAgent = await (await handleCreateAgent(
+      req("/anthropic/v1/agents", acmeKey, { body: { name: "acme-a", model: { id: "claude-sonnet-4-6" } } }),
+    )).json() as { id: string };
+    const acmeEnv = await (await handleCreateEnvironment(
+      req("/anthropic/v1/environments", acmeKey, {
+        body: { name: "acme-e", config: { type: "self_hosted", provider: "docker" } },
+      }),
+    )).json() as { id: string };
+
+    // Acme session attaching the default tenant's store → not-found (404).
+    const res = await handleCreateSession(
+      req("/anthropic/v1/sessions", acmeKey, {
+        body: {
+          agent: acmeAgent.id,
+          environment_id: acmeEnv.id,
+          resources: [{ type: "memory_store", memory_store_id: defStore.id, access: "read_only" }],
+        },
+      }),
+    );
+    expect(res.status).toBe(404);
+  });
 });

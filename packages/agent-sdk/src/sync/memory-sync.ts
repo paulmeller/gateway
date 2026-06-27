@@ -10,6 +10,20 @@
  */
 import type { ContainerProvider, ProviderSecrets } from "../providers/types";
 
+/**
+ * Select the memory_store resources that may be written back after a turn:
+ * only those attached `read_write`. A `read_only` store (e.g. a peer channel's
+ * store borrowed for cross-channel reads) is never written. Pure — exported so
+ * the read-only guarantee can be unit-tested without a live container.
+ */
+export function selectWritableMemoryResources<
+  T extends { type: string; memory_store_id?: string | null; access?: string },
+>(resources: T[]): T[] {
+  return resources.filter(
+    (r) => r.type === "memory_store" && !!r.memory_store_id && r.access === "read_write",
+  );
+}
+
 export async function syncMemoryStores(opts: {
   sessionId: string;
   sandboxName: string;
@@ -22,9 +36,7 @@ export async function syncMemoryStores(opts: {
   const { getMemoryStore, listMemories, createOrUpsertMemory, getMemoryByPath, deleteMemory } = await import("../db/memory");
 
   const resources = listResources(sessionId);
-  const memStoreResources = resources.filter(
-    r => r.type === "memory_store" && r.memory_store_id && r.access === "read_write",
-  );
+  const memStoreResources = selectWritableMemoryResources(resources);
 
   if (memStoreResources.length === 0) return;
 
