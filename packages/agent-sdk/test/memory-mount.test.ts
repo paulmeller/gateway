@@ -404,6 +404,51 @@ describe("memory mount + versions", () => {
       expect(memRes!.instructions).toBe("Keep notes here");
     });
 
+    it("allows attaching ANOTHER agent's store when access:read_only", async () => {
+      await bootDb();
+      const { createMemoryStore, createOrUpsertMemory } = await import("../src/db/memory");
+      const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
+      const agentA = await createTestAgent();
+      const agentB = await createTestAgent();
+      const env = await createTestEnv();
+
+      // Store owned by agent B; session runs agent A.
+      const storeB = createMemoryStore({ name: "b-notes", agent_id: agentB.id as string });
+      createOrUpsertMemory(storeB.id, "readme.md", "# B");
+
+      const res = await handleCreateSession(
+        req("/anthropic/v1/sessions", {
+          body: {
+            agent: agentA.id,
+            environment_id: env.id,
+            resources: [{ type: "memory_store", memory_store_id: storeB.id, access: "read_only" }],
+          },
+        }),
+      );
+      expect(res.status).toBe(201);
+    });
+
+    it("rejects attaching another agent's store as read_write (foreign write)", async () => {
+      await bootDb();
+      const { createMemoryStore } = await import("../src/db/memory");
+      const { handleCreateSession } = await import("../src/handlers/anthropic-compat/sessions");
+      const agentA = await createTestAgent();
+      const agentB = await createTestAgent();
+      const env = await createTestEnv();
+      const storeB = createMemoryStore({ name: "b-notes", agent_id: agentB.id as string });
+
+      const res = await handleCreateSession(
+        req("/anthropic/v1/sessions", {
+          body: {
+            agent: agentA.id,
+            environment_id: env.id,
+            resources: [{ type: "memory_store", memory_store_id: storeB.id, access: "read_write" }],
+          },
+        }),
+      );
+      expect(res.status).toBe(400);
+    });
+
     it("rejects more than 8 memory_store resources", async () => {
       await bootDb();
       const { createMemoryStore } = await import("../src/db/memory");
@@ -557,5 +602,19 @@ describe("memory mount + versions", () => {
       const names = cols.map(c => c.name);
       expect(names).toContain("archived_at");
     });
+  });
+});
+
+describe("read-only memory-sync filter", () => {
+  it("selects only read_write memory_store resources for write-back", async () => {
+    const { selectWritableMemoryResources } = await import("../src/sync/memory-sync");
+    const resources = [
+      { type: "memory_store", memory_store_id: "ms_rw", access: "read_write" },
+      { type: "memory_store", memory_store_id: "ms_ro", access: "read_only" },
+      { type: "memory_store", memory_store_id: "ms_default" }, // no access → not writable
+      { type: "file", file_id: "f_1" },
+    ];
+    const writable = selectWritableMemoryResources(resources);
+    expect(writable.map(r => r.memory_store_id)).toEqual(["ms_rw"]);
   });
 });

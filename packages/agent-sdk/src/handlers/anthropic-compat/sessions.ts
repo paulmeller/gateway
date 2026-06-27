@@ -329,6 +329,25 @@ export function handleCreateSession(request: Request): Promise<Response> {
           const store = getMemoryStore(r.memory_store_id);
           if (!store) throw notFound(`memory store not found: ${r.memory_store_id}`);
           if (store.archived_at) throw badRequest(`memory store ${r.memory_store_id} is archived`);
+
+          // Tenant isolation: a store's tenant is its owning agent's tenant.
+          // Reject cross-tenant (and null-agent/global) stores as not-found so
+          // existence never leaks across tenants. Mirrors the vault check above.
+          const storeOwnerTenantId = store.agent_id
+            ? ((getDb()
+                .prepare(`SELECT tenant_id FROM agents WHERE id = ?`)
+                .get(store.agent_id) as { tenant_id: string | null } | undefined)?.tenant_id ?? null)
+            : null;
+          assertResourceTenant(auth, storeOwnerTenantId, `memory store not found: ${r.memory_store_id}`);
+
+          // A foreign store (owned by a different agent than this session's)
+          // may be attached read-only only — the borrowing agent can read but
+          // never write back, so cross-channel reads can't mutate a peer's store.
+          if (store.agent_id !== agent.id && r.access !== "read_only") {
+            throw badRequest(
+              `memory store ${r.memory_store_id} is owned by another agent and may only be attached with access:"read_only"`,
+            );
+          }
         }
       }
 
