@@ -618,3 +618,24 @@ describe("read-only memory-sync filter", () => {
     expect(writable.map(r => r.memory_store_id)).toEqual(["ms_rw"]);
   });
 });
+
+describe("claude wrapper: memory mount writability", () => {
+  it("chowns /mnt/memory to the agent user so the non-root agent can write its memory store", async () => {
+    // The memory dirs are created root-owned by mountMemoryStores (root docker exec),
+    // but the claude wrapper drops to the non-root `agent` user. Without chowning
+    // /mnt/memory the agent gets EACCES creating files in its read_write store.
+    // Read-only stores stay safe regardless — memory-sync only writes back read_write
+    // stores (see the read-only memory-sync filter test above).
+    const { installClaudeWrapper } = await import("../src/backends/claude/wrapper-script");
+    let captured = "";
+    const fakeProvider = {
+      exec: async (_name, _argv, opts) => {
+        captured = opts?.stdin ?? "";
+        return { exit_code: 0, stdout: "OK", stderr: "" };
+      },
+    };
+    await installClaudeWrapper("sandbox1", fakeProvider);
+    // mirrors the existing `chown -R agent /home/agent` line in the root block
+    expect(captured).toContain("chown -R agent /mnt/memory");
+  });
+});
