@@ -56,6 +56,10 @@ if [ "$(id -u)" = "0" ]; then
   fi
   chown -R agent /tmp/ 2>/dev/null
   chown -R agent /home/agent 2>/dev/null
+  # Memory stores are mounted root-owned by mountMemoryStores (root docker exec);
+  # hand them to the agent user so it can create files in its read_write store.
+  # Read-only stores stay safe — memory-sync only persists read_write stores back.
+  chown -R agent /mnt/memory 2>/dev/null
   # Export env vars to a file for the agent user. Dotted prefix as above.
   ENV_FILE=$(mktemp /tmp/.claude-cw.XXXXXXXXXX)
   env | grep -E '^(ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN|NODE_COMPILE_CACHE|PATH)=' > "$ENV_FILE"
