@@ -100,6 +100,23 @@ describe("resolveToolset", () => {
     expect(r.disallowedTools).not.toContain("Read");
   });
 
+  it("normalizes official snake_case names (web_fetch/web_search → WebFetch/WebSearch)", () => {
+    const r = resolveToolset([
+      {
+        type: "agent_toolset_20260401",
+        default_config: { enabled: true },
+        configs: [
+          { name: "web_fetch", enabled: false },
+          { name: "web_search", enabled: false },
+        ],
+      },
+    ]);
+    expect(r.disallowedTools).toContain("WebFetch"); // was silently ignored before the underscore fix
+    expect(r.disallowedTools).toContain("WebSearch");
+    expect(r.allowedTools).not.toContain("WebFetch");
+    expect(r.allowedTools).toContain("Bash"); // others unaffected
+  });
+
   it("normalizes mixed-case tool names", () => {
     const r = resolveToolset([
       {

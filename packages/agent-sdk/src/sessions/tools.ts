@@ -25,11 +25,14 @@ export function resolveToolset(tools: ToolConfig[]): ResolvedTools {
         builtInEnabled = new Set();
       }
       for (const cfg of tool.configs ?? []) {
-        // Normalize tool names to PascalCase — Anthropic docs show lowercase
-        // ("read", "bash") but Claude Code uses PascalCase ("Read", "Bash").
+        // Normalize tool names to PascalCase — the official MA API uses lowercase,
+        // snake_case names ("read", "web_fetch") but Claude Code uses PascalCase
+        // ("Read", "WebFetch"). Fold BOTH case and underscores so "web_fetch" and
+        // "web_search" map correctly (case-only folding misses the underscore).
+        const norm = (s: string) => s.toLowerCase().replace(/_/g, "");
         const raw = cfg.name;
         const name = BUILT_IN_TOOL_NAMES.find(
-          (n) => n.toLowerCase() === raw.toLowerCase(),
+          (n) => norm(n) === norm(raw),
         ) ?? raw;
         if (!BUILT_IN_TOOL_NAMES.includes(name as BuiltInToolName)) continue;
         if (cfg.enabled === false) {
