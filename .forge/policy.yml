@@ -1,0 +1,25 @@
+# Forge policy for paulmeller/gateway
+#
+# Merging this file authorises Forge to dispatch coding agents against this
+# repository. Until it is merged, Forge does nothing here.
+#
+# This file is the complete policy for this repo: when it is present the
+# Settings page shows these values read-only, and changing policy means
+# changing this file. Detected verify command: (none detected — set one in AGENTS.md)
+
+gates:
+  ci: true          # never merge without CI green
+  selfVerify: true  # check the change against its acceptance criteria
+  aiReview: true    # independent review of the diff
+
+autoMerge:
+  enabled: false    # every change waits for a human. Turn on deliberately.
+
+requirePlanApproval: false
+
+budgets:
+  taskTokens: null        # null = use the deployment default
+  taskTurns: null
+  noProgressTokens: null
+
+concurrencyCap: null      # null = use the deployment default
