@@ -8,10 +8,14 @@ on:
 jobs:
   update:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
 
       - name: Fetch and curate model catalog
+        id: curate
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
@@ -81,17 +85,21 @@ jobs:
               TOTAL=$(python3 -c "import json; print(len(json.load(open('/tmp/curated.json'))))")
               echo "Curated: $TOTAL models"
             else
-              echo "Curation failed — using pre-filtered list"
-              cp /tmp/pre-filtered.json packages/agent-sdk/src/lib/model-catalog.json
-              TOTAL=$(python3 -c "import json; print(len(json.load(open('/tmp/pre-filtered.json'))))")
+              echo "::error::Curation failed. Not replacing the curated catalog with the unfiltered list."
+              exit 1
             fi
           else
-            echo "No ANTHROPIC_API_KEY — using pre-filtered list"
-            cp /tmp/pre-filtered.json packages/agent-sdk/src/lib/model-catalog.json
-            TOTAL=$(python3 -c "import json; print(len(json.load(open('/tmp/pre-filtered.json'))))")
+            echo "::warning::ANTHROPIC_API_KEY is not set, so the catalog cannot be curated. Leaving model-catalog.json unchanged."
+            echo "skipped=true" >> $GITHUB_OUTPUT
+            exit 0
           fi
 
           echo "Final catalog: $TOTAL models"
+          if [ "$TOTAL" -lt 10 ] || [ "$TOTAL" -gt 80 ]; then
+            echo "::error::Curated catalog has $TOTAL models, outside the expected 10-80. Not updating."
+            git checkout -- packages/agent-sdk/src/lib/model-catalog.json
+            exit 1
+          fi
           echo "TOTAL=$TOTAL" >> $GITHUB_ENV
 
       - name: Check for changes
@@ -104,7 +112,7 @@ jobs:
           fi
 
       - name: Create PR
-        if: steps.diff.outputs.changed == 'true'
+        if: steps.diff.outputs.changed == 'true' && steps.curate.outputs.skipped != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
